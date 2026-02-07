@@ -1,11 +1,13 @@
-const frontend = Bun.spawn(["bun", "run", "dev"], {
-  cwd: "./frontend",
+const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
+  cwd: "./backend",
   stdout: "inherit",
   stderr: "inherit",
 });
 
-const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
-  cwd: "./backend",
+await Bun.sleep(5000);
+
+const frontend = Bun.spawn(["bun", "run", "dev"], {
+  cwd: "./frontend",
   stdout: "inherit",
   stderr: "inherit",
 });

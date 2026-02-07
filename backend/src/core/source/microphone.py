@@ -26,6 +26,6 @@ class Microphone(Node[bytes]):
             dtype="int16",
             blocksize=self._frame_samples,
         ) as stream:
-            while True:
+            while not self._stopped:
                 data, _ = stream.read(self._frame_samples)
                 self.topic.send(data.tobytes())
