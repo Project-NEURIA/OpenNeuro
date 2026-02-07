@@ -7,38 +7,24 @@ from ..topic import Topic, Stream
 
 
 class LLM(Node[str]):
-    def __init__(
-        self,
-        source: Stream[str],
-        *,
-        model: str = "groq/llama-3.3-70b-versatile",
-        system_prompt: str = "",
-        top_p: float = 0.97,
-        temperature: float = 1.08,
-        max_tokens: int = 350,
-    ) -> None:
-        self._source = source
-        self._model = model
-        self._top_p = top_p
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._messages: list[dict[str, str]] = []
-        if system_prompt:
-            self._messages.append({"role": "system", "content": system_prompt})
-        self.output = Topic[str]()
-        super().__init__(self.output)
+    def __init__(self, input_stream: Stream[str]) -> None:
+        self._input_stream = input_stream
+        self._messages: list[dict[str, str]] = [
+            {"role": "system", "content": "You are a helpful assistant. Keep your responses short and conversational."},
+        ]
+        super().__init__(Topic[str]())
 
     def run(self) -> None:
-        for text in self._source:
+        for text in self._input_stream:
             self._messages.append({"role": "user", "content": text})
 
             response = litellm.completion(
-                model=self._model,
+                model="groq/llama-3.3-70b-versatile",
                 messages=self._messages,
                 stream=True,
-                top_p=self._top_p,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
+                top_p=0.97,
+                temperature=1.08,
+                max_tokens=350,
                 stop=["\n"],
             )
 
@@ -47,7 +33,7 @@ class LLM(Node[str]):
                 token = chunk.choices[0].delta.content or ""
                 if token:
                     assistant_text += token
-                    self.output.send(token)
+                    self.topic.send(token)
 
             self._messages.append({"role": "assistant", "content": assistant_text})
-            self.output.send("")  # done sentinel
+            self.topic.send("")  # done sentinel
