@@ -7,29 +7,28 @@ import wave
 import numpy as np
 import requests
 
-from ..base import Base, Streamable
-from .models import AudioSegment, Transcription
+from ..node import Node
+from ..topic import Topic, Stream
 
 
-class ASR(Base[Transcription]):
+class ASR(Node[str]):
     def __init__(
         self,
-        source: Streamable[AudioSegment],
+        source: Stream[bytes],
         api_key: str,
         *,
         url: str = "https://api.groq.com/openai/v1/audio/transcriptions",
         model: str = "whisper-large-v3-turbo",
     ) -> None:
-        super().__init__()
         self._source = source
         self._api_key = api_key
         self._url = url
         self._model = model
+        self.topic = Topic[str]()
+        super().__init__(self.topic)
 
     def run(self) -> None:
-        for segment in self._source.stream():
-            pcm48 = segment.pcm48_stereo
-
+        for pcm48 in self._source:
             pcm = np.frombuffer(pcm48, dtype=np.int16).reshape(-1, 2).mean(axis=1).astype(np.int16)
             mono16k = pcm[::3]
 
@@ -53,7 +52,7 @@ class ASR(Base[Transcription]):
 
                 text = r.json().get("text", "")
                 if text:
-                    self.send(Transcription(text=text))
+                    self.topic.send(text)
             finally:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
