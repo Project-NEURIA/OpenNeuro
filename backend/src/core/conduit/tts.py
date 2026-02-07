@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import base64
-import json
 import re
 from collections.abc import Callable
 
-import requests
+from openai import OpenAI
 
 from ..node import Node
 from ..topic import Topic, Stream
@@ -98,26 +96,14 @@ class StreamFilter:
 
 
 class TTS(Node[bytes]):
-    def __init__(
-        self,
-        source: Stream[str],
-        *,
-        url: str,
-        voice_id: str,
-        model_id: str,
-        credential: str = "",
-    ) -> None:
-        self._source = source
-        self._url = url
-        self._voice_id = voice_id
-        self._model_id = model_id
-        self._credential = credential
+    def __init__(self, input_stream: Stream[str]) -> None:
+        self._input_stream = input_stream
+        self._client = OpenAI()
         self._filter = StreamFilter()
-        self.output = Topic[bytes]()
-        super().__init__(self.output)
+        super().__init__(Topic[bytes]())
 
     def run(self) -> None:
-        for chunk in self._source:
+        for chunk in self._input_stream:
             if chunk == "":
                 text = self._filter.feed("", force=True)
             else:
@@ -127,25 +113,14 @@ class TTS(Node[bytes]):
                 self._synthesize(text)
 
     def _synthesize(self, text: str) -> None:
-        headers = {
-            "Authorization": f"Basic {self._credential}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "text": text,
-            "voiceId": self._voice_id,
-            "modelId": self._model_id,
-            "audio_config": {"audio_encoding": "LINEAR16", "sample_rate_hertz": 48000},
-        }
         try:
-            r = requests.post(self._url, json=payload, headers=headers, stream=True, timeout=10)
-            for line in r.iter_lines():
-                if not line:
-                    continue
-                msg = json.loads(line)
-                raw = base64.b64decode(msg["result"]["audioContent"])
-                if len(raw) > 44:
-                    pcm = raw[44:]  # strip WAV header
-                    self.output.send(pcm)
+            with self._client.audio.speech.with_streaming_response.create(
+                model="tts-1",
+                voice="alloy",
+                input=text,
+                response_format="pcm",
+            ) as response:
+                for pcm in response.iter_bytes(chunk_size=4096):
+                    self.topic.send(pcm)
         except Exception as e:
             print(f"[TTS] Error: {e}")

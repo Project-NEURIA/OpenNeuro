@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
@@ -14,24 +15,23 @@ from ..topic import Topic, Stream
 class VAD(Node[bytes]):
     def __init__(
         self,
-        source: Stream[bytes],
+        input_stream: Stream[bytes],
         *,
         silence_seconds: float = 0.9,
         max_silence_seconds: float = 1.4,
         pre_speech_seconds: float = 1.0,
         min_speech_seconds: float = 0.5,
         turn_threshold: float = 0.89,
-        smart_turn_onnx: str = "smart-turn-v3.0.onnx",
+        smart_turn_onnx: str = str(Path(__file__).resolve().parents[3] / "assets" / "smart-turn-v3.0.onnx"),
     ) -> None:
-        self._source = source
-        self.output = Topic[bytes]()
-        super().__init__(self.output)
+        self._input_stream = input_stream
+        super().__init__(Topic[bytes]())
 
         self._silence_seconds = silence_seconds
         self._max_silence_seconds = max_silence_seconds
         self._turn_threshold = turn_threshold
-        self._min_speech_bytes = int(48000 * 4 * min_speech_seconds)
-        self._max_pre_bytes = int(48000 * 4 * pre_speech_seconds)
+        self._min_speech_bytes = int(48000 * 2 * min_speech_seconds)
+        self._max_pre_bytes = int(48000 * 2 * pre_speech_seconds)
 
         self._speaking = False
         self._silence_start: float | None = None
@@ -64,7 +64,7 @@ class VAD(Node[bytes]):
         if not seg:
             return False
 
-        pcm = np.frombuffer(seg, dtype=np.int16).reshape(-1, 2).mean(axis=1)
+        pcm = np.frombuffer(seg, dtype=np.int16)
         pcm16k = pcm[::3].astype(np.float32) / 32768.0
 
         max_samples = 8 * 16000
@@ -88,8 +88,8 @@ class VAD(Node[bytes]):
         return outputs[0][0].item() > self._turn_threshold
 
     def run(self) -> None:
-        for data in self._source:
-            pcm = np.frombuffer(data, dtype=np.int16).reshape(-1, 2).mean(axis=1)
+        for data in self._input_stream:
+            pcm = np.frombuffer(data, dtype=np.int16)
             mono16k = pcm[::3].astype(np.float32) / 32768.0
 
             self._vad_buf.extend(mono16k.tolist())
@@ -135,4 +135,4 @@ class VAD(Node[bytes]):
         self._it.reset_states()
 
         if len(seg) >= self._min_speech_bytes:
-            self.output.send(seg)
+            self.topic.send(seg)
