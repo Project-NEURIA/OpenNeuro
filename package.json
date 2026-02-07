@@ -1,0 +1,7 @@
+{
+  "name": "openneuro",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "bun run scripts/dev.ts"
+  }
+}
