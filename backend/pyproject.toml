@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.115.0",
     "litellm>=1.81.8",
     "mypy>=1.19.1",
     "numpy>=2.4.2",
@@ -15,5 +16,6 @@ dependencies = [
     "torch>=2.10.0",
     "torchaudio>=2.10.0",
     "transformers>=5.1.0",
+    "uvicorn[standard]>=0.30.0",
     "websockets>=16.0",
 ]

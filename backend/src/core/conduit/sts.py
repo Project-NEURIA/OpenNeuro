@@ -11,11 +11,20 @@ from websockets.sync.client import connect
 from ..node import Node
 from ..topic import Topic, Stream
 
-
-class STS(Node[bytes]):
+class STS(Node[bytes, str]):
     def __init__(self, input_stream: Stream[bytes]) -> None:
         self._input_stream = input_stream
+        self._ws: object | None = None
         super().__init__(Topic[bytes]())
+
+    def stop(self) -> None:
+        # Close WebSocket to unblock the recv loop
+        if self._ws is not None:
+            try:
+                self._ws.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+        super().stop()
 
     def run(self) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
@@ -25,6 +34,7 @@ class STS(Node[bytes]):
         }
 
         with connect(url, additional_headers=headers) as ws:
+            self._ws = ws
             ws.send(json.dumps({
                 "type": "session.update",
                 "session": {
@@ -39,6 +49,8 @@ class STS(Node[bytes]):
             threading.Thread(target=self._send_loop, args=(ws,), daemon=True).start()
 
             for msg in ws:
+                if self._stopped:
+                    break
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])

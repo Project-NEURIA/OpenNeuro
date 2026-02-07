@@ -1,47 +1,29 @@
 from __future__ import annotations
 
-import threading
-
 from dotenv import load_dotenv
 
-from .core.source import Microphone
-from .core.sink import Speaker
-from .core.conduit import VAD, ASR, LLM, TTS, STS
+DEFAULT_CONFIG = {
+    "nodes": ["Microphone", "STS", "Speaker"],
+    "edges": [
+        {"source": "Microphone", "target": "STS"},
+        {"source": "STS", "target": "Speaker"},
+    ],
+}
 
 
 def main() -> None:
     load_dotenv(override=True)
 
-    mic = Microphone()
-    vad = VAD(mic.topic.stream())
-    asr = ASR(vad.topic.stream())
-    llm = LLM(asr.topic.stream())
-    tts = TTS(llm.topic.stream())
-    speaker = Speaker(tts.topic.stream())
+    from .server import app, manager
 
-    mic.start()
-    vad.start()
-    asr.start()
-    llm.start()
-    tts.start()
-    speaker.start()
+    # Apply default pipeline (Microphone → STS → Speaker)
+    result = manager.apply(DEFAULT_CONFIG)
+    print(f"[backend] Default pipeline: {result}")
 
-    threading.Event().wait()
-
-
-def main2() -> None:
-    load_dotenv(override=True)
-
-    mic = Microphone()
-    sts = STS(mic.topic.stream())
-    speaker = Speaker(sts.topic.stream())
-
-    mic.start()
-    sts.start()
-    speaker.start()
-
-    threading.Event().wait()
+    import uvicorn
+    print("[backend] API server starting on http://localhost:8000")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 
 
 if __name__ == "__main__":
-    main2()
+    main()
