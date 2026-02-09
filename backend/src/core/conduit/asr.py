@@ -16,6 +16,9 @@ class ASR(Node[str]):
         self._input_topic = input_topic
         super().__init__(Topic[str]())
 
+    def set_input_topics(self, *topics: Topic) -> None:
+        self._input_topic = topics[0]
+
     def run(self) -> None:
         for pcm48 in self._input_topic.stream(self.stop_event):
             if self._stopped:

@@ -1,2 +1,2 @@
-from .topic import Topic, Stream
+from .topic import Topic
 from .node import Node
