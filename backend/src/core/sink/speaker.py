@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Never
+
 import numpy as np
 import sounddevice as sd
 
@@ -7,7 +9,7 @@ from ..node import Node
 from ..topic import Topic
 
 
-class Speaker(Node):
+class Speaker(Node[Never]):
     def __init__(
         self,
         input_topic: Topic[bytes],
@@ -19,6 +21,9 @@ class Speaker(Node):
         self._channels = channels
         self._input_topic = input_topic
         super().__init__()
+
+    def set_input_topics(self, *topics: Topic) -> None:
+        self._input_topic = topics[0]
 
     def run(self) -> None:
         with sd.OutputStream(

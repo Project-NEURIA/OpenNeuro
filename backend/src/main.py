@@ -1,24 +1,37 @@
 from __future__ import annotations
 
-from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
-DEFAULT_CONFIG = {
-    "nodes": ["Mic", "STS", "Speaker"],
-    "edges": [
-        {"source": "Mic", "target": "STS"},
-        {"source": "STS", "target": "Speaker"},
-    ],
-}
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .api.graph.controller import router as graph_router
+from .api.metrics.controller import router as metrics_router
+from .core.graph import Graph
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.graph = Graph(nodes={}, edges={})
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(graph_router)
+app.include_router(metrics_router)
 
 
 def main() -> None:
     load_dotenv(override=True)
-
-    from .server import app, manager
-
-    # Apply default pipeline (Mic → STS → Speaker)
-    result = manager.apply(DEFAULT_CONFIG)
-    print(f"[backend] Default pipeline: {result}")
 
     import uvicorn
     print("[backend] API server starting on http://localhost:8000")

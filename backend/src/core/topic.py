@@ -5,6 +5,17 @@ import threading
 import time
 from typing import Generator
 
+from pydantic import BaseModel
+
+
+class TopicSnapshot(BaseModel):
+    name: str
+    msg_count: int
+    byte_count: int
+    last_send_time: float
+    buffer_depth: int
+    subscribers: int
+
 
 class Topic[T]:
 
@@ -27,15 +38,15 @@ class Topic[T]:
             self._last_send_time = time.time()
             self._condition.notify_all()
 
-    def snapshot(self) -> dict:
-        return {
-            "name": self.name,
-            "msg_count": self._msg_count,
-            "byte_count": self._byte_count,
-            "last_send_time": self._last_send_time,
-            "buffer_depth": len(self._items),
-            "subscribers": len(self._cursors),
-        }
+    def snapshot(self) -> TopicSnapshot:
+        return TopicSnapshot(
+            name=self.name,
+            msg_count=self._msg_count,
+            byte_count=self._byte_count,
+            last_send_time=self._last_send_time,
+            buffer_depth=len(self._items),
+            subscribers=len(self._cursors),
+        )
 
     def stream(self, stop_event: threading.Event) -> Generator[T, None, None]:
         """On GeneratorExit, stream is unregistered."""

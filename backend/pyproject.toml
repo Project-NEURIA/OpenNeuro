@@ -13,6 +13,7 @@ dependencies = [
     "openai>=2.17.0",
     "python-dotenv>=1.2.1",
     "sounddevice>=0.5.5",
+    "sse-starlette>=3.2.0",
     "torch>=2.10.0",
     "torchaudio>=2.10.0",
     "transformers>=5.1.0",

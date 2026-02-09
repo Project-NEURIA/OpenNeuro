@@ -17,14 +17,17 @@ class STS(Node[bytes]):
         self._ws: object | None = None
         super().__init__(Topic[bytes]())
 
-    def pause(self) -> None:
+    def set_input_topics(self, *topics: Topic) -> None:
+        self._input_topic = topics[0]
+
+    def stop(self) -> None:
         # Close WebSocket to unblock the recv loop
         if self._ws is not None:
             try:
                 self._ws.close()  # type: ignore[attr-defined]
             except Exception:
                 pass
-        super().pause()
+        super().stop()
 
     def run(self) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"

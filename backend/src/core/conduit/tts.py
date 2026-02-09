@@ -102,6 +102,9 @@ class TTS(Node[bytes]):
         self._filter = StreamFilter()
         super().__init__(Topic[bytes]())
 
+    def set_input_topics(self, *topics: Topic) -> None:
+        self._input_topic = topics[0]
+
     def run(self) -> None:
         for chunk in self._input_topic.stream(self.stop_event):
             if self._stopped:

@@ -27,6 +27,9 @@ class VAD(Node[bytes]):
         self._input_topic = input_topic
         super().__init__(Topic[bytes]())
 
+    def set_input_topics(self, *topics: Topic) -> None:
+        self._input_topic = topics[0]
+
         self._silence_seconds = silence_seconds
         self._max_silence_seconds = max_silence_seconds
         self._turn_threshold = turn_threshold
