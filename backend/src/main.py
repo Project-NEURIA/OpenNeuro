@@ -3,9 +3,9 @@ from __future__ import annotations
 from dotenv import load_dotenv
 
 DEFAULT_CONFIG = {
-    "nodes": ["Microphone", "STS", "Speaker"],
+    "nodes": ["Mic", "STS", "Speaker"],
     "edges": [
-        {"source": "Microphone", "target": "STS"},
+        {"source": "Mic", "target": "STS"},
         {"source": "STS", "target": "Speaker"},
     ],
 }
@@ -16,7 +16,7 @@ def main() -> None:
 
     from .server import app, manager
 
-    # Apply default pipeline (Microphone → STS → Speaker)
+    # Apply default pipeline (Mic → STS → Speaker)
     result = manager.apply(DEFAULT_CONFIG)
     print(f"[backend] Default pipeline: {result}")
 

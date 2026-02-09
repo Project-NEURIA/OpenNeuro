@@ -9,22 +9,22 @@ import numpy as np
 from websockets.sync.client import connect
 
 from ..node import Node
-from ..topic import Topic, Stream
+from ..topic import Topic
 
-class STS(Node[bytes, str]):
-    def __init__(self, input_stream: Stream[bytes]) -> None:
-        self._input_stream = input_stream
+class STS(Node[bytes]):
+    def __init__(self, input_topic: Topic[bytes]) -> None:
+        self._input_topic = input_topic
         self._ws: object | None = None
         super().__init__(Topic[bytes]())
 
-    def stop(self) -> None:
+    def pause(self) -> None:
         # Close WebSocket to unblock the recv loop
         if self._ws is not None:
             try:
                 self._ws.close()  # type: ignore[attr-defined]
             except Exception:
                 pass
-        super().stop()
+        super().pause()
 
     def run(self) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
@@ -57,7 +57,9 @@ class STS(Node[bytes, str]):
                     self.topic.send(pcm)
 
     def _send_loop(self, ws: object) -> None:
-        for data in self._input_stream:
+        for data in self._input_topic.stream(self.stop_event):
+            if self._stopped:
+                break
             pcm48 = np.frombuffer(data, dtype=np.int16)
             pcm24 = pcm48[::2]  # 48kHz -> 24kHz
             b64 = base64.b64encode(pcm24.tobytes()).decode()

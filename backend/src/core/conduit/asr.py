@@ -8,16 +8,18 @@ import numpy as np
 import requests
 
 from ..node import Node
-from ..topic import Topic, Stream
+from ..topic import Topic
 
 
 class ASR(Node[str]):
-    def __init__(self, input_stream: Stream[bytes]) -> None:
-        self._input_stream = input_stream
+    def __init__(self, input_topic: Topic[bytes]) -> None:
+        self._input_topic = input_topic
         super().__init__(Topic[str]())
 
     def run(self) -> None:
-        for pcm48 in self._input_stream:
+        for pcm48 in self._input_topic.stream(self.stop_event):
+            if self._stopped:
+                break
             pcm = np.frombuffer(pcm48, dtype=np.int16)
             mono16k = pcm[::3]
 

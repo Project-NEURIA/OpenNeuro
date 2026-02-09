@@ -9,13 +9,13 @@ import torch
 from transformers import WhisperFeatureExtractor
 
 from ..node import Node
-from ..topic import Topic, Stream
+from ..topic import Topic
 
 
 class VAD(Node[bytes]):
     def __init__(
         self,
-        input_stream: Stream[bytes],
+        input_topic: Topic[bytes],
         *,
         silence_seconds: float = 0.9,
         max_silence_seconds: float = 1.4,
@@ -24,7 +24,7 @@ class VAD(Node[bytes]):
         turn_threshold: float = 0.89,
         smart_turn_onnx: str = str(Path(__file__).resolve().parents[3] / "assets" / "smart-turn-v3.0.onnx"),
     ) -> None:
-        self._input_stream = input_stream
+        self._input_topic = input_topic
         super().__init__(Topic[bytes]())
 
         self._silence_seconds = silence_seconds
@@ -88,7 +88,9 @@ class VAD(Node[bytes]):
         return outputs[0][0].item() > self._turn_threshold
 
     def run(self) -> None:
-        for data in self._input_stream:
+        for data in self._input_topic.stream(self.stop_event):
+            if self._stopped:
+                break
             pcm = np.frombuffer(data, dtype=np.int16)
             mono16k = pcm[::3].astype(np.float32) / 32768.0
 

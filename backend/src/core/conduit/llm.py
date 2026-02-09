@@ -3,19 +3,21 @@ from __future__ import annotations
 import litellm
 
 from ..node import Node
-from ..topic import Topic, Stream
+from ..topic import Topic
 
 
 class LLM(Node[str]):
-    def __init__(self, input_stream: Stream[str]) -> None:
-        self._input_stream = input_stream
+    def __init__(self, input_topic: Topic[str]) -> None:
+        self._input_topic = input_topic
         self._messages: list[dict[str, str]] = [
             {"role": "system", "content": "You are a helpful assistant. Keep your responses short and conversational."},
         ]
         super().__init__(Topic[str]())
 
     def run(self) -> None:
-        for text in self._input_stream:
+        for text in self._input_topic.stream(self.stop_event):
+            if self._stopped:
+                break
             self._messages.append({"role": "user", "content": text})
 
             response = litellm.completion(

@@ -6,7 +6,7 @@ from ..node import Node
 from ..topic import Topic
 
 
-class Microphone(Node[bytes]):
+class Mic(Node[bytes]):
     def __init__(
         self,
         *,

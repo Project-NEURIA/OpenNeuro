@@ -24,7 +24,7 @@ manager = PipelineManager()
 
 # Static type map — generics are erased at runtime, so we label manually.
 _TYPE_LABELS: dict[str, tuple[str | None, str | None]] = {
-    "Microphone": (None, "bytes"),
+    "Mic": (None, "bytes"),
     "VAD":        ("bytes", "bytes"),
     "ASR":        ("bytes", "str"),
     "LLM":        ("str", "str"),
@@ -47,7 +47,7 @@ def _build_topology() -> dict:
     edges = []
 
     for node in Node._registry:
-        has_input = hasattr(node, "_input_stream")
+        has_input = node.input is not _NONE
         has_output = node.topic is not _NONE
 
         if not has_input:
@@ -65,20 +65,19 @@ def _build_topology() -> dict:
             "category": category,
             "input_type": type_info[0],
             "output_type": type_info[1],
-            "status": node._status,
+            "status": node._status.value,
         })
 
-        # Derive edge: if this node has an _input_stream, find the topic it reads from
+        # Derive edge: if this node has an input topic, find the owning node
         if has_input:
-            stream = node._input_stream  # type: ignore[attr-defined]
-            source_topic = stream._channel
-            source_node = topic_to_owner.get(id(source_topic))
+            input_topic = node.input
+            source_node = topic_to_owner.get(id(input_topic))
             if source_node is not None:
                 edges.append({
                     "id": f"{source_node.name}->{node.name}",
                     "source": source_node.name,
                     "target": node.name,
-                    "topic_name": source_topic.name,
+                    "topic_name": input_topic.name,
                 })
 
     return {"nodes": nodes, "edges": edges}

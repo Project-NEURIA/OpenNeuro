@@ -6,7 +6,7 @@ from collections.abc import Callable
 from openai import OpenAI
 
 from ..node import Node
-from ..topic import Topic, Stream
+from ..topic import Topic
 
 CutFn = Callable[[str], int]
 
@@ -96,14 +96,16 @@ class StreamFilter:
 
 
 class TTS(Node[bytes]):
-    def __init__(self, input_stream: Stream[str]) -> None:
-        self._input_stream = input_stream
+    def __init__(self, input_topic: Topic[str]) -> None:
+        self._input_topic = input_topic
         self._client = OpenAI()
         self._filter = StreamFilter()
         super().__init__(Topic[bytes]())
 
     def run(self) -> None:
-        for chunk in self._input_stream:
+        for chunk in self._input_topic.stream(self.stop_event):
+            if self._stopped:
+                break
             if chunk == "":
                 text = self._filter.feed("", force=True)
             else:
