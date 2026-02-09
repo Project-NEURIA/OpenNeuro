@@ -32,7 +32,7 @@ const TYPE_LABELS: Record<string, { category: PipelineNode["category"]; input: s
   Speaker:    { category: "sink", input: "bytes", output: null },
 };
 
-// Default pipeline: Microphone → STS → Speaker
+// Default pipeline: Mic → STS → Speaker
 const DEFAULT_PIPELINE_NODES: PipelineNode[] = [
   { id: "Microphone", name: "Microphone", category: "source", input_type: null, output_type: "bytes", status: "idle" },
   { id: "STS",        name: "STS",        category: "conduit", input_type: "bytes", output_type: "bytes", status: "idle" },
@@ -40,7 +40,7 @@ const DEFAULT_PIPELINE_NODES: PipelineNode[] = [
 ];
 
 const DEFAULT_PIPELINE_EDGES: PipelineEdge[] = [
-  { id: "Microphone->STS", source: "Microphone", target: "STS", topic_name: "Microphone_out" },
+  { id: "Mic->STS", source: "Microphone", target: "STS", topic_name: "Microphone_out" },
   { id: "STS->Speaker",    source: "STS",        target: "Speaker", topic_name: "STS_out" },
 ];
 

@@ -5,12 +5,12 @@ from typing import Any
 
 from .core.node import Node, _NONE
 from .core.topic import Topic
-from .core.source import Microphone
+from .core.source import Mic
 from .core.sink import Speaker
 from .core.conduit import VAD, ASR, LLM, TTS, STS
 
 NODE_CLASSES: dict[str, type[Node]] = {
-    "Microphone": Microphone,
+    "Mic": Mic,
     "VAD": VAD,
     "ASR": ASR,
     "LLM": LLM,
@@ -20,7 +20,7 @@ NODE_CLASSES: dict[str, type[Node]] = {
 }
 
 # Which nodes are sources (no input stream needed)
-_SOURCES = {"Microphone"}
+_SOURCES = {"Mic"}
 # Which nodes are sinks (no output topic)
 _SINKS = {"Speaker"}
 
@@ -95,22 +95,20 @@ class PipelineManager:
             cls = NODE_CLASSES[name]
 
             if name in _SOURCES:
-                # Source nodes: no input stream
+                # Source nodes: no input topic
                 node = cls()
             elif name in _SINKS:
-                # Sink nodes: need input stream from upstream
+                # Sink nodes: need input topic from upstream
                 upstream = in_edges.get(name)
                 if upstream is None or upstream not in instances:
                     return {"status": "error", "detail": f"Sink {name} has no connected source"}
-                stream = instances[upstream].topic.stream()
-                node = cls(stream)
+                node = cls(instances[upstream].topic)
             else:
-                # Conduit nodes: need input stream from upstream
+                # Conduit nodes: need input topic from upstream
                 upstream = in_edges.get(name)
                 if upstream is None or upstream not in instances:
                     return {"status": "error", "detail": f"Conduit {name} has no connected source"}
-                stream = instances[upstream].topic.stream()
-                node = cls(stream)
+                node = cls(instances[upstream].topic)
 
             instances[name] = node
 

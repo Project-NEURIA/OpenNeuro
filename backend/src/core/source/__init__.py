@@ -1,1 +1,1 @@
-from .microphone import Microphone
+from .mic import Mic
