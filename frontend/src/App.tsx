@@ -101,7 +101,7 @@ function AppInner() {
             target: e.target_node,
             targetHandle: `in-${e.target_slot}`,
             type: "pipeline",
-            data: { topicName: "", msgPerSec: 0 },
+            data: { channelName: "", msgPerSec: 0 },
           }))
         );
       } catch (err) {
@@ -179,7 +179,7 @@ function AppInner() {
     (connection) => {
       setEdges((eds) =>
         addEdge(
-          { ...connection, type: "pipeline", data: { topicName: "", msgPerSec: 0 } },
+          { ...connection, type: "pipeline", data: { channelName: "", msgPerSec: 0 } },
           eds
         )
       );

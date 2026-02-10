@@ -9,10 +9,10 @@ import torch
 from transformers import WhisperFeatureExtractor
 
 from ..component import Component
-from ..topic import Topic
+from ..channel import Channel
 
 
-class VAD(Component[Topic[bytes]]):
+class VAD(Component[Channel[bytes]]):
     def __init__(
         self,
         *,
@@ -24,7 +24,7 @@ class VAD(Component[Topic[bytes]]):
         smart_turn_onnx: str = str(Path(__file__).resolve().parents[3] / "assets" / "smart-turn-v3.0.onnx"),
     ) -> None:
         super().__init__()
-        self._output = Topic[bytes]()
+        self._output = Channel[bytes]()
 
         self._silence_seconds = silence_seconds
         self._max_silence_seconds = max_silence_seconds
@@ -41,11 +41,11 @@ class VAD(Component[Topic[bytes]]):
         self._load_silero()
         self._load_smart_turn(smart_turn_onnx)
 
-    def get_output_topics(self) -> tuple[Topic[bytes]]:
+    def get_output_channels(self) -> tuple[Channel[bytes]]:
         return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes]) -> None:
-        self._input_topic = t1
+    def set_input_channels(self, t1: Channel[bytes]) -> None:
+        self._input_channel = t1
 
     def _load_silero(self) -> None:
         self._model, utils = torch.hub.load(
@@ -93,7 +93,7 @@ class VAD(Component[Topic[bytes]]):
         return outputs[0][0].item() > self._turn_threshold
 
     def run(self) -> None:
-        for data in self._input_topic.stream(self.stop_event):
+        for data in self._input_channel.stream(self.stop_event):
             if data is None:
                 break
             pcm = np.frombuffer(data, dtype=np.int16)

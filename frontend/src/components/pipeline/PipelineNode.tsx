@@ -88,15 +88,15 @@ function PipelineNodeComponent({ data }: NodeProps) {
       </div>
 
       {/* Live metrics */}
-      {d.nodeMetrics && d.nodeMetrics.topics.length > 0 && (
+      {d.nodeMetrics && d.nodeMetrics.channels.length > 0 && (
         <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] border-t border-zinc-700/50 pt-1.5">
           <div className="text-zinc-500">total</div>
           <div className="text-zinc-500">buf</div>
           <div className="text-zinc-300 font-mono">
-            {d.nodeMetrics.topics.reduce((s, t) => s + t.msg_count, 0).toLocaleString()}
+            {d.nodeMetrics.channels.reduce((s, t) => s + t.msg_count, 0).toLocaleString()}
           </div>
           <div className="text-zinc-300 font-mono">
-            {d.nodeMetrics.topics.reduce((s, t) => s + t.buffer_depth, 0)}
+            {d.nodeMetrics.channels.reduce((s, t) => s + t.buffer_depth, 0)}
           </div>
         </div>
       )}

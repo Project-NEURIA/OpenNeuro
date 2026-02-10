@@ -72,7 +72,7 @@ def create_edge(
     if target is None:
         raise KeyError(f"Node not found: {target_node}")
 
-    outputs = source.get_output_topics()
+    outputs = source.get_output_channels()
     if source_slot >= len(outputs):
         raise ValueError(f"source_slot {source_slot} out of range (node {source_node} has {len(outputs)} outputs)")
 
@@ -91,7 +91,7 @@ def create_edge(
         raise ValueError(f"Edge already exists: {edge}")
 
     graph.edges.append(edge)
-    _set_input_topics(target_node, graph)
+    _set_input_channels(target_node, graph)
 
 
 def delete_edge(
@@ -117,8 +117,8 @@ def delete_edge(
         raise KeyError(f"Edge not found: {edge}")
 
 
-def _set_input_topics(target_node_id: str, graph: Graph[Component]) -> None:
-    """Collect all incoming edges for a target node and call set_input_topics."""
+def _set_input_channels(target_node_id: str, graph: Graph[Component]) -> None:
+    """Collect all incoming edges for a target node and call set_input_channels."""
     target = graph.nodes[target_node_id]
     incoming = sorted(
         (e for e in graph.edges if e.target_node == target_node_id),
@@ -128,12 +128,12 @@ def _set_input_topics(target_node_id: str, graph: Graph[Component]) -> None:
     if not incoming:
         return
 
-    topics = []
+    channels = []
     for edge in incoming:
         source = graph.nodes[edge.source_node]
-        topics.append(source.get_output_topics()[edge.source_slot])
+        channels.append(source.get_output_channels()[edge.source_slot])
 
-    target.set_input_topics(*topics)
+    target.set_input_channels(*channels)
 
 
 def start_all(graph: Graph[Component]) -> None:

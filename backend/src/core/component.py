@@ -9,14 +9,14 @@ from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from .topic import Topic, TopicSnapshot
+from .channel import Channel, ChannelSnapshot
 
 
 class ComponentSnapshot(BaseModel):
     name: str
     status: str
     started_at: float | None
-    topics: list[TopicSnapshot]
+    channels: list[ChannelSnapshot]
 
 
 class Status(Enum):
@@ -43,11 +43,11 @@ class Component[*ITs](ABC):
         return self._stop_event
 
     @abstractmethod
-    def get_output_topics(self) -> tuple[Topic, ...]:
+    def get_output_channels(self) -> tuple[Channel, ...]:
         ...
 
     @abstractmethod
-    def set_input_topics(self, *input_topics: *ITs) -> None:
+    def set_input_channels(self, *input_channels: *ITs) -> None:
         ...
 
     @abstractmethod
@@ -74,7 +74,7 @@ class Component[*ITs](ABC):
         """
         Idempotent.
         When a component instance is stopped, it will stop the running thread cooperatively by setting self._stop_event
-        and expect the run() method to return. Input streams are unregistered from input topics as streams
+        and expect the run() method to return. Input streams are unregistered from input channels as streams
         will periodically check and raise StopIteration when self._stop_event is set.
         """
         if self.status == Status.STOPPED:
@@ -86,7 +86,7 @@ class Component[*ITs](ABC):
             name=self.name,
             status=self.status.value,
             started_at=self._started_at,
-            topics=[t.snapshot() for t in self.get_output_topics()],
+            channels=[t.snapshot() for t in self.get_output_channels()],
         )
 
     @classmethod
@@ -98,9 +98,9 @@ class Component[*ITs](ABC):
 
     @classmethod
     def get_input_types(cls) -> tuple[type, ...]:
-        """Returns input types from the generic args Component[Topic[T1], Topic[T2], ...].
+        """Returns input types from the generic args Component[Channel[T1], Channel[T2], ...].
 
-        Unwraps Topic[T] -> T.
+        Unwraps Channel[T] -> T.
         """
         for base in getattr(cls, "__orig_bases__", ()):
             origin = getattr(base, "__origin__", None)
@@ -115,11 +115,11 @@ class Component[*ITs](ABC):
 
     @classmethod
     def get_output_types(cls) -> tuple[type, ...]:
-        """Returns output types from the return annotation of get_output_topics().
+        """Returns output types from the return annotation of get_output_channels().
 
-        e.g. tuple[Topic[bytes], Topic[str]] -> (bytes, str)
+        e.g. tuple[Channel[bytes], Channel[str]] -> (bytes, str)
         """
-        hints = get_type_hints(cls.get_output_topics)
+        hints = get_type_hints(cls.get_output_channels)
         ret = hints.get("return")
         if ret is None:
             return ()

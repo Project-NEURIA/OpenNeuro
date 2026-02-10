@@ -7,7 +7,7 @@ export interface ComponentInfo {
   outputs: string[];
 }
 
-export interface TopicMetrics {
+export interface ChannelMetrics {
   name: string;
   msg_count: number;
   byte_count: number;
@@ -20,7 +20,7 @@ export interface NodeMetrics {
   name: string;
   status: string;
   started_at: number | null;
-  topics: TopicMetrics[];
+  channels: ChannelMetrics[];
 }
 
 export interface MetricsSnapshot {

@@ -11,7 +11,7 @@ interface MetricsOverlayProps {
 export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
   const totalMsgs = metrics
     ? Object.values(metrics.nodes).reduce(
-        (s, n) => s + n.topics.reduce((s2, t) => s2 + t.msg_count, 0),
+        (s, n) => s + n.channels.reduce((s2, t) => s2 + t.msg_count, 0),
         0,
       )
     : 0;

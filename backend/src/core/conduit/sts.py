@@ -10,19 +10,19 @@ from websockets.sync.client import connect
 from websockets.sync.connection import Connection
 
 from ..component import Component
-from ..topic import Topic
+from ..channel import Channel
 
-class STS(Component[Topic[bytes]]):
+class STS(Component[Channel[bytes]]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Topic[bytes]()
+        self._output = Channel[bytes]()
         self._ws: Connection | None = None
 
-    def get_output_topics(self) -> tuple[Topic[bytes]]:
+    def get_output_channels(self) -> tuple[Channel[bytes]]:
         return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes]) -> None:
-        self._input_topic = t1
+    def set_input_channels(self, t1: Channel[bytes]) -> None:
+        self._input_channel = t1
 
     def stop(self) -> None:
         # Close WebSocket to unblock the recv loop
@@ -66,7 +66,7 @@ class STS(Component[Topic[bytes]]):
     def _send_loop(self, ws: Connection) -> None:
         from websockets.exceptions import ConnectionClosed
 
-        for data in self._input_topic.stream(self.stop_event):
+        for data in self._input_channel.stream(self.stop_event):
             if data is None:
                 break
             pcm48 = np.frombuffer(data, dtype=np.int16)
