@@ -128,9 +128,7 @@ class Component[*ITs](ABC):
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[Component]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
-        from .source import Mic
-        from .sink import Speaker
-        from .conduit import VAD, ASR, LLM, TTS, STS
+        from . import source, sink, conduit  # noqa: F401
 
         result: dict[str, type[Component]] = {}
 
