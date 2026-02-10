@@ -45,14 +45,17 @@ function PipelineNodeComponent({ data }: NodeProps) {
         colors.bg,
       )}
     >
-      {/* Input handle */}
-      {d.input_type && (
+      {/* Input handles */}
+      {d.inputs.map((type, i) => (
         <Handle
+          key={`in-${i}`}
+          id={`in-${i}`}
           type="target"
           position={Position.Left}
           className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"
+          style={{ top: `${((i + 1) / (d.inputs.length + 1)) * 100}%` }}
         />
-      )}
+      ))}
 
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
@@ -73,37 +76,42 @@ function PipelineNodeComponent({ data }: NodeProps) {
 
       {/* Type labels */}
       <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-2">
-        {d.input_type && <span className="font-mono">{d.input_type}</span>}
-        {d.input_type && d.output_type && <span>-&gt;</span>}
-        {d.output_type && (
-          <span className={cn("font-mono", !d.input_type && "ml-auto")}>
-            {d.output_type}
+        {d.inputs.length > 0 && (
+          <span className="font-mono">{d.inputs.join(", ")}</span>
+        )}
+        {d.inputs.length > 0 && d.outputs.length > 0 && <span>-&gt;</span>}
+        {d.outputs.length > 0 && (
+          <span className={cn("font-mono", d.inputs.length === 0 && "ml-auto")}>
+            {d.outputs.join(", ")}
           </span>
         )}
       </div>
 
       {/* Live metrics */}
-      {d.topicMetrics && (
+      {d.nodeMetrics && d.nodeMetrics.topics.length > 0 && (
         <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] border-t border-zinc-700/50 pt-1.5">
           <div className="text-zinc-500">total</div>
           <div className="text-zinc-500">buf</div>
           <div className="text-zinc-300 font-mono">
-            {d.topicMetrics.msg_count.toLocaleString()}
+            {d.nodeMetrics.topics.reduce((s, t) => s + t.msg_count, 0).toLocaleString()}
           </div>
           <div className="text-zinc-300 font-mono">
-            {d.topicMetrics.buffer_depth}
+            {d.nodeMetrics.topics.reduce((s, t) => s + t.buffer_depth, 0)}
           </div>
         </div>
       )}
 
-      {/* Output handle */}
-      {d.output_type && (
+      {/* Output handles */}
+      {d.outputs.map((type, i) => (
         <Handle
+          key={`out-${i}`}
+          id={`out-${i}`}
           type="source"
           position={Position.Right}
           className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"
+          style={{ top: `${((i + 1) / (d.outputs.length + 1)) * 100}%` }}
         />
-      )}
+      ))}
     </div>
   );
 }

@@ -20,10 +20,10 @@ export interface NodeMetrics {
   name: string;
   status: string;
   started_at: number | null;
+  topics: TopicMetrics[];
 }
 
 export interface MetricsSnapshot {
-  topics: Record<string, TopicMetrics>;
   nodes: Record<string, NodeMetrics>;
   timestamp: number;
 }

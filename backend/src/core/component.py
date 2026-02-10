@@ -9,18 +9,21 @@ from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from .topic import Topic
+from .topic import Topic, TopicSnapshot
 
 
-class ComponentMetadata(BaseModel):
+class ComponentSnapshot(BaseModel):
     name: str
     status: str
     started_at: float | None
+    topics: list[TopicSnapshot]
+
 
 class Status(Enum):
     STARTUP = "startup"
     RUNNING = "running"
     STOPPED = "stopped"
+
 
 class Component[*ITs](ABC):
     def __init__(self) -> None:
@@ -78,11 +81,12 @@ class Component[*ITs](ABC):
             return
         self._stop_event.set()
 
-    def metadata(self) -> ComponentMetadata:
-        return ComponentMetadata(
+    def snapshot(self) -> ComponentSnapshot:
+        return ComponentSnapshot(
             name=self.name,
             status=self.status.value,
             started_at=self._started_at,
+            topics=[t.snapshot() for t in self.get_output_topics()],
         )
 
     @classmethod

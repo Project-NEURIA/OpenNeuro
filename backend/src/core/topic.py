@@ -33,6 +33,8 @@ class Topic[T]:
 
     def send(self, item: T) -> None:
         with self._condition:
+            if not self._cursors: # stop data from accumulating when no one is listening
+                return
             self._items.append(item)
             self._msg_count += 1
             self._byte_count += sys.getsizeof(item)

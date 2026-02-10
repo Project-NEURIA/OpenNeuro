@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from ...core.graph import Graph
 from ...core.component import Component
+from ..dep import get_graph
 from .dto import NodeCreateRequest, NodeResponse, EdgeCreateRequest, EdgeResponse
 from . import service
 
 router = APIRouter(prefix="/graph")
-
-
-def get_graph(request: Request) -> Graph[Component]:
-    return request.app.state.graph
 
 
 @router.get("/nodes")
@@ -57,25 +54,35 @@ def stop_all(graph: Graph[Component] = Depends(get_graph)) -> None:
 @router.get("/edges")
 def list_edges(graph: Graph[Component] = Depends(get_graph)) -> list[EdgeResponse]:
     return [
-        EdgeResponse(source=source, target=target)
-        for source, target in service.list_edges(graph)
+        EdgeResponse(
+            source_node=e.source_node,
+            source_slot=e.source_slot,
+            target_node=e.target_node,
+            target_slot=e.target_slot,
+        )
+        for e in service.list_edges(graph)
     ]
 
 
 @router.post("/edges", status_code=201)
 def create_edge(req: EdgeCreateRequest, graph: Graph[Component] = Depends(get_graph)) -> EdgeResponse:
     try:
-        service.create_edge(graph, req.source, req.target)
+        service.create_edge(graph, req.source_node, req.source_slot, req.target_node, req.target_slot)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return EdgeResponse(source=req.source, target=req.target)
+    return EdgeResponse(
+        source_node=req.source_node,
+        source_slot=req.source_slot,
+        target_node=req.target_node,
+        target_slot=req.target_slot,
+    )
 
 
 @router.delete("/edges", status_code=204)
 def delete_edge(req: EdgeCreateRequest, graph: Graph[Component] = Depends(get_graph)) -> None:
     try:
-        service.delete_edge(graph, req.source, req.target)
+        service.delete_edge(graph, req.source_node, req.source_slot, req.target_node, req.target_slot)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))

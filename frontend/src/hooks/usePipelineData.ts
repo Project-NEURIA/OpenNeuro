@@ -1,14 +1,13 @@
 import { useMemo } from "react";
 import { useSSE } from "./useSSE";
-import type { ComponentInfo, MetricsSnapshot, TopicMetrics, NodeMetrics } from "@/lib/types";
+import type { ComponentInfo, MetricsSnapshot, NodeMetrics } from "@/lib/types";
 
 export interface PipelineNodeData extends Record<string, unknown> {
   label: string;
   category: "source" | "conduit" | "sink";
-  input_type: string | null;
-  output_type: string | null;
+  inputs: string[];
+  outputs: string[];
   status: string;
-  topicMetrics: TopicMetrics | null;
   nodeMetrics: NodeMetrics | null;
 }
 
