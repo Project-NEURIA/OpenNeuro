@@ -4,7 +4,7 @@ import time
 
 from ...core.graph import Graph
 from ...core.component import Component, ComponentMetadata
-from ...core.topic import NOTOPIC, Topic, TopicSnapshot
+from ...core.topic import TopicSnapshot
 
 
 def collect(graph: Graph[Component]) -> dict:
@@ -15,8 +15,6 @@ def collect(graph: Graph[Component]) -> dict:
         nodes[node_id] = node.metadata()
 
         for topic in node.get_output_topics():
-            if topic is NOTOPIC:
-                continue
             snap = topic.snapshot()
             topics[snap.name] = snap
 

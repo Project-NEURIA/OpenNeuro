@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Never
-
 import sounddevice as sd
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 
-class Mic(Component[Never, bytes]):
+class Mic(Component):
     def __init__(
         self,
         *,
@@ -22,8 +20,8 @@ class Mic(Component[Never, bytes]):
         self._frame_samples = int(sample_rate * frame_ms / 1000)
         self._output = Topic[bytes]()
 
-    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[bytes]]:
+        return (self._output,)
 
     def run(self) -> None:
         with sd.InputStream(

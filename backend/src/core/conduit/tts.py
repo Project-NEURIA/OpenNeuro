@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from typing import Never
 
 from openai import OpenAI
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 CutFn = Callable[[str], int]
 
@@ -96,17 +95,17 @@ class StreamFilter:
             i += 1
 
 
-class TTS(Component[str, bytes]):
+class TTS(Component[Topic[str]]):
     def __init__(self) -> None:
         super().__init__()
         self._output = Topic[bytes]()
         self._client = OpenAI()
         self._filter = StreamFilter()
 
-    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[bytes]]:
+        return (self._output,)
 
-    def set_input_topics(self, t1: Topic[str], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[str]) -> None:
         self._input_topic = t1
 
     def run(self) -> None:
