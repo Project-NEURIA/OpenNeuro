@@ -3,24 +3,23 @@ from __future__ import annotations
 import os
 import tempfile
 import wave
-from typing import Never
 
 import numpy as np
 import requests
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 
-class ASR(Component[bytes, str]):
+class ASR(Component[Topic[bytes]]):
     def __init__(self) -> None:
         super().__init__()
         self._output = Topic[str]()
 
-    def get_output_topics(self) -> tuple[Topic[str], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[str]]:
+        return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[bytes]) -> None:
         self._input_topic = t1
 
     def run(self) -> None:

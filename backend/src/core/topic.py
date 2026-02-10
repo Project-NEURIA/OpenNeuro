@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from typing import Generator, Never
+from typing import Generator
 
 from pydantic import BaseModel
 
@@ -94,6 +94,3 @@ class Topic[T]:
         if drop > 0:
             del self._items[:drop]
             self._offset += drop
-
-
-NOTOPIC: Topic[Never] = Topic(name="NOTOPIC")

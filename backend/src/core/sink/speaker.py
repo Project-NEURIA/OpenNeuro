@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Never
 
 import numpy as np
 import sounddevice as sd
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 
-class Speaker(Component[bytes, Never]):
+class Speaker(Component[Topic[bytes]]):
     def __init__(
         self,
         *,
@@ -20,10 +19,7 @@ class Speaker(Component[bytes, Never]):
         self._sample_rate = sample_rate
         self._channels = channels
 
-    def get_output_topics(self) -> tuple[Topic[Never], Topic[Never], Topic[Never], Topic[Never]]:
-        return (NOTOPIC, NOTOPIC, NOTOPIC, NOTOPIC)
-
-    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[bytes]) -> None:
         self._input_topic = t1
 
     def run(self) -> None:

@@ -4,25 +4,24 @@ import base64
 import json
 import os
 import threading
-from typing import Never
 
 import numpy as np
 from websockets.sync.client import connect
 from websockets.sync.connection import Connection
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
-class STS(Component[bytes, bytes]):
+class STS(Component[Topic[bytes]]):
     def __init__(self) -> None:
         super().__init__()
         self._output = Topic[bytes]()
         self._ws: Connection | None = None
 
-    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[bytes]]:
+        return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[bytes]) -> None:
         self._input_topic = t1
 
     def stop(self) -> None:

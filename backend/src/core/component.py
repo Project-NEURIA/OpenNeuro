@@ -5,11 +5,11 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Never
+from typing import Any
 
 from pydantic import BaseModel
 
-from .topic import NOTOPIC, Topic
+from .topic import Topic
 
 
 class ComponentMetadata(BaseModel):
@@ -22,7 +22,7 @@ class Status(Enum):
     RUNNING = "running"
     STOPPED = "stopped"
 
-class Component[I1 = Never, O1 = Never, I2 = Never, O2 = Never, I3 = Never, O3 = Never, I4 = Never, O4 = Never](ABC):
+class Component[*ITs](ABC):
     def __init__(self) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP
@@ -39,24 +39,11 @@ class Component[I1 = Never, O1 = Never, I2 = Never, O2 = Never, I3 = Never, O3 =
     def stop_event(self) -> threading.Event:
         return self._stop_event
 
-    def get_output_topics(self) -> tuple[Topic[O1], Topic[O2], Topic[O3], Topic[O4]]:
+    def get_output_topics(self) -> tuple[Topic, ...]:
         raise NotImplementedError
 
-    def set_input_topics(
-        self,
-        t1: Topic[I1],
-        t2: Topic[I2],
-        t3: Topic[I3],
-        t4: Topic[I4],
-    ) -> None:
+    def set_input_topics(self, *input_topics: *ITs) -> None:
         raise NotImplementedError
-
-    def metadata(self) -> ComponentMetadata:
-        return ComponentMetadata(
-            name=self.name,
-            status=self.status.value,
-            started_at=self._started_at,
-        )
 
     @abstractmethod
     def run(self) -> None: ...
@@ -88,25 +75,21 @@ class Component[I1 = Never, O1 = Never, I2 = Never, O2 = Never, I3 = Never, O3 =
             return
         self._stop_event.set()
 
-    @classmethod
-    def get_sig(cls) -> tuple[tuple[type, ...], tuple[type, ...]]:
-        """Returns (input_types, output_types) from the generic args.
+    def metadata(self) -> ComponentMetadata:
+        return ComponentMetadata(
+            name=self.name,
+            status=self.status.value,
+            started_at=self._started_at,
+        )
 
-        Generic params are interleaved: Component[I1, O1, I2, O2, ...].
-        Even indices (0, 2, 4, 6) are input types, odd (1, 3, 5, 7) are output types.
-        Never-typed params are filtered out.
-        """
-        input_types: tuple[type, ...] = ()
-        output_types: tuple[type, ...] = ()
+    @classmethod
+    def get_input_types(cls) -> tuple[type, ...]:
+        """Returns input types from the generic args Component[*ITs]."""
         for base in getattr(cls, "__orig_bases__", ()):
             origin = getattr(base, "__origin__", None)
             if origin is Component:
-                args = getattr(base, "__args__", ())
-                input_types = tuple(a for a in args[0::2] if a is not Never)
-                output_types = tuple(a for a in args[1::2] if a is not Never)
-                break
-
-        return input_types, output_types
+                return getattr(base, "__args__", ())
+        return ()
 
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[Component]]:
@@ -117,7 +100,7 @@ class Component[I1 = Never, O1 = Never, I2 = Never, O2 = Never, I3 = Never, O3 =
 
         result: dict[str, type[Component]] = {}
 
-        def walk(subclass: type[Component[Any, Any, Any, Any, Any, Any, Any, Any]]) -> None:
+        def walk(subclass: type[Component[*tuple[Any, ...]]]) -> None:
             if not inspect.isabstract(subclass):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import Never
 
 import litellm
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 
-class LLM(Component[str, str]):
+class LLM(Component[Topic[str]]):
     def __init__(self) -> None:
         super().__init__()
         self._output = Topic[str]()
@@ -16,10 +15,10 @@ class LLM(Component[str, str]):
             {"role": "system", "content": "You are a helpful assistant. Keep your responses short and conversational."},
         ]
 
-    def get_output_topics(self) -> tuple[Topic[str], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[str]]:
+        return (self._output,)
 
-    def set_input_topics(self, t1: Topic[str], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[str]) -> None:
         self._input_topic = t1
 
     def run(self) -> None:

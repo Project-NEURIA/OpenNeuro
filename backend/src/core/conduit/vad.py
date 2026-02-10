@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Never
 
 import numpy as np
 import onnxruntime as ort
@@ -10,10 +9,10 @@ import torch
 from transformers import WhisperFeatureExtractor
 
 from ..component import Component
-from ..topic import NOTOPIC, Topic
+from ..topic import Topic
 
 
-class VAD(Component[bytes, bytes]):
+class VAD(Component[Topic[bytes]]):
     def __init__(
         self,
         *,
@@ -42,10 +41,10 @@ class VAD(Component[bytes, bytes]):
         self._load_silero()
         self._load_smart_turn(smart_turn_onnx)
 
-    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
-        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+    def get_output_topics(self) -> tuple[Topic[bytes]]:
+        return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+    def set_input_topics(self, t1: Topic[bytes]) -> None:
         self._input_topic = t1
 
     def _load_silero(self) -> None:
