@@ -26,7 +26,7 @@ def list_components() -> list[ComponentInfo]:
         result.append(ComponentInfo(
             name=name,
             category=category,
-            inputs=[str(t) for t in inputs],
-            outputs=[str(t) for t in outputs],
+            inputs=[getattr(t, "__name__", str(t)) for t in inputs],
+            outputs=[getattr(t, "__name__", str(t)) for t in outputs],
         ))
     return result
