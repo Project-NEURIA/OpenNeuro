@@ -14,7 +14,7 @@ from .core.graph import Graph
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.graph = Graph(nodes={}, edges={})
+    app.state.graph = Graph(nodes={}, edges=[])
     yield
 
 

@@ -9,6 +9,7 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type Node,
+  type Edge,
 } from "@xyflow/react";
 import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
 import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
@@ -26,6 +27,18 @@ import {
 } from "@/lib/api";
 import type { ComponentInfo } from "@/lib/types";
 
+function parseSlot(handleId: string | null | undefined): number {
+  if (!handleId) return 0;
+  const parts = handleId.split("-");
+  return parseInt(parts[1] ?? "0", 10);
+}
+
+function deleteEdgeFromReactFlow(edge: Edge) {
+  const sourceSlot = parseSlot(edge.sourceHandle);
+  const targetSlot = parseSlot(edge.targetHandle);
+  apiDeleteEdge(edge.source, sourceSlot, edge.target, targetSlot).catch(console.error);
+}
+
 function AppInner() {
   const components = useComponents();
   const {
@@ -34,8 +47,8 @@ function AppInner() {
     componentMap,
   } = usePipelineData(components);
 
-  const [nodes, setNodes, onNodesChangeRaw] = useNodesState([]);
-  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>([] as Node[]);
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([] as Edge[]);
   const initialized = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
 
@@ -52,7 +65,10 @@ function AppInner() {
         ]);
 
         const nodeSpecs = backendNodes.map((n) => ({ id: n.id, type: n.type }));
-        const edgeSpecs = backendEdges.map((e) => ({ source: e.source, target: e.target }));
+        const edgeSpecs = backendEdges.map((e) => ({
+          source: e.source_node,
+          target: e.target_node,
+        }));
         const positions = layoutNodes(nodeSpecs, edgeSpecs);
         const posMap = new Map(positions.map((p) => [p.id, p]));
 
@@ -60,8 +76,6 @@ function AppInner() {
           backendNodes.map((n) => {
             const pos = posMap.get(n.id) ?? { x: 0, y: 0 };
             const info = componentMap[n.type];
-            const inputType = info?.inputs[0] ?? null;
-            const outputType = info?.outputs[0] ?? null;
 
             return {
               id: n.id,
@@ -70,10 +84,9 @@ function AppInner() {
               data: {
                 label: n.id,
                 category: info?.category ?? "conduit",
-                input_type: inputType,
-                output_type: outputType,
+                inputs: info?.inputs ?? [],
+                outputs: info?.outputs ?? [],
                 status: n.status,
-                topicMetrics: null,
                 nodeMetrics: null,
               } satisfies PipelineNodeData,
             };
@@ -82,9 +95,11 @@ function AppInner() {
 
         setEdges(
           backendEdges.map((e) => ({
-            id: `${e.source}->${e.target}`,
-            source: e.source,
-            target: e.target,
+            id: `${e.source_node}:${e.source_slot}->${e.target_node}:${e.target_slot}`,
+            source: e.source_node,
+            sourceHandle: `out-${e.source_slot}`,
+            target: e.target_node,
+            targetHandle: `in-${e.target_slot}`,
             type: "pipeline",
             data: { topicName: "", msgPerSec: 0 },
           }))
@@ -101,9 +116,6 @@ function AppInner() {
     setNodes((prev) =>
       prev.map((n) => {
         const nodeMetrics = metrics.nodes[n.id] ?? null;
-        const topicMetrics = Object.values(metrics.topics).find(
-          (t) => t.name.includes(n.id)
-        ) ?? null;
         const status = nodeMetrics?.status ?? (n.data as PipelineNodeData).status;
 
         return {
@@ -111,7 +123,6 @@ function AppInner() {
           data: {
             ...(n.data as PipelineNodeData),
             status,
-            topicMetrics,
             nodeMetrics,
           },
         };
@@ -130,7 +141,7 @@ function AppInner() {
           setEdges((currentEdges) => {
             for (const e of currentEdges) {
               if (e.source === r.id || e.target === r.id) {
-                apiDeleteEdge(e.source, e.target).catch(console.error);
+                deleteEdgeFromReactFlow(e);
               }
             }
             return currentEdges.filter(
@@ -152,7 +163,7 @@ function AppInner() {
           if (c.type === "remove") {
             const edge = currentEdges.find((e) => e.id === c.id);
             if (edge) {
-              apiDeleteEdge(edge.source, edge.target).catch(console.error);
+              deleteEdgeFromReactFlow(edge);
             }
           }
         }
@@ -173,7 +184,9 @@ function AppInner() {
         )
       );
       if (connection.source && connection.target) {
-        apiCreateEdge(connection.source, connection.target).catch(console.error);
+        const sourceSlot = parseSlot(connection.sourceHandle);
+        const targetSlot = parseSlot(connection.targetHandle);
+        apiCreateEdge(connection.source, sourceSlot, connection.target, targetSlot).catch(console.error);
       }
     },
     [setEdges]
@@ -193,9 +206,6 @@ function AppInner() {
       const item = JSON.parse(raw) as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      const inputType = item.inputs[0] ?? null;
-      const outputType = item.outputs[0] ?? null;
-
       const newNode: Node<PipelineNodeData> = {
         id: item.name,
         type: "pipeline",
@@ -203,10 +213,9 @@ function AppInner() {
         data: {
           label: item.name,
           category: item.category,
-          input_type: inputType,
-          output_type: outputType,
+          inputs: item.inputs,
+          outputs: item.outputs,
           status: "startup",
-          topicMetrics: null,
           nodeMetrics: null,
         },
       };

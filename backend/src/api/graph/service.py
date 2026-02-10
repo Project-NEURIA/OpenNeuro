@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...core.graph import Graph
+from ...core.graph import Graph, Edge
 from ...core.component import Component
 
 
@@ -35,37 +35,105 @@ def delete_node(graph: Graph[Component], node_id: str) -> None:
 
     node.stop()
 
-    graph.edges.pop(node_id, None)
-    for targets in graph.edges.values():
-        if node_id in targets:
-            targets.remove(node_id)
+    # Collect target nodes that need stopping after edge removal
+    targets: set[str] = set()
+    for edge in graph.edges:
+        if edge.source_node == node_id:
+            targets.add(edge.target_node)
+
+    graph.edges = [
+        e for e in graph.edges
+        if e.source_node != node_id and e.target_node != node_id
+    ]
+
+    for target_id in targets:
+        if node := graph.nodes.get(target_id):
+            node.stop()
 
     del graph.nodes[node_id]
 
 
-def list_edges(graph: Graph[Component]) -> list[tuple[str, str]]:
-    return [
-        (source, target)
-        for source, targets in graph.edges.items()
-        for target in targets
-    ]
+def list_edges(graph: Graph[Component]) -> list[Edge]:
+    return graph.edges
 
 
-def create_edge(graph: Graph[Component], source_id: str, target_id: str) -> None:
-    source = graph.nodes.get(source_id)
+def create_edge(
+    graph: Graph[Component],
+    source_node: str,
+    source_slot: int,
+    target_node: str,
+    target_slot: int,
+) -> None:
+    source = graph.nodes.get(source_node)
     if source is None:
-        raise KeyError(f"Node not found: {source_id}")
+        raise KeyError(f"Node not found: {source_node}")
 
-    target = graph.nodes.get(target_id)
+    target = graph.nodes.get(target_node)
     if target is None:
-        raise KeyError(f"Node not found: {target_id}")
+        raise KeyError(f"Node not found: {target_node}")
 
-    targets = graph.edges.setdefault(source_id, [])
-    if target_id in targets:
-        raise ValueError(f"Edge already exists: {source_id} -> {target_id}")
+    outputs = source.get_output_topics()
+    if source_slot >= len(outputs):
+        raise ValueError(f"source_slot {source_slot} out of range (node {source_node} has {len(outputs)} outputs)")
 
-    targets.append(target_id)
-    target.set_input_topics(*source.get_output_topics())
+    input_types = type(target).get_input_types()
+    if target_slot >= len(input_types):
+        raise ValueError(f"target_slot {target_slot} out of range (node {target_node} has {len(input_types)} inputs)")
+
+    edge = Edge(
+        source_node=source_node,
+        source_slot=source_slot,
+        target_node=target_node,
+        target_slot=target_slot,
+    )
+
+    if edge in graph.edges:
+        raise ValueError(f"Edge already exists: {edge}")
+
+    graph.edges.append(edge)
+    _set_input_topics(target_node, graph)
+
+
+def delete_edge(
+    graph: Graph[Component],
+    source_node: str,
+    source_slot: int,
+    target_node: str,
+    target_slot: int,
+) -> None:
+    edge = Edge(
+        source_node=source_node,
+        source_slot=source_slot,
+        target_node=target_node,
+        target_slot=target_slot,
+    )
+
+    try:
+        graph.edges.remove(edge)
+        node = graph.nodes.get(target_node)
+        if node:
+            node.stop()
+    except ValueError:
+        raise KeyError(f"Edge not found: {edge}")
+
+
+def _set_input_topics(target_node_id: str, graph: Graph[Component]) -> None:
+    """Collect all incoming edges for a target node and call set_input_topics."""
+    target = graph.nodes[target_node_id]
+    incoming = sorted(
+        (e for e in graph.edges if e.target_node == target_node_id),
+        key=lambda e: e.target_slot,
+    )
+
+    if not incoming:
+        return
+
+    topics = []
+    for edge in incoming:
+        source = graph.nodes[edge.source_node]
+        topics.append(source.get_output_topics()[edge.source_slot])
+
+    target.set_input_topics(*topics)
 
 
 def start_all(graph: Graph[Component]) -> None:
@@ -76,11 +144,3 @@ def start_all(graph: Graph[Component]) -> None:
 def stop_all(graph: Graph[Component]) -> None:
     for node in graph.nodes.values():
         node.stop()
-
-
-def delete_edge(graph: Graph[Component], source_id: str, target_id: str) -> None:
-    targets = graph.edges.get(source_id)
-    if targets is None or target_id not in targets:
-        raise KeyError(f"Edge not found: {source_id} -> {target_id}")
-
-    targets.remove(target_id)

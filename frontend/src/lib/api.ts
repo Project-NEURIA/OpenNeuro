@@ -1,5 +1,12 @@
 import type { ComponentInfo } from "./types";
 
+export interface EdgeData {
+  source_node: string;
+  source_slot: number;
+  target_node: string;
+  target_slot: number;
+}
+
 export async function fetchComponents(): Promise<ComponentInfo[]> {
   const res = await fetch("/component");
   if (!res.ok) throw new Error(`Fetch components failed: ${res.status}`);
@@ -12,7 +19,7 @@ export async function fetchNodes(): Promise<{ id: string; type: string; status: 
   return res.json();
 }
 
-export async function fetchEdges(): Promise<{ source: string; target: string }[]> {
+export async function fetchEdges(): Promise<EdgeData[]> {
   const res = await fetch("/graph/edges");
   if (!res.ok) throw new Error(`Fetch edges failed: ${res.status}`);
   return res.json();
@@ -33,21 +40,31 @@ export async function deleteNode(id: string) {
   if (!res.ok) throw new Error(`Delete node failed: ${res.status}`);
 }
 
-export async function createEdge(source: string, target: string) {
+export async function createEdge(
+  source_node: string,
+  source_slot: number,
+  target_node: string,
+  target_slot: number,
+) {
   const res = await fetch("/graph/edges", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source, target }),
+    body: JSON.stringify({ source_node, source_slot, target_node, target_slot }),
   });
   if (!res.ok) throw new Error(`Create edge failed: ${res.status}`);
-  return res.json() as Promise<{ source: string; target: string }>;
+  return res.json() as Promise<EdgeData>;
 }
 
-export async function deleteEdge(source: string, target: string) {
+export async function deleteEdge(
+  source_node: string,
+  source_slot: number,
+  target_node: string,
+  target_slot: number,
+) {
   const res = await fetch("/graph/edges", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source, target }),
+    body: JSON.stringify({ source_node, source_slot, target_node, target_slot }),
   });
   if (!res.ok) throw new Error(`Delete edge failed: ${res.status}`);
 }
