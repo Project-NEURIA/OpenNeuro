@@ -7,3 +7,4 @@ class ComponentInfo(BaseModel):
     name: str
     category: str
     inputs: list[str]
+    outputs: list[str]

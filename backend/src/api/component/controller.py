@@ -24,9 +24,12 @@ def list_components() -> list[ComponentInfo]:
     result = []
     for name, cls in classes.items():
         inputs = cls.get_input_types()
+        outputs = cls.get_output_types()
 
         if not inputs:
             category = "source"
+        elif not outputs:
+            category = "sink"
         else:
             category = "conduit"
 
@@ -34,5 +37,6 @@ def list_components() -> list[ComponentInfo]:
             name=name,
             category=category,
             inputs=[_type_str(t) for t in inputs],
+            outputs=[_type_str(t) for t in outputs],
         ))
     return result

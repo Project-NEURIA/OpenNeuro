@@ -5,7 +5,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
@@ -90,6 +90,22 @@ class Component[*ITs](ABC):
             if origin is Component:
                 return getattr(base, "__args__", ())
         return ()
+
+    @classmethod
+    def get_output_types(cls) -> tuple[type, ...]:
+        """Returns output types from the return annotation of get_output_topics().
+
+        e.g. tuple[Topic[bytes], Topic[str]] -> (bytes, str)
+        """
+        hints = get_type_hints(cls.get_output_topics)
+        ret = hints.get("return")
+        if ret is None:
+            return ()
+        return tuple(
+            a.__args__[0]
+            for a in getattr(ret, "__args__", ())
+            if getattr(a, "__args__", ())
+        )
 
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[Component]]:
