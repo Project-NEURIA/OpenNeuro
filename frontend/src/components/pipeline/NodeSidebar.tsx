@@ -1,15 +1,16 @@
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker } from "lucide-react";
+import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Puzzle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ComponentInfo } from "@/lib/types";
 
-const palette = [
-  { name: "Microphone", icon: Mic, category: "source", output: "bytes" },
-  { name: "VAD", icon: AudioLines, category: "conduit", input: "bytes", output: "bytes" },
-  { name: "ASR", icon: MessageSquareText, category: "conduit", input: "bytes", output: "str" },
-  { name: "LLM", icon: Brain, category: "conduit", input: "str", output: "str" },
-  { name: "TTS", icon: Volume2, category: "conduit", input: "str", output: "bytes" },
-  { name: "STS", icon: Radio, category: "conduit", input: "bytes", output: "bytes" },
-  { name: "Speaker", icon: Speaker, category: "sink", input: "bytes" },
-] as const;
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  Mic,
+  VAD: AudioLines,
+  ASR: MessageSquareText,
+  LLM: Brain,
+  TTS: Volume2,
+  STS: Radio,
+  Speaker,
+};
 
 const catColor: Record<string, string> = {
   source: "border-emerald-500/30 hover:border-emerald-500/60",
@@ -17,8 +18,12 @@ const catColor: Record<string, string> = {
   sink: "border-amber-500/30 hover:border-amber-500/60",
 };
 
-export function NodeSidebar() {
-  function onDragStart(e: React.DragEvent, item: (typeof palette)[number]) {
+interface NodeSidebarProps {
+  components: ComponentInfo[];
+}
+
+export function NodeSidebar({ components }: NodeSidebarProps) {
+  function onDragStart(e: React.DragEvent, item: ComponentInfo) {
     e.dataTransfer.setData("application/pipeline-node", JSON.stringify(item));
     e.dataTransfer.effectAllowed = "move";
   }
@@ -28,8 +33,8 @@ export function NodeSidebar() {
       <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
         Components
       </h2>
-      {palette.map((item) => {
-        const Icon = item.icon;
+      {components.map((item) => {
+        const Icon = iconMap[item.name] ?? Puzzle;
         return (
           <div
             key={item.name}
@@ -44,9 +49,14 @@ export function NodeSidebar() {
             <Icon className="w-4 h-4 shrink-0 text-zinc-500" />
             <span className="text-sm font-medium">{item.name}</span>
             <span className="ml-auto text-[9px] font-mono text-zinc-600">
-              {"input" in item ? item.input : ""}
-              {"input" in item && "output" in item ? " > " : ""}
-              {"output" in item ? item.output : ""}
+              {(() => {
+                const inputType = item.inputs[0];
+                const outputType = item.outputs[0];
+                if (inputType && outputType) return `${inputType} > ${outputType}`;
+                if (outputType) return outputType;
+                if (inputType) return inputType;
+                return "";
+              })()}
             </span>
           </div>
         );

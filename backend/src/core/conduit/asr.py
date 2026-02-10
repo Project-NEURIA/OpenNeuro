@@ -3,25 +3,29 @@ from __future__ import annotations
 import os
 import tempfile
 import wave
+from typing import Never
 
 import numpy as np
 import requests
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
 
-class ASR(Node[str]):
-    def __init__(self, input_topic: Topic[bytes]) -> None:
-        self._input_topic = input_topic
-        super().__init__(Topic[str]())
+class ASR(Component[bytes, str]):
+    def __init__(self) -> None:
+        super().__init__()
+        self._output = Topic[str]()
 
-    def set_input_topics(self, *topics: Topic) -> None:
-        self._input_topic = topics[0]
+    def get_output_topics(self) -> tuple[Topic[str], Topic[Never], Topic[Never], Topic[Never]]:
+        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+
+    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+        self._input_topic = t1
 
     def run(self) -> None:
         for pcm48 in self._input_topic.stream(self.stop_event):
-            if self._stopped:
+            if pcm48 is None:
                 break
             pcm = np.frombuffer(pcm48, dtype=np.int16)
             mono16k = pcm[::3]
@@ -49,7 +53,7 @@ class ASR(Node[str]):
 
                 text = r.json().get("text", "")
                 if text:
-                    self.topic.send(text)
+                    self._output.send(text)
             finally:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)

@@ -26,15 +26,14 @@ const categoryColors: Record<string, { border: string; bg: string; badge: string
 
 const statusDot: Record<string, string> = {
   running: "bg-green-400 shadow-green-400/50 shadow-[0_0_6px] animate-pulse",
-  idle: "bg-zinc-500",
+  startup: "bg-yellow-400",
   stopped: "bg-zinc-500",
-  error: "bg-red-500 shadow-red-500/50 shadow-[0_0_6px]",
 };
 
 function PipelineNodeComponent({ data }: NodeProps) {
   const d = data as PipelineNodeData;
   const colors = categoryColors[d.category]!;
-  const dot = statusDot[d.status]!;
+  const dot = statusDot[d.status] ?? "bg-zinc-500";
 
   return (
     <div
@@ -85,26 +84,15 @@ function PipelineNodeComponent({ data }: NodeProps) {
 
       {/* Live metrics */}
       {d.topicMetrics && (
-        <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 text-[10px] border-t border-zinc-700/50 pt-1.5">
-          <div className="text-zinc-500">msg/s</div>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] border-t border-zinc-700/50 pt-1.5">
           <div className="text-zinc-500">total</div>
           <div className="text-zinc-500">buf</div>
-          <div className="text-zinc-300 font-mono">
-            {d.topicMetrics.msg_per_sec.toFixed(1)}
-          </div>
           <div className="text-zinc-300 font-mono">
             {d.topicMetrics.msg_count.toLocaleString()}
           </div>
           <div className="text-zinc-300 font-mono">
             {d.topicMetrics.buffer_depth}
           </div>
-        </div>
-      )}
-
-      {/* Error display */}
-      {d.nodeMetrics?.error && (
-        <div className="mt-1.5 text-[10px] text-red-400 truncate">
-          {d.nodeMetrics.error}
         </div>
       )}
 

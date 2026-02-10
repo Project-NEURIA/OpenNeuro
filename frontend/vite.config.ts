@@ -12,11 +12,15 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api/ws": {
-        target: "ws://localhost:8000",
-        ws: true,
+      "/graph": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
       },
-      "/api": {
+      "/metrics": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/component": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },

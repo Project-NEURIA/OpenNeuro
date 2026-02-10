@@ -1,5 +1,3 @@
-import type { PipelineNode, PipelineEdge } from "./types";
-
 interface PositionedNode {
   id: string;
   x: number;
@@ -10,8 +8,8 @@ interface PositionedNode {
  * Topological sort of pipeline nodes, then assign left-to-right positions.
  */
 export function layoutNodes(
-  nodes: PipelineNode[],
-  edges: PipelineEdge[],
+  nodes: { id: string }[],
+  edges: { source: string; target: string }[],
 ): PositionedNode[] {
   const adj = new Map<string, string[]>();
   const inDeg = new Map<string, number>();

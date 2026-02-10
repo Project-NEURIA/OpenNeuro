@@ -4,27 +4,32 @@ import base64
 import json
 import os
 import threading
+from typing import Never
 
 import numpy as np
 from websockets.sync.client import connect
+from websockets.sync.connection import Connection
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
-class STS(Node[bytes]):
-    def __init__(self, input_topic: Topic[bytes]) -> None:
-        self._input_topic = input_topic
-        self._ws: object | None = None
-        super().__init__(Topic[bytes]())
+class STS(Component[bytes, bytes]):
+    def __init__(self) -> None:
+        super().__init__()
+        self._output = Topic[bytes]()
+        self._ws: Connection | None = None
 
-    def set_input_topics(self, *topics: Topic) -> None:
-        self._input_topic = topics[0]
+    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
+        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+
+    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+        self._input_topic = t1
 
     def stop(self) -> None:
         # Close WebSocket to unblock the recv loop
         if self._ws is not None:
             try:
-                self._ws.close()  # type: ignore[attr-defined]
+                self._ws.close()
             except Exception:
                 pass
         super().stop()
@@ -52,21 +57,21 @@ class STS(Node[bytes]):
             threading.Thread(target=self._send_loop, args=(ws,), daemon=True).start()
 
             for msg in ws:
-                if self._stopped:
+                if self.stop_event.is_set():
                     break
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])
-                    self.topic.send(pcm)
+                    self._output.send(pcm)
 
-    def _send_loop(self, ws: object) -> None:
+    def _send_loop(self, ws: Connection) -> None:
         for data in self._input_topic.stream(self.stop_event):
-            if self._stopped:
+            if data is None:
                 break
             pcm48 = np.frombuffer(data, dtype=np.int16)
             pcm24 = pcm48[::2]  # 48kHz -> 24kHz
             b64 = base64.b64encode(pcm24.tobytes()).decode()
-            ws.send(json.dumps({  # type: ignore[attr-defined]
+            ws.send(json.dumps({
                 "type": "input_audio_buffer.append",
                 "audio": b64,
             }))

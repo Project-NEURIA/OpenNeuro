@@ -1,4 +1,6 @@
+import { Play, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { startAll, stopAll } from "@/lib/api";
 import type { MetricsSnapshot } from "@/lib/types";
 
 interface MetricsOverlayProps {
@@ -7,10 +9,6 @@ interface MetricsOverlayProps {
 }
 
 export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
-  const totalMsgSec = metrics
-    ? Object.values(metrics.topics).reduce((s, t) => s + t.msg_per_sec, 0)
-    : 0;
-
   const totalMsgs = metrics
     ? Object.values(metrics.topics).reduce((s, t) => s + t.msg_count, 0)
     : 0;
@@ -19,6 +17,8 @@ export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
   const runningCount = metrics
     ? Object.values(metrics.nodes).filter((n) => n.status === "running").length
     : 0;
+
+  const isRunning = runningCount > 0;
 
   return (
     <div className="absolute top-3 right-3 z-10 flex items-center gap-3 bg-zinc-900/80 backdrop-blur-sm border border-zinc-800 rounded-lg px-3 py-1.5 text-[11px]">
@@ -48,20 +48,38 @@ export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
       <div className="w-px h-3 bg-zinc-700" />
 
       <span className="text-zinc-500">
-        Throughput:{" "}
-        <span className="text-zinc-300 font-mono">
-          {totalMsgSec.toFixed(1)} msg/s
-        </span>
-      </span>
-
-      <div className="w-px h-3 bg-zinc-700" />
-
-      <span className="text-zinc-500">
         Total:{" "}
         <span className="text-zinc-300 font-mono">
           {totalMsgs.toLocaleString()}
         </span>
       </span>
+
+      <div className="w-px h-3 bg-zinc-700" />
+
+      <button
+        onClick={() => startAll().catch(console.error)}
+        disabled={isRunning}
+        className={cn(
+          "p-1 rounded transition-colors",
+          isRunning
+            ? "text-zinc-600 cursor-not-allowed"
+            : "text-emerald-400 hover:bg-zinc-800",
+        )}
+      >
+        <Play className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => stopAll().catch(console.error)}
+        disabled={!isRunning}
+        className={cn(
+          "p-1 rounded transition-colors",
+          !isRunning
+            ? "text-zinc-600 cursor-not-allowed"
+            : "text-red-400 hover:bg-zinc-800",
+        )}
+      >
+        <Square className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }

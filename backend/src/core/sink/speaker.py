@@ -5,25 +5,26 @@ from typing import Never
 import numpy as np
 import sounddevice as sd
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
 
-class Speaker(Node[Never]):
+class Speaker(Component[bytes, Never]):
     def __init__(
         self,
-        input_topic: Topic[bytes],
         *,
         sample_rate: int = 24000,
         channels: int = 1,
     ) -> None:
+        super().__init__()
         self._sample_rate = sample_rate
         self._channels = channels
-        self._input_topic = input_topic
-        super().__init__()
 
-    def set_input_topics(self, *topics: Topic) -> None:
-        self._input_topic = topics[0]
+    def get_output_topics(self) -> tuple[Topic[Never], Topic[Never], Topic[Never], Topic[Never]]:
+        return (NOTOPIC, NOTOPIC, NOTOPIC, NOTOPIC)
+
+    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+        self._input_topic = t1
 
     def run(self) -> None:
         with sd.OutputStream(
@@ -32,7 +33,7 @@ class Speaker(Node[Never]):
             dtype="int16",
         ) as stream:
             for pcm in self._input_topic.stream(self.stop_event):
-                if self._stopped:
+                if pcm is None:
                     break
                 data = np.frombuffer(pcm, dtype=np.int16)
                 if self._channels == 1:

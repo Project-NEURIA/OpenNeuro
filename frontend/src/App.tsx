@@ -14,113 +14,169 @@ import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
 import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
 import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
 import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
+import { useComponents } from "@/hooks/useComponents";
+import { layoutNodes } from "@/lib/layout";
+import {
+  fetchNodes as apiFetchNodes,
+  fetchEdges as apiFetchEdges,
+  createNode as apiCreateNode,
+  deleteNode as apiDeleteNode,
+  createEdge as apiCreateEdge,
+  deleteEdge as apiDeleteEdge,
+} from "@/lib/api";
+import type { ComponentInfo } from "@/lib/types";
 
 function AppInner() {
+  const components = useComponents();
   const {
-    defaultNodes,
-    defaultEdges,
     connected,
     metrics,
-    syncPipeline,
-    typeLabels,
-  } = usePipelineData();
+    componentMap,
+  } = usePipelineData(components);
 
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState([]);
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState([]);
   const initialized = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
 
-  // Initialize graph state from defaults (once)
+  // Initialize: fetch existing graph from backend
   useEffect(() => {
-    if (initialized.current || defaultNodes.length === 0) return;
+    if (initialized.current || components.length === 0) return;
     initialized.current = true;
-    setNodes(defaultNodes);
-    setEdges(defaultEdges);
-  }, [defaultNodes, defaultEdges, setNodes, setEdges]);
 
-  // Update metrics data on existing nodes without replacing positions
+    (async () => {
+      try {
+        const [backendNodes, backendEdges] = await Promise.all([
+          apiFetchNodes(),
+          apiFetchEdges(),
+        ]);
+
+        const nodeSpecs = backendNodes.map((n) => ({ id: n.id, type: n.type }));
+        const edgeSpecs = backendEdges.map((e) => ({ source: e.source, target: e.target }));
+        const positions = layoutNodes(nodeSpecs, edgeSpecs);
+        const posMap = new Map(positions.map((p) => [p.id, p]));
+
+        setNodes(
+          backendNodes.map((n) => {
+            const pos = posMap.get(n.id) ?? { x: 0, y: 0 };
+            const info = componentMap[n.type];
+            const inputType = info?.inputs[0] ?? null;
+            const outputType = info?.outputs[0] ?? null;
+
+            return {
+              id: n.id,
+              type: "pipeline",
+              position: { x: pos.x, y: pos.y },
+              data: {
+                label: n.id,
+                category: info?.category ?? "conduit",
+                input_type: inputType,
+                output_type: outputType,
+                status: n.status,
+                topicMetrics: null,
+                nodeMetrics: null,
+              } satisfies PipelineNodeData,
+            };
+          })
+        );
+
+        setEdges(
+          backendEdges.map((e) => ({
+            id: `${e.source}->${e.target}`,
+            source: e.source,
+            target: e.target,
+            type: "pipeline",
+            data: { topicName: "", msgPerSec: 0 },
+          }))
+        );
+      } catch (err) {
+        console.error("[pipeline] Init failed:", err);
+      }
+    })();
+  }, [components, componentMap, setNodes, setEdges]);
+
+  // Update node data with metrics (preserve positions)
   useEffect(() => {
-    if (!initialized.current) return;
+    if (!initialized.current || !metrics) return;
     setNodes((prev) =>
       prev.map((n) => {
-        const fresh = defaultNodes.find((d) => d.id === n.id);
-        if (!fresh) return n;
-        return { ...n, data: fresh.data };
+        const nodeMetrics = metrics.nodes[n.id] ?? null;
+        const topicMetrics = Object.values(metrics.topics).find(
+          (t) => t.name.includes(n.id)
+        ) ?? null;
+        const status = nodeMetrics?.status ?? (n.data as PipelineNodeData).status;
+
+        return {
+          ...n,
+          data: {
+            ...(n.data as PipelineNodeData),
+            status,
+            topicMetrics,
+            nodeMetrics,
+          },
+        };
       })
     );
-  }, [defaultNodes, setNodes]);
+  }, [metrics, setNodes]);
 
-  // Update edge data (metrics) without replacing structure
-  useEffect(() => {
-    if (!initialized.current) return;
-    setEdges((prev) =>
-      prev.map((e) => {
-        const fresh = defaultEdges.find((d) => d.id === e.id);
-        if (!fresh) return e;
-        return { ...e, data: fresh.data };
-      })
-    );
-  }, [defaultEdges, setEdges]);
-
-  // Wrap node changes — detect removals and sync
+  // Wrap node changes — detect removals and call backend
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => {
-      const hasRemoval = changes.some((c) => c.type === "remove");
+      const removals = changes.filter((c) => c.type === "remove");
       onNodesChangeRaw(changes);
-      if (hasRemoval) {
-        // Sync after state settles
-        setNodes((current) => {
-          // Also remove edges that reference removed nodes
-          const nodeIds = new Set(current.map((n) => n.id));
+
+      for (const r of removals) {
+        if (r.type === "remove") {
           setEdges((currentEdges) => {
-            const filtered = currentEdges.filter(
-              (e) => nodeIds.has(e.source) && nodeIds.has(e.target)
+            for (const e of currentEdges) {
+              if (e.source === r.id || e.target === r.id) {
+                apiDeleteEdge(e.source, e.target).catch(console.error);
+              }
+            }
+            return currentEdges.filter(
+              (e) => e.source !== r.id && e.target !== r.id
             );
-            // Schedule sync with the cleaned-up state
-            setTimeout(() => syncPipeline(current as Node<PipelineNodeData>[], filtered), 0);
-            return filtered;
           });
-          return current;
-        });
+          apiDeleteNode(r.id).catch(console.error);
+        }
       }
     },
-    [onNodesChangeRaw, setNodes, setEdges, syncPipeline]
+    [onNodesChangeRaw, setEdges]
   );
 
-  // Wrap edge changes — detect removals and sync
+  // Wrap edge changes — detect removals and call backend
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
-      const hasRemoval = changes.some((c) => c.type === "remove");
+      setEdges((currentEdges) => {
+        for (const c of changes) {
+          if (c.type === "remove") {
+            const edge = currentEdges.find((e) => e.id === c.id);
+            if (edge) {
+              apiDeleteEdge(edge.source, edge.target).catch(console.error);
+            }
+          }
+        }
+        return currentEdges;
+      });
       onEdgesChangeRaw(changes);
-      if (hasRemoval) {
-        setEdges((current) => {
-          setNodes((currentNodes) => {
-            setTimeout(() => syncPipeline(currentNodes as Node<PipelineNodeData>[], current), 0);
-            return currentNodes;
-          });
-          return current;
-        });
-      }
     },
-    [onEdgesChangeRaw, setEdges, setNodes, syncPipeline]
+    [onEdgesChangeRaw, setEdges]
   );
 
   // Handle new edge connections
   const onConnect: OnConnect = useCallback(
     (connection) => {
-      setEdges((eds) => {
-        const updated = addEdge(
+      setEdges((eds) =>
+        addEdge(
           { ...connection, type: "pipeline", data: { topicName: "", msgPerSec: 0 } },
           eds
-        );
-        setNodes((currentNodes) => {
-          setTimeout(() => syncPipeline(currentNodes as Node<PipelineNodeData>[], updated), 0);
-          return currentNodes;
-        });
-        return updated;
-      });
+        )
+      );
+      if (connection.source && connection.target) {
+        apiCreateEdge(connection.source, connection.target).catch(console.error);
+      }
     },
-    [setEdges, setNodes, syncPipeline]
+    [setEdges]
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -134,11 +190,11 @@ function AppInner() {
       const raw = e.dataTransfer.getData("application/pipeline-node");
       if (!raw) return;
 
-      const item = JSON.parse(raw) as { name: string };
-      const info = typeLabels[item.name];
-      if (!info) return;
-
+      const item = JSON.parse(raw) as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+
+      const inputType = item.inputs[0] ?? null;
+      const outputType = item.outputs[0] ?? null;
 
       const newNode: Node<PipelineNodeData> = {
         id: item.name,
@@ -146,32 +202,28 @@ function AppInner() {
         position,
         data: {
           label: item.name,
-          category: info.category,
-          input_type: info.input,
-          output_type: info.output,
-          status: "idle",
+          category: item.category,
+          input_type: inputType,
+          output_type: outputType,
+          status: "startup",
           topicMetrics: null,
           nodeMetrics: null,
         },
       };
 
       setNodes((nds) => {
-        // Don't add if already exists
         if (nds.some((n) => n.id === newNode.id)) return nds;
-        const updated = [...nds, newNode];
-        setEdges((currentEdges) => {
-          setTimeout(() => syncPipeline(updated as Node<PipelineNodeData>[], currentEdges), 0);
-          return currentEdges;
-        });
-        return updated;
+        return [...nds, newNode];
       });
+
+      apiCreateNode(item.name, item.name).catch(console.error);
     },
-    [screenToFlowPosition, typeLabels, setNodes, setEdges, syncPipeline]
+    [screenToFlowPosition, setNodes]
   );
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
-      <NodeSidebar />
+      <NodeSidebar components={components} />
       <div className="relative flex-1">
         <MetricsOverlay connected={connected} metrics={metrics} />
         <PipelineCanvas

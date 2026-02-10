@@ -1,2 +1,2 @@
 from .topic import Topic
-from .node import Node
+from .component import Component
