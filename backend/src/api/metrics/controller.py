@@ -8,18 +8,18 @@ from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
 
 from ...core.graph import Graph
-from ...core.node import Node
+from ...core.component import Component
 from .dto import MetricsResponse
 from . import service
 
 router = APIRouter(prefix="/metrics")
 
 
-def get_graph(request: Request) -> Graph[Node]:
+def get_graph(request: Request) -> Graph[Component]:
     return request.app.state.graph
 
 
-async def _stream(graph: Graph[Node]) -> AsyncGenerator[str, None]:
+async def _stream(graph: Graph[Component]) -> AsyncGenerator[str, None]:
     while True:
         raw = service.collect(graph)
         data = MetricsResponse(**raw)
@@ -28,5 +28,5 @@ async def _stream(graph: Graph[Node]) -> AsyncGenerator[str, None]:
 
 
 @router.get("")
-async def get_metrics(graph: Graph[Node] = Depends(get_graph)) -> EventSourceResponse:
+async def get_metrics(graph: Graph[Component] = Depends(get_graph)) -> EventSourceResponse:
     return EventSourceResponse(_stream(graph))

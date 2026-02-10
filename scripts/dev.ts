@@ -4,7 +4,7 @@ const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
   stderr: "inherit",
 });
 
-await Bun.sleep(5000);
+await Bun.sleep(1000);
 
 const frontend = Bun.spawn(["bun", "run", "dev"], {
   cwd: "./frontend",

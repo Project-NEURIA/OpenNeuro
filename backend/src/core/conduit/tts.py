@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import Never
 
 from openai import OpenAI
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
 CutFn = Callable[[str], int]
 
@@ -95,19 +96,22 @@ class StreamFilter:
             i += 1
 
 
-class TTS(Node[bytes]):
-    def __init__(self, input_topic: Topic[str]) -> None:
-        self._input_topic = input_topic
+class TTS(Component[str, bytes]):
+    def __init__(self) -> None:
+        super().__init__()
+        self._output = Topic[bytes]()
         self._client = OpenAI()
         self._filter = StreamFilter()
-        super().__init__(Topic[bytes]())
 
-    def set_input_topics(self, *topics: Topic) -> None:
-        self._input_topic = topics[0]
+    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
+        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+
+    def set_input_topics(self, t1: Topic[str], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+        self._input_topic = t1
 
     def run(self) -> None:
         for chunk in self._input_topic.stream(self.stop_event):
-            if self._stopped:
+            if chunk is None:
                 break
             if chunk == "":
                 text = self._filter.feed("", force=True)
@@ -126,6 +130,6 @@ class TTS(Node[bytes]):
                 response_format="pcm",
             ) as response:
                 for pcm in response.iter_bytes(chunk_size=4096):
-                    self.topic.send(pcm)
+                    self._output.send(pcm)
         except Exception as e:
             print(f"[TTS] Error: {e}")

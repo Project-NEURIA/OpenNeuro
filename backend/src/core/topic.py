@@ -3,9 +3,10 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from typing import Generator
+from typing import Generator, Never
 
 from pydantic import BaseModel
+
 
 
 class TopicSnapshot(BaseModel):
@@ -48,14 +49,14 @@ class Topic[T]:
             subscribers=len(self._cursors),
         )
 
-    def stream(self, stop_event: threading.Event) -> Generator[T, None, None]:
+    def stream(self, stop_event: threading.Event) -> Generator[T | None, None, None]:
         """On GeneratorExit, stream is unregistered."""
         sub_id = self._register()
         try:
-            while True:
-                if stop_event.is_set():
-                    raise StopIteration
-                yield self._wait_and_get(sub_id, stop_event)
+            while not stop_event.is_set():
+                item = self._wait_and_get(sub_id, stop_event)
+                yield item
+            yield None
         finally:
             self._unregister(sub_id)
 
@@ -66,13 +67,13 @@ class Topic[T]:
             self._cursors[sub_id] = self._offset + len(self._items)
             return sub_id
 
-    def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T:
+    def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
         with self._condition:
             index = self._cursors[sub_id]
             while index >= self._offset + len(self._items):
                 self._condition.wait(0.1)
                 if stop_event.is_set():
-                    raise StopIteration
+                    return None
             item = self._items[index - self._offset]
             self._cursors[sub_id] = index + 1
             self._gc()
@@ -93,3 +94,6 @@ class Topic[T]:
         if drop > 0:
             del self._items[:drop]
             self._offset += drop
+
+
+NOTOPIC: Topic[Never] = Topic(name="NOTOPIC")

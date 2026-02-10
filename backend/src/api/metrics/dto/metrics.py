@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ....core.node import NodeMetadata
+from ....core.component import ComponentMetadata
 from ....core.topic import TopicSnapshot
 
 
 class MetricsResponse(BaseModel):
-    nodes: dict[str, NodeMetadata]
+    nodes: dict[str, ComponentMetadata]
     topics: dict[str, TopicSnapshot]
     timestamp: float

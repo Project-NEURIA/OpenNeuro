@@ -3,19 +3,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ...core.graph import Graph
-from ...core.node import Node
+from ...core.component import Component
 from .dto import NodeCreateRequest, NodeResponse, EdgeCreateRequest, EdgeResponse
 from . import service
 
 router = APIRouter(prefix="/graph")
 
 
-def get_graph(request: Request) -> Graph[Node]:
+def get_graph(request: Request) -> Graph[Component]:
     return request.app.state.graph
 
 
 @router.get("/nodes")
-def list_nodes(graph: Graph[Node] = Depends(get_graph)) -> list[NodeResponse]:
+def list_nodes(graph: Graph[Component] = Depends(get_graph)) -> list[NodeResponse]:
     return [
         NodeResponse(id=node_id, type=type(node).__name__, status=node.status.value)
         for node_id, node in service.list_nodes(graph).items()
@@ -23,7 +23,7 @@ def list_nodes(graph: Graph[Node] = Depends(get_graph)) -> list[NodeResponse]:
 
 
 @router.get("/nodes/{node_id}")
-def get_node(node_id: str, graph: Graph[Node] = Depends(get_graph)) -> NodeResponse:
+def get_node(node_id: str, graph: Graph[Component] = Depends(get_graph)) -> NodeResponse:
     node = service.get_node(graph, node_id)
     if node is None:
         raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
@@ -31,7 +31,7 @@ def get_node(node_id: str, graph: Graph[Node] = Depends(get_graph)) -> NodeRespo
 
 
 @router.post("/nodes", status_code=201)
-def create_node(req: NodeCreateRequest, graph: Graph[Node] = Depends(get_graph)) -> NodeResponse:
+def create_node(req: NodeCreateRequest, graph: Graph[Component] = Depends(get_graph)) -> NodeResponse:
     try:
         node = service.create_node(graph, req.type, req.id)
     except ValueError as e:
@@ -40,25 +40,22 @@ def create_node(req: NodeCreateRequest, graph: Graph[Node] = Depends(get_graph))
 
 
 @router.delete("/nodes/{node_id}", status_code=204)
-def delete_node(node_id: str, graph: Graph[Node] = Depends(get_graph)) -> None:
-    try:
-        service.delete_node(graph, node_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+def delete_node(node_id: str, graph: Graph[Component] = Depends(get_graph)) -> None:
+    service.delete_node(graph, node_id)
 
 
 @router.post("/start", status_code=204)
-def start_all(graph: Graph[Node] = Depends(get_graph)) -> None:
+def start_all(graph: Graph[Component] = Depends(get_graph)) -> None:
     service.start_all(graph)
 
 
 @router.post("/stop", status_code=204)
-def stop_all(graph: Graph[Node] = Depends(get_graph)) -> None:
+def stop_all(graph: Graph[Component] = Depends(get_graph)) -> None:
     service.stop_all(graph)
 
 
 @router.get("/edges")
-def list_edges(graph: Graph[Node] = Depends(get_graph)) -> list[EdgeResponse]:
+def list_edges(graph: Graph[Component] = Depends(get_graph)) -> list[EdgeResponse]:
     return [
         EdgeResponse(source=source, target=target)
         for source, target in service.list_edges(graph)
@@ -66,7 +63,7 @@ def list_edges(graph: Graph[Node] = Depends(get_graph)) -> list[EdgeResponse]:
 
 
 @router.post("/edges", status_code=201)
-def create_edge(req: EdgeCreateRequest, graph: Graph[Node] = Depends(get_graph)) -> EdgeResponse:
+def create_edge(req: EdgeCreateRequest, graph: Graph[Component] = Depends(get_graph)) -> EdgeResponse:
     try:
         service.create_edge(graph, req.source, req.target)
     except KeyError as e:
@@ -77,7 +74,7 @@ def create_edge(req: EdgeCreateRequest, graph: Graph[Node] = Depends(get_graph))
 
 
 @router.delete("/edges", status_code=204)
-def delete_edge(req: EdgeCreateRequest, graph: Graph[Node] = Depends(get_graph)) -> None:
+def delete_edge(req: EdgeCreateRequest, graph: Graph[Component] = Depends(get_graph)) -> None:
     try:
         service.delete_edge(graph, req.source, req.target)
     except KeyError as e:

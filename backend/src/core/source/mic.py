@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from typing import Never
+
 import sounddevice as sd
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
 
-class Mic(Node[bytes]):
+class Mic(Component[Never, bytes]):
     def __init__(
         self,
         *,
@@ -14,10 +16,14 @@ class Mic(Node[bytes]):
         channels: int = 1,
         frame_ms: int = 20,
     ) -> None:
+        super().__init__()
         self._sample_rate = sample_rate
         self._channels = channels
         self._frame_samples = int(sample_rate * frame_ms / 1000)
-        super().__init__(Topic[bytes]())
+        self._output = Topic[bytes]()
+
+    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
+        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
 
     def run(self) -> None:
         with sd.InputStream(
@@ -26,6 +32,6 @@ class Mic(Node[bytes]):
             dtype="int16",
             blocksize=self._frame_samples,
         ) as stream:
-            while not self._stopped:
+            while not self.stop_event.is_set():
                 data, _ = stream.read(self._frame_samples)
-                self.topic.send(data.tobytes())
+                self._output.send(data.tobytes())

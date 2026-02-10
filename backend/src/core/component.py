@@ -3,15 +3,16 @@ from __future__ import annotations
 import inspect
 import threading
 import time
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Never, get_type_hints, overload
+from typing import Any, Never
 
 from pydantic import BaseModel
 
-from .topic import Topic
+from .topic import NOTOPIC, Topic
 
 
-class NodeMetadata(BaseModel):
+class ComponentMetadata(BaseModel):
     name: str
     status: str
     started_at: float | None
@@ -21,32 +22,14 @@ class Status(Enum):
     RUNNING = "running"
     STOPPED = "stopped"
 
-class Node[O1, O2 = Never, O3 = Never, O4 = Never]:
-
-    @overload
-    def __init__(self) -> None: ...
-    @overload
-    def __init__(self, c1: Topic[O1], /) -> None: ...
-    @overload
-    def __init__(self, c1: Topic[O1], c2: Topic[O2], /) -> None: ...
-    @overload
-    def __init__(self, c1: Topic[O1], c2: Topic[O2], c3: Topic[O3], /) -> None: ...
-    @overload
-    def __init__(self, c1: Topic[O1], c2: Topic[O2], c3: Topic[O3], c4: Topic[O4], /) -> None: ...
-
-    def __init__(self, *topics: Topic) -> None:  # type: ignore[override]
-        padded = topics + tuple([Topic[Never] for _ in range(4 - len(topics))])
-        self._topics: tuple[Topic[O1], Topic[O2], Topic[O3], Topic[O4]] = padded  # type: ignore[assignment]
+class Component[I1 = Never, O1 = Never, I2 = Never, O2 = Never, I3 = Never, O3 = Never, I4 = Never, O4 = Never](ABC):
+    def __init__(self) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP
         self._started_at: float | None = None
         self._error: str | None = None
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-
-    @property
-    def _stopped(self) -> bool:
-        return self._stop_event.is_set()
 
     @property
     def status(self) -> Status:
@@ -56,25 +39,27 @@ class Node[O1, O2 = Never, O3 = Never, O4 = Never]:
     def stop_event(self) -> threading.Event:
         return self._stop_event
 
-    @property
-    def topic(self) -> Topic[O1]:
-        return self._topics[0]
+    def get_output_topics(self) -> tuple[Topic[O1], Topic[O2], Topic[O3], Topic[O4]]:
+        raise NotImplementedError
 
-    def topics(self) -> tuple[Topic[O1], Topic[O2], Topic[O3], Topic[O4]]:
-        return self._topics
+    def set_input_topics(
+        self,
+        t1: Topic[I1],
+        t2: Topic[I2],
+        t3: Topic[I3],
+        t4: Topic[I4],
+    ) -> None:
+        raise NotImplementedError
 
-    def set_input_topics(self, *topics: Topic) -> None:
-        pass
-
-    def metadata(self) -> NodeMetadata:
-        return NodeMetadata(
+    def metadata(self) -> ComponentMetadata:
+        return ComponentMetadata(
             name=self.name,
             status=self.status.value,
             started_at=self._started_at,
         )
 
-    def run(self) -> None:
-        raise NotImplementedError
+    @abstractmethod
+    def run(self) -> None: ...
 
     def _safe_run(self) -> None:
         self._status = Status.RUNNING
@@ -95,7 +80,7 @@ class Node[O1, O2 = Never, O3 = Never, O4 = Never]:
     def stop(self) -> None:
         """
         Idempotent.
-        When a node instance is stopped, it will stop the running thread cooperatively by setting self._stop_event
+        When a component instance is stopped, it will stop the running thread cooperatively by setting self._stop_event
         and expect the run() method to return. Input streams are unregistered from input topics as streams
         will periodically check and raise StopIteration when self._stop_event is set.
         """
@@ -104,44 +89,35 @@ class Node[O1, O2 = Never, O3 = Never, O4 = Never]:
         self._stop_event.set()
 
     @classmethod
-    def get_sig(cls) -> tuple[dict[str, type], tuple[type, ...]]:
-        """Returns (input_params, output_types).
+    def get_sig(cls) -> tuple[tuple[type, ...], tuple[type, ...]]:
+        """Returns (input_types, output_types) from the generic args.
 
-        input_params: __init__ param names to types (excluding self).
-        output_types: generic args from the class definition (e.g. Node[bytes] -> (bytes,)).
+        Generic params are interleaved: Component[I1, O1, I2, O2, ...].
+        Even indices (0, 2, 4, 6) are input types, odd (1, 3, 5, 7) are output types.
+        Never-typed params are filtered out.
         """
-        sig = inspect.signature(cls.__init__)
-        hints = get_type_hints(cls.__init__)
-
-        input_params: dict[str, type] = {}
-        for name, param in sig.parameters.items():
-            if name == "self":
-                continue
-            t = hints.get(name, param.annotation)
-            if t is inspect._empty:
-                t = Any
-            input_params[name] = t
-
+        input_types: tuple[type, ...] = ()
         output_types: tuple[type, ...] = ()
         for base in getattr(cls, "__orig_bases__", ()):
             origin = getattr(base, "__origin__", None)
-            if origin is Node:
+            if origin is Component:
                 args = getattr(base, "__args__", ())
-                output_types = tuple(a for a in args if a is not Never)
+                input_types = tuple(a for a in args[0::2] if a is not Never)
+                output_types = tuple(a for a in args[1::2] if a is not Never)
                 break
 
-        return input_params, output_types
+        return input_types, output_types
 
     @classmethod
-    def registered_subclasses(cls) -> dict[str, type[Node]]:
+    def registered_subclasses(cls) -> dict[str, type[Component]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
         from .source import Mic
         from .sink import Speaker
         from .conduit import VAD, ASR, LLM, TTS, STS
 
-        result: dict[str, type[Node]] = {}
+        result: dict[str, type[Component]] = {}
 
-        def walk(subclass: type[Node]) -> None:
+        def walk(subclass: type[Component[Any, Any, Any, Any, Any, Any, Any, Any]]) -> None:
             if not inspect.isabstract(subclass):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():

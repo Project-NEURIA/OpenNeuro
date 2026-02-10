@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Never
 
 import numpy as np
 import onnxruntime as ort
 import torch
 from transformers import WhisperFeatureExtractor
 
-from ..node import Node
-from ..topic import Topic
+from ..component import Component
+from ..topic import NOTOPIC, Topic
 
 
-class VAD(Node[bytes]):
+class VAD(Component[bytes, bytes]):
     def __init__(
         self,
-        input_topic: Topic[bytes],
         *,
         silence_seconds: float = 0.9,
         max_silence_seconds: float = 1.4,
@@ -24,11 +24,8 @@ class VAD(Node[bytes]):
         turn_threshold: float = 0.89,
         smart_turn_onnx: str = str(Path(__file__).resolve().parents[3] / "assets" / "smart-turn-v3.0.onnx"),
     ) -> None:
-        self._input_topic = input_topic
-        super().__init__(Topic[bytes]())
-
-    def set_input_topics(self, *topics: Topic) -> None:
-        self._input_topic = topics[0]
+        super().__init__()
+        self._output = Topic[bytes]()
 
         self._silence_seconds = silence_seconds
         self._max_silence_seconds = max_silence_seconds
@@ -44,6 +41,12 @@ class VAD(Node[bytes]):
 
         self._load_silero()
         self._load_smart_turn(smart_turn_onnx)
+
+    def get_output_topics(self) -> tuple[Topic[bytes], Topic[Never], Topic[Never], Topic[Never]]:
+        return (self._output, NOTOPIC, NOTOPIC, NOTOPIC)
+
+    def set_input_topics(self, t1: Topic[bytes], t2: Topic[Never] = NOTOPIC, t3: Topic[Never] = NOTOPIC, t4: Topic[Never] = NOTOPIC) -> None:
+        self._input_topic = t1
 
     def _load_silero(self) -> None:
         self._model, utils = torch.hub.load(
@@ -92,7 +95,7 @@ class VAD(Node[bytes]):
 
     def run(self) -> None:
         for data in self._input_topic.stream(self.stop_event):
-            if self._stopped:
+            if data is None:
                 break
             pcm = np.frombuffer(data, dtype=np.int16)
             mono16k = pcm[::3].astype(np.float32) / 32768.0
@@ -140,4 +143,4 @@ class VAD(Node[bytes]):
         self._it.reset_states()
 
         if len(seg) >= self._min_speech_bytes:
-            self.topic.send(seg)
+            self._output.send(seg)
