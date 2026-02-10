@@ -6,7 +6,8 @@ from ..component import Component
 from ..topic import Topic
 
 
-class Mic(Component):
+class Mic(Component[()]):
+
     def __init__(
         self,
         *,
@@ -19,6 +20,9 @@ class Mic(Component):
         self._channels = channels
         self._frame_samples = int(sample_rate * frame_ms / 1000)
         self._output = Topic[bytes]()
+
+    def set_input_topics(self) -> None:
+        pass
 
     def get_output_topics(self) -> tuple[Topic[bytes]]:
         return (self._output,)

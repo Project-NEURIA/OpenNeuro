@@ -39,14 +39,17 @@ class Component[*ITs](ABC):
     def stop_event(self) -> threading.Event:
         return self._stop_event
 
+    @abstractmethod
     def get_output_topics(self) -> tuple[Topic, ...]:
-        raise NotImplementedError
-
-    def set_input_topics(self, *input_topics: *ITs) -> None:
-        raise NotImplementedError
+        ...
 
     @abstractmethod
-    def run(self) -> None: ...
+    def set_input_topics(self, *input_topics: *ITs) -> None:
+        ...
+
+    @abstractmethod
+    def run(self) -> None:
+        ...
 
     def _safe_run(self) -> None:
         self._status = Status.RUNNING
@@ -83,12 +86,27 @@ class Component[*ITs](ABC):
         )
 
     @classmethod
+    def get_init_types(cls) -> dict[str, type]:
+        """Returns {param_name: type} from __init__, excluding self."""
+        hints = get_type_hints(cls.__init__)
+        hints.pop("return", None)
+        return hints
+
+    @classmethod
     def get_input_types(cls) -> tuple[type, ...]:
-        """Returns input types from the generic args Component[*ITs]."""
+        """Returns input types from the generic args Component[Topic[T1], Topic[T2], ...].
+
+        Unwraps Topic[T] -> T.
+        """
         for base in getattr(cls, "__orig_bases__", ()):
             origin = getattr(base, "__origin__", None)
             if origin is Component:
-                return getattr(base, "__args__", ())
+                args = getattr(base, "__args__", ())
+                return tuple(
+                    a.__args__[0]
+                    for a in args
+                    if getattr(a, "__args__", ())
+                )
         return ()
 
     @classmethod

@@ -8,16 +8,6 @@ from . import service
 router = APIRouter(prefix="/component")
 
 
-def _type_str(t: type) -> str:
-    origin = getattr(t, "__origin__", None)
-    args = getattr(t, "__args__", ())
-    if origin is not None and args:
-        name = getattr(origin, "__name__", str(origin))
-        inner = ", ".join(_type_str(a) for a in args)
-        return f"{name}[{inner}]"
-    return getattr(t, "__name__", str(t))
-
-
 @router.get("")
 def list_components() -> list[ComponentInfo]:
     classes = service.list_components()
@@ -36,7 +26,7 @@ def list_components() -> list[ComponentInfo]:
         result.append(ComponentInfo(
             name=name,
             category=category,
-            inputs=[_type_str(t) for t in inputs],
-            outputs=[_type_str(t) for t in outputs],
+            inputs=[str(t) for t in inputs],
+            outputs=[str(t) for t in outputs],
         ))
     return result
