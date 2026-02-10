@@ -5,10 +5,10 @@ import numpy as np
 import sounddevice as sd
 
 from ..component import Component
-from ..topic import Topic
+from ..channel import Channel
 
 
-class Speaker(Component[Topic[bytes]]):
+class Speaker(Component[Channel[bytes]]):
     def __init__(
         self,
         *,
@@ -19,11 +19,11 @@ class Speaker(Component[Topic[bytes]]):
         self._sample_rate = sample_rate
         self._channels = channels
 
-    def get_output_topics(self) -> tuple[()]:
+    def get_output_channels(self) -> tuple[()]:
         return ()
 
-    def set_input_topics(self, t1: Topic[bytes]) -> None:
-        self._input_topic = t1
+    def set_input_channels(self, t1: Channel[bytes]) -> None:
+        self._input_channel = t1
 
     def run(self) -> None:
         with sd.OutputStream(
@@ -31,7 +31,7 @@ class Speaker(Component[Topic[bytes]]):
             channels=self._channels,
             dtype="int16",
         ) as stream:
-            for pcm in self._input_topic.stream(self.stop_event):
+            for pcm in self._input_channel.stream(self.stop_event):
                 if pcm is None:
                     break
                 data = np.frombuffer(pcm, dtype=np.int16)

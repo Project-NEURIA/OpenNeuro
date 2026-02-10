@@ -1,2 +1,2 @@
-from .topic import Topic
+from .channel import Channel
 from .component import Component

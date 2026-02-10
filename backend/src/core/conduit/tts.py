@@ -6,7 +6,7 @@ from collections.abc import Callable
 from openai import OpenAI
 
 from ..component import Component
-from ..topic import Topic
+from ..channel import Channel
 
 CutFn = Callable[[str], int]
 
@@ -95,21 +95,21 @@ class StreamFilter:
             i += 1
 
 
-class TTS(Component[Topic[str]]):
+class TTS(Component[Channel[str]]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Topic[bytes]()
+        self._output = Channel[bytes]()
         self._client = OpenAI()
         self._filter = StreamFilter()
 
-    def get_output_topics(self) -> tuple[Topic[bytes]]:
+    def get_output_channels(self) -> tuple[Channel[bytes]]:
         return (self._output,)
 
-    def set_input_topics(self, t1: Topic[str]) -> None:
-        self._input_topic = t1
+    def set_input_channels(self, t1: Channel[str]) -> None:
+        self._input_channel = t1
 
     def run(self) -> None:
-        for chunk in self._input_topic.stream(self.stop_event):
+        for chunk in self._input_channel.stream(self.stop_event):
             if chunk is None:
                 break
             if chunk == "":

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 
-class TopicSnapshot(BaseModel):
+class ChannelSnapshot(BaseModel):
     name: str
     msg_count: int
     byte_count: int
@@ -18,7 +18,7 @@ class TopicSnapshot(BaseModel):
     subscribers: int
 
 
-class Topic[T]:
+class Channel[T]:
 
     def __init__(self, *, name: str | None = None) -> None:
         self._items: list[T] = []
@@ -26,7 +26,7 @@ class Topic[T]:
         self._condition = threading.Condition()
         self._cursors: dict[int, int] = {}
         self._next_sub_id = 0
-        self.name: str = name or f"topic_{id(self):x}"
+        self.name: str = name or f"channel_{id(self):x}"
         self._msg_count: int = 0
         self._byte_count: int = 0
         self._last_send_time: float = 0.0
@@ -41,8 +41,8 @@ class Topic[T]:
             self._last_send_time = time.time()
             self._condition.notify_all()
 
-    def snapshot(self) -> TopicSnapshot:
-        return TopicSnapshot(
+    def snapshot(self) -> ChannelSnapshot:
+        return ChannelSnapshot(
             name=self.name,
             msg_count=self._msg_count,
             byte_count=self._byte_count,

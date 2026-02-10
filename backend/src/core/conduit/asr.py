@@ -8,22 +8,22 @@ import numpy as np
 import requests
 
 from ..component import Component
-from ..topic import Topic
+from ..channel import Channel
 
 
-class ASR(Component[Topic[bytes]]):
+class ASR(Component[Channel[bytes]]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Topic[str]()
+        self._output = Channel[str]()
 
-    def get_output_topics(self) -> tuple[Topic[str]]:
+    def get_output_channels(self) -> tuple[Channel[str]]:
         return (self._output,)
 
-    def set_input_topics(self, t1: Topic[bytes]) -> None:
-        self._input_topic = t1
+    def set_input_channels(self, t1: Channel[bytes]) -> None:
+        self._input_channel = t1
 
     def run(self) -> None:
-        for pcm48 in self._input_topic.stream(self.stop_event):
+        for pcm48 in self._input_channel.stream(self.stop_event):
             if pcm48 is None:
                 break
             pcm = np.frombuffer(pcm48, dtype=np.int16)
