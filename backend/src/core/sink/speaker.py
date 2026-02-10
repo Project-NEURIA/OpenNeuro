@@ -19,6 +19,9 @@ class Speaker(Component[Topic[bytes]]):
         self._sample_rate = sample_rate
         self._channels = channels
 
+    def get_output_topics(self) -> tuple[()]:
+        return ()
+
     def set_input_topics(self, t1: Topic[bytes]) -> None:
         self._input_topic = t1
 
