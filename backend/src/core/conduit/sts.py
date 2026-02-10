@@ -64,13 +64,18 @@ class STS(Component[Topic[bytes]]):
                     self._output.send(pcm)
 
     def _send_loop(self, ws: Connection) -> None:
+        from websockets.exceptions import ConnectionClosed
+
         for data in self._input_topic.stream(self.stop_event):
             if data is None:
                 break
             pcm48 = np.frombuffer(data, dtype=np.int16)
             pcm24 = pcm48[::2]  # 48kHz -> 24kHz
             b64 = base64.b64encode(pcm24.tobytes()).decode()
-            ws.send(json.dumps({
-                "type": "input_audio_buffer.append",
-                "audio": b64,
-            }))
+            try:
+                ws.send(json.dumps({
+                    "type": "input_audio_buffer.append",
+                    "audio": b64,
+                }))
+            except ConnectionClosed:
+                break
