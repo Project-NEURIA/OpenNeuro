@@ -1,1 +1,1 @@
-from .component import ComponentInfo
+from src.api.component.dto.component import ComponentInfo

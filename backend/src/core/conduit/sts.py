@@ -9,8 +9,8 @@ import numpy as np
 from websockets.sync.client import connect
 from websockets.sync.connection import Connection
 
-from ..component import Component
-from ..channel import Channel
+from src.core.component import Component
+from src.core.channel import Channel
 
 class STS(Component[Channel[bytes]]):
     def __init__(self) -> None:

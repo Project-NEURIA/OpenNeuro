@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ....core.component import ComponentSnapshot
+from src.core.component import ComponentSnapshot
 
 
 class MetricsResponse(BaseModel):

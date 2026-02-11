@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import litellm
 
-from ..component import Component
-from ..channel import Channel
+from src.core.component import Component
+from src.core.channel import Channel
 
 
 class LLM(Component[Channel[str]]):

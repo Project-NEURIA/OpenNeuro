@@ -1,1 +1,1 @@
-from .speaker import Speaker
+from src.core.sink.speaker import Speaker

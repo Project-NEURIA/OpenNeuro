@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...core.component import Component
+from src.core.component import Component
 
 
 def list_components() -> dict[str, type[Component]]:

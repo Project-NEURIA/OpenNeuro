@@ -1,1 +1,1 @@
-from .metrics import MetricsResponse
+from src.api.metrics.dto.metrics import MetricsResponse

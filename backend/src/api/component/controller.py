@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .dto import ComponentInfo
-from . import service
+from src.api.component.dto import ComponentInfo
+from src.api.component import service
 
 router = APIRouter(prefix="/component")
 

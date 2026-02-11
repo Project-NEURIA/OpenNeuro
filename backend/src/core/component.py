@@ -9,7 +9,7 @@ from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from .channel import Channel, ChannelSnapshot
+from src.core.channel import Channel, ChannelSnapshot
 
 
 class ComponentSnapshot(BaseModel):
@@ -132,7 +132,7 @@ class Component[*ITs](ABC):
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[Component]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
-        from . import source, sink, conduit  # noqa: F401
+        from src.core import source, sink, conduit  # noqa: F401
 
         result: dict[str, type[Component]] = {}
 
