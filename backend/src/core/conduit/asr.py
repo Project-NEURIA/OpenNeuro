@@ -7,8 +7,8 @@ import wave
 import numpy as np
 import requests
 
-from ..component import Component
-from ..channel import Channel
+from src.core.component import Component
+from src.core.channel import Channel
 
 
 class ASR(Component[Channel[bytes]]):

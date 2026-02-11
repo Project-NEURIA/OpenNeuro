@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.graph.controller import router as graph_router
-from .api.metrics.controller import router as metrics_router
-from .api.component.controller import router as component_router
-from .core.graph import Graph
+from src.api.graph.controller import router as graph_router
+from src.api.metrics.controller import router as metrics_router
+from src.api.component.controller import router as component_router
+from src.api.graph.domain.graph import Graph
 
 
 @asynccontextmanager

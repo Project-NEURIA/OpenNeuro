@@ -5,8 +5,8 @@ from collections.abc import Callable
 
 from openai import OpenAI
 
-from ..component import Component
-from ..channel import Channel
+from src.core.component import Component
+from src.core.channel import Channel
 
 CutFn = Callable[[str], int]
 

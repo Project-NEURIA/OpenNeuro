@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import time
 
-from ...core.graph import Graph
-from ...core.component import Component
-from .dto import MetricsResponse
+from src.api.graph.domain.graph import Graph
+from src.core.component import Component
+from src.api.metrics.dto import MetricsResponse
 
 
 def collect(graph: Graph[Component]) -> MetricsResponse:

@@ -8,8 +8,8 @@ import onnxruntime as ort
 import torch
 from transformers import WhisperFeatureExtractor
 
-from ..component import Component
-from ..channel import Channel
+from src.core.component import Component
+from src.core.channel import Channel
 
 
 class VAD(Component[Channel[bytes]]):

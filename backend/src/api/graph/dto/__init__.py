@@ -1,2 +1,2 @@
-from .node import NodeCreateRequest, NodeResponse
-from .edge import EdgeCreateRequest, EdgeResponse
+from src.api.graph.dto.node import NodeCreateRequest, NodeResponse
+from src.api.graph.dto.edge import EdgeCreateRequest, EdgeResponse

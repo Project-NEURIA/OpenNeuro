@@ -6,10 +6,10 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
 
-from ...core.graph import Graph
-from ...core.component import Component
-from ..dep import get_graph
-from . import service
+from src.api.graph.domain.graph import Graph
+from src.core.component import Component
+from src.api.dep import get_graph
+from src.api.metrics import service
 
 router = APIRouter(prefix="/metrics")
 

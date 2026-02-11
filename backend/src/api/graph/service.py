@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ...core.graph import Graph, Edge
-from ...core.component import Component
+from src.api.graph.domain.graph import Graph, Edge
+from src.core.component import Component
 
 
 def list_nodes(graph: Graph[Component]) -> dict[str, Component]:

@@ -1,2 +1,2 @@
-from .channel import Channel
-from .component import Component
+from src.core.channel import Channel
+from src.core.component import Component
