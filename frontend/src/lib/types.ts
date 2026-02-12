@@ -3,8 +3,9 @@ export type NodeCategory = "source" | "conduit" | "sink";
 export interface ComponentInfo {
   name: string;
   category: NodeCategory;
-  inputs: string[];
-  outputs: string[];
+  init: Record<string, string>;
+  inputs: Record<string, string>;
+  outputs: Record<string, string>;
 }
 
 export interface ChannelMetrics {
@@ -20,7 +21,7 @@ export interface NodeMetrics {
   name: string;
   status: string;
   started_at: number | null;
-  channels: ChannelMetrics[];
+  channels: Record<string, ChannelMetrics>;
 }
 
 export interface MetricsSnapshot {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import wave
+from typing import TypedDict
 
 import numpy as np
 import requests
@@ -11,19 +12,20 @@ from src.core.component import Component
 from src.core.channel import Channel
 
 
-class ASR(Component[Channel[bytes]]):
+class ASROutputs(TypedDict):
+    text: Channel[str]
+
+
+class ASR(Component[[Channel[bytes]], ASROutputs]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Channel[str]()
+        self._output_text: Channel[str] = Channel(name="text")
 
-    def get_output_channels(self) -> tuple[Channel[str]]:
-        return (self._output,)
+    def output_channels(self) -> ASROutputs:
+        return {"text": self._output_text}
 
-    def set_input_channels(self, t1: Channel[bytes]) -> None:
-        self._input_channel = t1
-
-    def run(self) -> None:
-        for pcm48 in self._input_channel.stream(self.stop_event):
+    def run(self, audio: Channel[bytes]) -> None:
+        for pcm48 in audio.stream(self.stop_event):
             if pcm48 is None:
                 break
             pcm = np.frombuffer(pcm48, dtype=np.int16)
@@ -52,7 +54,7 @@ class ASR(Component[Channel[bytes]]):
 
                 text = r.json().get("text", "")
                 if text:
-                    self._output.send(text)
+                    self._output_text.send(text)
             finally:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)

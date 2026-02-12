@@ -9,13 +9,6 @@ interface MetricsOverlayProps {
 }
 
 export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
-  const totalMsgs = metrics
-    ? Object.values(metrics.nodes).reduce(
-        (s, n) => s + n.channels.reduce((s2, t) => s2 + t.msg_count, 0),
-        0,
-      )
-    : 0;
-
   const nodeCount = metrics ? Object.keys(metrics.nodes).length : 0;
   const runningCount = metrics
     ? Object.values(metrics.nodes).filter((n) => n.status === "running").length
@@ -45,15 +38,6 @@ export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
         Nodes:{" "}
         <span className="text-zinc-300 font-mono">
           {runningCount}/{nodeCount}
-        </span>
-      </span>
-
-      <div className="w-px h-3 bg-zinc-700" />
-
-      <span className="text-zinc-500">
-        Total:{" "}
-        <span className="text-zinc-300 font-mono">
-          {totalMsgs.toLocaleString()}
         </span>
       </span>
 

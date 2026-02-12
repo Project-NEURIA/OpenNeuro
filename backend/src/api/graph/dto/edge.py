@@ -5,13 +5,13 @@ from pydantic import BaseModel
 
 class EdgeCreateRequest(BaseModel):
     source_node: str
-    source_slot: int
+    source_slot: str
     target_node: str
-    target_slot: int
+    target_slot: str
 
 
 class EdgeResponse(BaseModel):
     source_node: str
-    source_slot: int
+    source_slot: str
     target_node: str
-    target_slot: int
+    target_slot: str

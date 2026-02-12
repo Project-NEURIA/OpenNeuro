@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import threading
+from typing import TypedDict
 
 import numpy as np
 from websockets.sync.client import connect
@@ -12,17 +13,19 @@ from websockets.sync.connection import Connection
 from src.core.component import Component
 from src.core.channel import Channel
 
-class STS(Component[Channel[bytes]]):
+
+class STSOutputs(TypedDict):
+    audio: Channel[bytes]
+
+
+class STS(Component[[Channel[bytes]], STSOutputs]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Channel[bytes]()
         self._ws: Connection | None = None
+        self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def get_output_channels(self) -> tuple[Channel[bytes]]:
-        return (self._output,)
-
-    def set_input_channels(self, t1: Channel[bytes]) -> None:
-        self._input_channel = t1
+    def output_channels(self) -> STSOutputs:
+        return {"audio": self._output_audio}
 
     def stop(self) -> None:
         # Close WebSocket to unblock the recv loop
@@ -33,7 +36,7 @@ class STS(Component[Channel[bytes]]):
                 pass
         super().stop()
 
-    def run(self) -> None:
+    def run(self, audio: Channel[bytes]) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
         headers = {
             "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
@@ -53,7 +56,7 @@ class STS(Component[Channel[bytes]]):
                 },
             }))
 
-            threading.Thread(target=self._send_loop, args=(ws,), daemon=True).start()
+            threading.Thread(target=self._send_loop, args=(ws, audio), daemon=True).start()
 
             for msg in ws:
                 if self.stop_event.is_set():
@@ -61,12 +64,12 @@ class STS(Component[Channel[bytes]]):
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])
-                    self._output.send(pcm)
+                    self._output_audio.send(pcm)
 
-    def _send_loop(self, ws: Connection) -> None:
+    def _send_loop(self, ws: Connection, audio: Channel[bytes]) -> None:
         from websockets.exceptions import ConnectionClosed
 
-        for data in self._input_channel.stream(self.stop_event):
+        for data in audio.stream(self.stop_event):
             if data is None:
                 break
             pcm48 = np.frombuffer(data, dtype=np.int16)

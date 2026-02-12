@@ -8,11 +8,22 @@ from src.api.component import service
 router = APIRouter(prefix="/component")
 
 
+def _type_name(t: type) -> str:
+    origin = getattr(t, "__origin__", None)
+    args = getattr(t, "__args__", None)
+    if origin and args:
+        name = origin.__name__
+        inner = ", ".join(a.__name__ if hasattr(a, "__name__") else str(a) for a in args)
+        return f"{name}[{inner}]"
+    return getattr(t, "__name__", str(t))
+
+
 @router.get("")
 def list_components() -> list[ComponentInfo]:
     classes = service.list_components()
     result = []
     for name, cls in classes.items():
+        init = cls.get_init_types()
         inputs = cls.get_input_types()
         outputs = cls.get_output_types()
 
@@ -26,7 +37,9 @@ def list_components() -> list[ComponentInfo]:
         result.append(ComponentInfo(
             name=name,
             category=category,
-            inputs=[getattr(t, "__name__", str(t)) for t in inputs],
-            outputs=[getattr(t, "__name__", str(t)) for t in outputs],
+            init={k: _type_name(v) for k, v in init.items()},
+            inputs={k: _type_name(v) for k, v in inputs.items()},
+            outputs={k: _type_name(v) for k, v in outputs.items()},
         ))
+
     return result

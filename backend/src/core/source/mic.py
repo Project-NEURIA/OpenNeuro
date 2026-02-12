@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 import sounddevice as sd
 
 from src.core.component import Component
 from src.core.channel import Channel
 
 
-class Mic(Component[()]):
+class MicOutputs(TypedDict):
+    audio: Channel[bytes]
+
+
+class Mic(Component[[], MicOutputs]):
 
     def __init__(
         self,
@@ -19,13 +25,10 @@ class Mic(Component[()]):
         self._sample_rate = sample_rate
         self._channels = channels
         self._frame_samples = int(sample_rate * frame_ms / 1000)
-        self._output = Channel[bytes]()
+        self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def set_input_channels(self) -> None:
-        pass
-
-    def get_output_channels(self) -> tuple[Channel[bytes]]:
-        return (self._output,)
+    def output_channels(self) -> MicOutputs:
+        return {"audio": self._output_audio}
 
     def run(self) -> None:
         with sd.InputStream(
@@ -36,4 +39,4 @@ class Mic(Component[()]):
         ) as stream:
             while not self.stop_event.is_set():
                 data, _ = stream.read(self._frame_samples)
-                self._output.send(data.tobytes())
+                self._output_audio.send(data.tobytes())

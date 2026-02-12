@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import onnxruntime as ort
@@ -12,7 +13,11 @@ from src.core.component import Component
 from src.core.channel import Channel
 
 
-class VAD(Component[Channel[bytes]]):
+class VADOutputs(TypedDict):
+    audio: Channel[bytes]
+
+
+class VAD(Component[[Channel[bytes]], VADOutputs]):
     def __init__(
         self,
         *,
@@ -24,7 +29,6 @@ class VAD(Component[Channel[bytes]]):
         smart_turn_onnx: str = str(Path(__file__).resolve().parents[3] / "assets" / "smart-turn-v3.0.onnx"),
     ) -> None:
         super().__init__()
-        self._output = Channel[bytes]()
 
         self._silence_seconds = silence_seconds
         self._max_silence_seconds = max_silence_seconds
@@ -41,11 +45,10 @@ class VAD(Component[Channel[bytes]]):
         self._load_silero()
         self._load_smart_turn(smart_turn_onnx)
 
-    def get_output_channels(self) -> tuple[Channel[bytes]]:
-        return (self._output,)
+        self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def set_input_channels(self, t1: Channel[bytes]) -> None:
-        self._input_channel = t1
+    def output_channels(self) -> VADOutputs:
+        return {"audio": self._output_audio}
 
     def _load_silero(self) -> None:
         self._model, utils = torch.hub.load(
@@ -92,8 +95,8 @@ class VAD(Component[Channel[bytes]]):
         outputs = self._smart_turn_session.run(None, {"input_features": input_features})
         return outputs[0][0].item() > self._turn_threshold
 
-    def run(self) -> None:
-        for data in self._input_channel.stream(self.stop_event):
+    def run(self, audio: Channel[bytes]) -> None:
+        for data in audio.stream(self.stop_event):
             if data is None:
                 break
             pcm = np.frombuffer(data, dtype=np.int16)
@@ -104,10 +107,10 @@ class VAD(Component[Channel[bytes]]):
             while len(self._vad_buf) >= 512:
                 chunk = torch.tensor(self._vad_buf[:512])
                 self._vad_buf = self._vad_buf[512:]
-                out = self._it(chunk, return_seconds=False)
+                vad_out = self._it(chunk, return_seconds=False)
 
-                start = out and "start" in out
-                end = out and "end" in out
+                start = vad_out and "start" in vad_out
+                end = vad_out and "end" in vad_out
 
                 if start and not self._speaking:
                     self._speaking = True
@@ -142,4 +145,4 @@ class VAD(Component[Channel[bytes]]):
         self._it.reset_states()
 
         if len(seg) >= self._min_speech_bytes:
-            self._output.send(seg)
+            self._output_audio.send(seg)

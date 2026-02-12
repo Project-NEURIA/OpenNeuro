@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import TypedDict
 
 from openai import OpenAI
 
@@ -95,30 +96,31 @@ class StreamFilter:
             i += 1
 
 
-class TTS(Component[Channel[str]]):
+class TTSOutputs(TypedDict):
+    audio: Channel[bytes]
+
+
+class TTS(Component[[Channel[str]], TTSOutputs]):
     def __init__(self) -> None:
         super().__init__()
-        self._output = Channel[bytes]()
         self._client = OpenAI()
         self._filter = StreamFilter()
+        self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def get_output_channels(self) -> tuple[Channel[bytes]]:
-        return (self._output,)
+    def output_channels(self) -> TTSOutputs:
+        return {"audio": self._output_audio}
 
-    def set_input_channels(self, t1: Channel[str]) -> None:
-        self._input_channel = t1
-
-    def run(self) -> None:
-        for chunk in self._input_channel.stream(self.stop_event):
+    def run(self, text: Channel[str]) -> None:
+        for chunk in text.stream(self.stop_event):
             if chunk is None:
                 break
             if chunk == "":
-                text = self._filter.feed("", force=True)
+                t = self._filter.feed("", force=True)
             else:
-                text = self._filter.feed(chunk)
+                t = self._filter.feed(chunk)
 
-            if text and text.strip():
-                self._synthesize(text)
+            if t and t.strip():
+                self._synthesize(t)
 
     def _synthesize(self, text: str) -> None:
         try:
@@ -129,6 +131,6 @@ class TTS(Component[Channel[str]]):
                 response_format="pcm",
             ) as response:
                 for pcm in response.iter_bytes(chunk_size=4096):
-                    self._output.send(pcm)
+                    self._output_audio.send(pcm)
         except Exception as e:
             print(f"[TTS] Error: {e}")
