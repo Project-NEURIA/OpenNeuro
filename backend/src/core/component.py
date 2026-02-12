@@ -4,19 +4,20 @@ import inspect
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any, get_type_hints
 
 from pydantic import BaseModel
 
-from src.core.channel import Channel, ChannelSnapshot
+from src.core.channel import ChannelSnapshot
 
 
 class ComponentSnapshot(BaseModel):
     name: str
     status: str
     started_at: float | None
-    channels: list[ChannelSnapshot]
+    channels: dict[str, ChannelSnapshot]
 
 
 class Status(Enum):
@@ -25,7 +26,7 @@ class Status(Enum):
     STOPPED = "stopped"
 
 
-class Component[*ITs](ABC):
+class Component[**P, O: Mapping[str, Any]](ABC):
     def __init__(self) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP
@@ -43,31 +44,24 @@ class Component[*ITs](ABC):
         return self._stop_event
 
     @abstractmethod
-    def get_output_channels(self) -> tuple[Channel, ...]:
-        ...
+    def run(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 
     @abstractmethod
-    def set_input_channels(self, *input_channels: *ITs) -> None:
-        ...
+    def output_channels(self) -> O: ...
 
-    @abstractmethod
-    def run(self) -> None:
-        ...
-
-    def _safe_run(self) -> None:
+    def _safe_run(self, *args: P.args, **kwargs: P.kwargs) -> None:
         self._status = Status.RUNNING
         self._started_at = time.time()
         try:
-            self.run()
+            self.run(*args, **kwargs)
         finally:
             self._status = Status.STOPPED
 
-    def start(self) -> None:
+    def start(self, *args: P.args, **kwargs: P.kwargs) -> None:
         if self.status == Status.RUNNING:
             return
-
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._safe_run, daemon=True)
+        self._thread = threading.Thread(target=self._safe_run, args=args, kwargs=kwargs, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:
@@ -86,7 +80,7 @@ class Component[*ITs](ABC):
             name=self.name,
             status=self.status.value,
             started_at=self._started_at,
-            channels=[t.snapshot() for t in self.get_output_channels()],
+            channels={n: ch.snapshot() for n, ch in self.output_channels().items()},
         )
 
     @classmethod
@@ -97,46 +91,29 @@ class Component[*ITs](ABC):
         return hints
 
     @classmethod
-    def get_input_types(cls) -> tuple[type, ...]:
-        """Returns input types from the generic args Component[Channel[T1], Channel[T2], ...].
-
-        Unwraps Channel[T] -> T.
-        """
-        for base in getattr(cls, "__orig_bases__", ()):
-            origin = getattr(base, "__origin__", None)
-            if origin is Component:
-                args = getattr(base, "__args__", ())
-                return tuple(
-                    a.__args__[0]
-                    for a in args
-                    if getattr(a, "__args__", ())
-                )
-        return ()
+    def get_input_types(cls) -> dict[str, type]:
+        """Introspect run()'s keyword params for input channel types."""
+        hints = get_type_hints(cls.run)
+        hints.pop("return", None)
+        return hints
 
     @classmethod
-    def get_output_types(cls) -> tuple[type, ...]:
-        """Returns output types from the return annotation of get_output_channels().
-
-        e.g. tuple[Channel[bytes], Channel[str]] -> (bytes, str)
-        """
-        hints = get_type_hints(cls.get_output_channels)
-        ret = hints.get("return")
-        if ret is None:
-            return ()
-        return tuple(
-            a.__args__[0]
-            for a in getattr(ret, "__args__", ())
-            if getattr(a, "__args__", ())
-        )
+    def get_output_types(cls) -> dict[str, type]:
+        """Introspect output_channels()'s return type (TypedDict) for output types."""
+        hints = get_type_hints(cls.output_channels)
+        td = hints.get("return")
+        if td is None:
+            return {}
+        return get_type_hints(td)
 
     @classmethod
-    def registered_subclasses(cls) -> dict[str, type[Component]]:
+    def registered_subclasses(cls) -> dict[str, type[Component[..., Any]]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
         from src.core import source, sink, conduit  # noqa: F401
 
-        result: dict[str, type[Component]] = {}
+        result: dict[str, type[Component[..., Any]]] = {}
 
-        def walk(subclass: type[Component[*tuple[Any, ...]]]) -> None:
+        def walk(subclass: type[Component[..., Any]]) -> None:
             if not inspect.isabstract(subclass):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():

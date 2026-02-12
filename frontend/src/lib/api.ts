@@ -2,9 +2,9 @@ import type { ComponentInfo } from "./types";
 
 export interface EdgeData {
   source_node: string;
-  source_slot: number;
+  source_slot: string;
   target_node: string;
-  target_slot: number;
+  target_slot: string;
 }
 
 export async function fetchComponents(): Promise<ComponentInfo[]> {
@@ -42,9 +42,9 @@ export async function deleteNode(id: string) {
 
 export async function createEdge(
   source_node: string,
-  source_slot: number,
+  source_slot: string,
   target_node: string,
-  target_slot: number,
+  target_slot: string,
 ) {
   const res = await fetch("/graph/edges", {
     method: "POST",
@@ -57,9 +57,9 @@ export async function createEdge(
 
 export async function deleteEdge(
   source_node: string,
-  source_slot: number,
+  source_slot: string,
   target_node: string,
-  target_slot: number,
+  target_slot: string,
 ) {
   const res = await fetch("/graph/edges", {
     method: "DELETE",

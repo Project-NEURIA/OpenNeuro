@@ -50,11 +50,11 @@ export function NodeSidebar({ components }: NodeSidebarProps) {
             <span className="text-sm font-medium">{item.name}</span>
             <span className="ml-auto text-[9px] font-mono text-zinc-600">
               {(() => {
-                const inputType = item.inputs[0];
-                const outputType = item.outputs[0];
-                if (inputType && outputType) return `${inputType} > ${outputType}`;
-                if (outputType) return outputType;
-                if (inputType) return inputType;
+                const ins = Object.values(item.inputs);
+                const outs = Object.values(item.outputs);
+                if (ins[0] && outs[0]) return `${ins[0]} > ${outs[0]}`;
+                if (outs[0]) return outs[0];
+                if (ins[0]) return ins[0];
                 return "";
               })()}
             </span>

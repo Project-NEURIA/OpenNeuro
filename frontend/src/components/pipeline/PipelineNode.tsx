@@ -33,6 +33,7 @@ const statusDot: Record<string, string> = {
 function PipelineNodeComponent({ data }: NodeProps) {
   const d = data as PipelineNodeData;
   const colors = categoryColors[d.category]!;
+
   const dot = statusDot[d.status] ?? "bg-zinc-500";
 
   return (
@@ -46,10 +47,10 @@ function PipelineNodeComponent({ data }: NodeProps) {
       )}
     >
       {/* Input handles */}
-      {d.inputs.map((type, i) => (
+      {d.inputs.map((name, i) => (
         <Handle
-          key={`in-${i}`}
-          id={`in-${i}`}
+          key={`in-${name}`}
+          id={`in-${name}`}
           type="target"
           position={Position.Left}
           className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"
@@ -87,25 +88,11 @@ function PipelineNodeComponent({ data }: NodeProps) {
         )}
       </div>
 
-      {/* Live metrics */}
-      {d.nodeMetrics && d.nodeMetrics.channels.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] border-t border-zinc-700/50 pt-1.5">
-          <div className="text-zinc-500">total</div>
-          <div className="text-zinc-500">buf</div>
-          <div className="text-zinc-300 font-mono">
-            {d.nodeMetrics.channels.reduce((s, t) => s + t.msg_count, 0).toLocaleString()}
-          </div>
-          <div className="text-zinc-300 font-mono">
-            {d.nodeMetrics.channels.reduce((s, t) => s + t.buffer_depth, 0)}
-          </div>
-        </div>
-      )}
-
       {/* Output handles */}
-      {d.outputs.map((type, i) => (
+      {d.outputs.map((name, i) => (
         <Handle
-          key={`out-${i}`}
-          id={`out-${i}`}
+          key={`out-${name}`}
+          id={`out-${name}`}
           type="source"
           position={Position.Right}
           className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"

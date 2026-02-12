@@ -6,5 +6,6 @@ from pydantic import BaseModel
 class ComponentInfo(BaseModel):
     name: str
     category: str
-    inputs: list[str]
-    outputs: list[str]
+    init: dict[str, str]
+    inputs: dict[str, str]
+    outputs: dict[str, str]

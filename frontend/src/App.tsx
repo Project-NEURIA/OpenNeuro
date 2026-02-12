@@ -27,10 +27,10 @@ import {
 } from "@/lib/api";
 import type { ComponentInfo } from "@/lib/types";
 
-function parseSlot(handleId: string | null | undefined): number {
-  if (!handleId) return 0;
+function parseSlot(handleId: string | null | undefined): string {
+  if (!handleId) return "";
   const parts = handleId.split("-");
-  return parseInt(parts[1] ?? "0", 10);
+  return parts.slice(1).join("-");
 }
 
 function deleteEdgeFromReactFlow(edge: Edge) {
@@ -84,8 +84,8 @@ function AppInner() {
               data: {
                 label: n.id,
                 category: info?.category ?? "conduit",
-                inputs: info?.inputs ?? [],
-                outputs: info?.outputs ?? [],
+                inputs: info ? Object.keys(info.inputs) : [],
+                outputs: info ? Object.keys(info.outputs) : [],
                 status: n.status,
                 nodeMetrics: null,
               } satisfies PipelineNodeData,
@@ -101,7 +101,7 @@ function AppInner() {
             target: e.target_node,
             targetHandle: `in-${e.target_slot}`,
             type: "pipeline",
-            data: { channelName: "", msgPerSec: 0 },
+            data: {},
           }))
         );
       } catch (err) {
@@ -179,7 +179,7 @@ function AppInner() {
     (connection) => {
       setEdges((eds) =>
         addEdge(
-          { ...connection, type: "pipeline", data: { channelName: "", msgPerSec: 0 } },
+          { ...connection, type: "pipeline", data: {} },
           eds
         )
       );
@@ -213,8 +213,8 @@ function AppInner() {
         data: {
           label: item.name,
           category: item.category,
-          inputs: item.inputs,
-          outputs: item.outputs,
+          inputs: Object.keys(item.inputs),
+          outputs: Object.keys(item.outputs),
           status: "startup",
           nodeMetrics: null,
         },
