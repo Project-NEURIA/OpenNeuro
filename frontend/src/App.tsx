@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlowProvider,
   useNodesState,
@@ -14,8 +14,10 @@ import {
 import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
 import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
 import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
+import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
 import { useComponents } from "@/hooks/useComponents";
+import { useMetricsHistory } from "@/hooks/useMetricsHistory";
 import { layoutNodes } from "@/lib/layout";
 import {
   fetchNodes as apiFetchNodes,
@@ -46,6 +48,9 @@ function AppInner() {
     metrics,
     componentMap,
   } = usePipelineData(components);
+
+  const [metricsOpen, setMetricsOpen] = useState(false);
+  const history = useMetricsHistory(metrics);
 
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>([] as Node[]);
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([] as Edge[]);
@@ -255,7 +260,19 @@ function AppInner() {
         onDragOver={onDragOver}
       />
       <NodeSidebar components={components} />
-      <MetricsOverlay connected={connected} metrics={metrics} />
+      <MetricsOverlay
+        connected={connected}
+        metrics={metrics}
+        onOpenDashboard={() => setMetricsOpen(true)}
+      />
+      {metricsOpen && (
+        <MetricsDashboard
+          connected={connected}
+          history={history}
+          componentMap={componentMap}
+          onClose={() => setMetricsOpen(false)}
+        />
+      )}
     </div>
   );
 }
