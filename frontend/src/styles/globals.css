@@ -26,29 +26,76 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --color-source: var(--source);
+  --color-conduit: var(--conduit);
+  --color-sink: var(--sink);
+  --color-status-running: var(--status-running);
+  --color-status-startup: var(--status-startup);
+  --color-status-stopped: var(--status-stopped);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-glass-hover: var(--glass-hover);
+  --color-glass-subtle: var(--glass-subtle);
+  --color-edge: var(--edge);
+  --color-edge-dot: var(--edge-dot);
+  --color-handle: var(--handle);
+  --color-handle-border: var(--handle-border);
 }
 
 :root {
   --radius: 0.5rem;
-  --background: #09090b;
+  --background: #08060d;
   --foreground: #fafafa;
-  --card: #09090b;
+  --card: #16141f;
   --card-foreground: #fafafa;
-  --popover: #09090b;
+  --popover: #16141f;
   --popover-foreground: #fafafa;
   --primary: #fafafa;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
+  --primary-foreground: #08060d;
+  --secondary: #16141f;
   --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
+  --muted: #16141f;
+  --muted-foreground: #8a8697;
+  --accent: #1a1724;
   --accent-foreground: #fafafa;
   --destructive: #7f1d1d;
   --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
+  --border: transparent;
+  --input: #16141f;
   --ring: #d4d4d8;
+
+  /* Category colors (source / conduit / sink) */
+  --source: #10b981;
+  --conduit: #3b82f6;
+  --sink: #f59e0b;
+
+  /* Status colors */
+  --status-running: #4ade80;
+  --status-startup: #facc15;
+  --status-stopped: #5a5666;
+
+  /* Surface / glass tokens */
+  --glass: rgba(30, 27, 53, 0.3);
+  --glass-border: transparent;
+  --glass-hover: rgba(255, 255, 255, 0.06);
+  --glass-subtle: rgba(255, 255, 255, 0.03);
+
+  /* Grid */
+  --grid: #322e3c;
+
+  /* Edge */
+  --edge: #5a5666;
+  --edge-dot: #8a8697;
+
+  /* Handle */
+  --handle: #5a5666;
+  --handle-border: transparent;
+
+  /* Syntax highlighting */
+  --syn-param: #c4b5fd;     /* lavender — parameter names */
+  --syn-type: #67e8f9;      /* cyan — type/class names */
+  --syn-primitive: #fbbf24;  /* amber — primitive type params */
+  --syn-punct: #8a8697;      /* muted — colons, brackets */
 }
 
 body {
@@ -59,5 +106,5 @@ body {
 
 /* ReactFlow overrides for dark theme */
 .react-flow__background {
-  background-color: #09090b !important;
+  background-color: var(--background) !important;
 }

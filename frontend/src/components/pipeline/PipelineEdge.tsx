@@ -34,12 +34,12 @@ function PipelineEdgeComponent({
         id={id}
         path={edgePath}
         style={{
-          stroke: `rgba(113, 113, 122, ${opacity})`,
+          stroke: `color-mix(in srgb, var(--edge) ${opacity * 100}%, transparent)`,
           strokeWidth: thickness,
         }}
       />
       {/* Animated flowing dot */}
-      <circle r={3} fill="#a1a1aa" opacity={0.8}>
+      <circle r={3} fill="var(--edge-dot)" opacity={0.8}>
         <animateMotion dur={`${Math.max(3 - msgPerSec * 0.2, 0.5)}s`} repeatCount="indefinite" path={edgePath} />
       </circle>
     </>

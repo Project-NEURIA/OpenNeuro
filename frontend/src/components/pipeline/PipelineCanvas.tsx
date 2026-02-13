@@ -60,9 +60,9 @@ export function PipelineCanvas({
         onDrop={onDrop}
         onDragOver={onDragOver}
       >
-        <Background color="#27272a" gap={20} size={1} />
+        <Background color="var(--grid)" gap={40} size={3} />
         <Controls
-          className="!bg-zinc-800 !border-zinc-700 !rounded-lg [&>button]:!bg-zinc-800 [&>button]:!border-zinc-700 [&>button]:!text-zinc-400 [&>button:hover]:!bg-zinc-700"
+          className="!bg-secondary !border-border !rounded-lg [&>button]:!bg-secondary [&>button]:!border-border [&>button]:!text-muted-foreground [&>button:hover]:!bg-accent"
         />
       </ReactFlow>
     </div>

@@ -7,6 +7,8 @@ export interface PipelineNodeData extends Record<string, unknown> {
   category: "source" | "conduit" | "sink";
   inputs: string[];
   outputs: string[];
+  inputTypes: Record<string, string>;
+  outputTypes: Record<string, string>;
   status: string;
   nodeMetrics: NodeMetrics | null;
 }
