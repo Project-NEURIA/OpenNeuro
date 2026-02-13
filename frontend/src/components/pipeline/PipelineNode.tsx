@@ -2,103 +2,192 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import type { PipelineNodeData } from "@/hooks/usePipelineData";
+import type { ChannelMetrics } from "@/lib/types";
 
 const categoryColors: Record<string, { border: string; bg: string; badge: string; badgeText: string }> = {
   source: {
-    border: "border-emerald-500/40",
-    bg: "from-emerald-500/10 to-emerald-500/5",
-    badge: "bg-emerald-500/20",
-    badgeText: "text-emerald-400",
+    border: "border-source/40",
+    bg: "from-source/10 to-source/5",
+    badge: "bg-source/20",
+    badgeText: "text-source",
   },
   conduit: {
-    border: "border-blue-500/40",
-    bg: "from-blue-500/10 to-blue-500/5",
-    badge: "bg-blue-500/20",
-    badgeText: "text-blue-400",
+    border: "border-conduit/40",
+    bg: "from-conduit/10 to-conduit/5",
+    badge: "bg-conduit/20",
+    badgeText: "text-conduit",
   },
   sink: {
-    border: "border-amber-500/40",
-    bg: "from-amber-500/10 to-amber-500/5",
-    badge: "bg-amber-500/20",
-    badgeText: "text-amber-400",
+    border: "border-sink/40",
+    bg: "from-sink/10 to-sink/5",
+    badge: "bg-sink/20",
+    badgeText: "text-sink",
   },
 };
 
 const statusDot: Record<string, string> = {
-  running: "bg-green-400 shadow-green-400/50 shadow-[0_0_6px] animate-pulse",
-  startup: "bg-yellow-400",
-  stopped: "bg-zinc-500",
+  running: "bg-status-running shadow-status-running/50 shadow-[0_0_6px] animate-pulse",
+  startup: "bg-status-startup",
+  stopped: "bg-status-stopped",
 };
+
+/** Renders `name: Type[T]` with syntax highlighting */
+function TypeLabel({ name, type }: { name: string; type: string }) {
+  const match = type.match(/^(\w+)\[(.+)]$/);
+
+  return (
+    <span className="text-[12px] font-mono">
+      <span style={{ color: "var(--syn-param)" }}>{name}</span>
+      <span style={{ color: "var(--syn-punct)" }}>: </span>
+      {match ? (
+        <>
+          <span style={{ color: "var(--syn-type)" }}>{match[1]}</span>
+          <span style={{ color: "var(--syn-punct)" }}>[</span>
+          <span style={{ color: "var(--syn-primitive)" }}>{match[2]}</span>
+          <span style={{ color: "var(--syn-punct)" }}>]</span>
+        </>
+      ) : (
+        <span style={{ color: "var(--syn-type)" }}>{type}</span>
+      )}
+    </span>
+  );
+}
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+function formatBytes(n: number): string {
+  if (n >= 1_073_741_824) return `${(n / 1_073_741_824).toFixed(1)} GB`;
+  if (n >= 1_048_576) return `${(n / 1_048_576).toFixed(1)} MB`;
+  if (n >= 1_024) return `${(n / 1_024).toFixed(1)} KB`;
+  return `${n} B`;
+}
+
+function formatUptime(startedAt: number | null): string {
+  if (!startedAt) return "--";
+  const secs = Math.floor(Date.now() / 1000 - startedAt);
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+}
+
+function ChannelRow({ ch }: { ch: ChannelMetrics }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-foreground/60 font-medium">{ch.name}</span>
+      <div className="flex items-center gap-3">
+        <Stat label="msgs" value={formatCount(ch.msg_count)} />
+        <Stat label="bytes" value={formatBytes(ch.byte_count)} />
+        <Stat label="buf" value={String(ch.buffer_depth)} />
+        <Stat label="subs" value={String(ch.subscribers)} />
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <span className="text-foreground/70 tabular-nums">{value}</span>
+      <span className="text-muted-foreground/60 ml-0.5">{label}</span>
+    </span>
+  );
+}
 
 function PipelineNodeComponent({ data }: NodeProps) {
   const d = data as PipelineNodeData;
   const colors = categoryColors[d.category]!;
 
-  const dot = statusDot[d.status] ?? "bg-zinc-500";
+  const dot = statusDot[d.status] ?? "bg-status-stopped";
+
+  const maxSlots = Math.max(d.inputs.length, d.outputs.length, 1);
+
+  const channels = d.nodeMetrics?.channels;
+  const channelEntries = channels ? Object.values(channels) : [];
+  const uptime = formatUptime(d.nodeMetrics?.started_at ?? null);
 
   return (
     <div
       className={cn(
-        "relative rounded-xl border px-4 py-3 min-w-[180px]",
-        "bg-gradient-to-b backdrop-blur-md",
-        "bg-zinc-900/80",
+        "relative rounded-2xl border px-6 py-5 min-w-[360px]",
+        "bg-gradient-to-b backdrop-blur-xs",
+        "bg-glass backdrop-saturate-150",
         colors.border,
         colors.bg,
       )}
     >
-      {/* Input handles */}
-      {d.inputs.map((name, i) => (
-        <Handle
-          key={`in-${name}`}
-          id={`in-${name}`}
-          type="target"
-          position={Position.Left}
-          className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"
-          style={{ top: `${((i + 1) / (d.inputs.length + 1)) * 100}%` }}
-        />
-      ))}
-
       {/* Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className={cn("w-2 h-2 rounded-full shrink-0", dot)} />
-        <span className="font-semibold text-sm text-zinc-100 truncate">
+      <div className="flex items-center gap-3 pb-5 border-b border-white/[0.06]">
+        <div className={cn("w-3 h-3 rounded-full shrink-0", dot)} />
+        <span
+          className="font-bold text-xl truncate"
+          style={{ color: "color(display-p3 1.4 1.4 1.4)" }}
+        >
           {d.label}
         </span>
         <span
           className={cn(
-            "ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-md uppercase tracking-wider",
+            "ml-auto text-[11px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider",
             colors.badge,
-            colors.badgeText,
           )}
+          style={{ color: `color(display-p3 ${d.category === "source" ? "0.2 1.2 0.6" : d.category === "sink" ? "1.2 0.8 0.1" : "0.3 0.6 1.3"})` }}
         >
           {d.category}
         </span>
       </div>
 
-      {/* Type labels */}
-      <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-2">
-        {d.inputs.length > 0 && (
-          <span className="font-mono">{d.inputs.join(", ")}</span>
-        )}
-        {d.inputs.length > 0 && d.outputs.length > 0 && <span>-&gt;</span>}
-        {d.outputs.length > 0 && (
-          <span className={cn("font-mono", d.inputs.length === 0 && "ml-auto")}>
-            {d.outputs.join(", ")}
-          </span>
-        )}
+      {/* Type rows with inline handles */}
+      <div className="flex flex-col gap-3 py-5">
+        {Array.from({ length: maxSlots }, (_, i) => {
+          const inName = d.inputs[i];
+          const outName = d.outputs[i];
+          return (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {inName && (
+                  <Handle
+                    id={`in-${inName}`}
+                    type="target"
+                    position={Position.Left}
+                    className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-ml-[32px]"
+                  />
+                )}
+                {inName && <TypeLabel name={inName} type={d.inputTypes[inName] ?? inName} />}
+              </div>
+              <div className="flex items-center gap-2">
+                {outName && <TypeLabel name={outName} type={d.outputTypes[outName] ?? outName} />}
+                {outName && (
+                  <Handle
+                    id={`out-${outName}`}
+                    type="source"
+                    position={Position.Right}
+                    className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-mr-[32px]"
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Output handles */}
-      {d.outputs.map((name, i) => (
-        <Handle
-          key={`out-${name}`}
-          id={`out-${name}`}
-          type="source"
-          position={Position.Right}
-          className="!w-3 !h-3 !bg-zinc-600 !border-zinc-500"
-          style={{ top: `${((i + 1) / (d.outputs.length + 1)) * 100}%` }}
-        />
-      ))}
+      {/* Metrics */}
+      <div className="pt-5 border-t border-white/[0.06] text-[10px] font-mono space-y-2">
+        {/* Uptime bar */}
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground/60 uppercase tracking-wider">uptime</span>
+          <span className="text-foreground/70 tabular-nums">{uptime}</span>
+        </div>
+
+        {/* Channel metrics */}
+        {channelEntries.length > 0 ? (
+          channelEntries.map((ch) => <ChannelRow key={ch.name} ch={ch} />)
+        ) : (
+          <div className="text-muted-foreground/40 text-center py-1">awaiting data</div>
+        )}
+      </div>
     </div>
   );
 }

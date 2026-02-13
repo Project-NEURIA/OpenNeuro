@@ -86,6 +86,8 @@ function AppInner() {
                 category: info?.category ?? "conduit",
                 inputs: info ? Object.keys(info.inputs) : [],
                 outputs: info ? Object.keys(info.outputs) : [],
+                inputTypes: info?.inputs ?? {},
+                outputTypes: info?.outputs ?? {},
                 status: n.status,
                 nodeMetrics: null,
               } satisfies PipelineNodeData,
@@ -215,6 +217,8 @@ function AppInner() {
           category: item.category,
           inputs: Object.keys(item.inputs),
           outputs: Object.keys(item.outputs),
+          inputTypes: item.inputs,
+          outputTypes: item.outputs,
           status: "startup",
           nodeMetrics: null,
         },
@@ -231,20 +235,18 @@ function AppInner() {
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="relative h-screen w-screen overflow-hidden">
+      <PipelineCanvas
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+      />
       <NodeSidebar components={components} />
-      <div className="relative flex-1">
-        <MetricsOverlay connected={connected} metrics={metrics} />
-        <PipelineCanvas
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-        />
-      </div>
+      <MetricsOverlay connected={connected} metrics={metrics} />
     </div>
   );
 }
