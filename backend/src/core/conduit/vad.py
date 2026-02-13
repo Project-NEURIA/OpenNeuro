@@ -96,7 +96,7 @@ class VAD(Component[[Channel[bytes]], VADOutputs]):
         return outputs[0][0].item() > self._turn_threshold
 
     def run(self, audio: Channel[bytes]) -> None:
-        for data in audio.stream(self.stop_event):
+        for data in audio.stream(self):
             if data is None:
                 break
             pcm = np.frombuffer(data, dtype=np.int16)

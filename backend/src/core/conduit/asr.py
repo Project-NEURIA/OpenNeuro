@@ -25,7 +25,7 @@ class ASR(Component[[Channel[bytes]], ASROutputs]):
         return {"text": self._output_text}
 
     def run(self, audio: Channel[bytes]) -> None:
-        for pcm48 in audio.stream(self.stop_event):
+        for pcm48 in audio.stream(self):
             if pcm48 is None:
                 break
             pcm = np.frombuffer(pcm48, dtype=np.int16)

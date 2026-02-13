@@ -111,7 +111,7 @@ class TTS(Component[[Channel[str]], TTSOutputs]):
         return {"audio": self._output_audio}
 
     def run(self, text: Channel[str]) -> None:
-        for chunk in text.stream(self.stop_event):
+        for chunk in text.stream(self):
             if chunk is None:
                 break
             if chunk == "":

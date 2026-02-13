@@ -79,10 +79,10 @@ function ChannelRow({ ch }: { ch: ChannelMetrics }) {
     <div className="flex items-center justify-between gap-4">
       <span className="text-foreground/60 font-medium">{ch.name}</span>
       <div className="flex items-center gap-3">
-        <Stat label="msgs" value={formatCount(ch.msg_count)} />
-        <Stat label="bytes" value={formatBytes(ch.byte_count)} />
+        <Stat label="msgs" value={formatCount(ch.msg_count_delta)} />
+        <Stat label="bytes" value={formatBytes(ch.byte_count_delta)} />
         <Stat label="buf" value={String(ch.buffer_depth)} />
-        <Stat label="subs" value={String(ch.subscribers)} />
+        <Stat label="subs" value={String(Object.keys(ch.subscribers).length)} />
       </div>
     </div>
   );

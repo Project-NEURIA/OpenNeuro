@@ -82,7 +82,7 @@ function AppInner() {
               type: "pipeline",
               position: { x: pos.x, y: pos.y },
               data: {
-                label: n.id,
+                label: n.type,
                 category: info?.category ?? "conduit",
                 inputs: info ? Object.keys(info.inputs) : [],
                 outputs: info ? Object.keys(info.outputs) : [],
@@ -112,7 +112,7 @@ function AppInner() {
     })();
   }, [components, componentMap, setNodes, setEdges]);
 
-  // Update node data with metrics (preserve positions)
+  // Update node and edge data with metrics
   useEffect(() => {
     if (!initialized.current || !metrics) return;
     setNodes((prev) =>
@@ -130,7 +130,18 @@ function AppInner() {
         };
       })
     );
-  }, [metrics, setNodes]);
+    setEdges((prev) =>
+      prev.map((e) => {
+        const slot = parseSlot(e.sourceHandle);
+        const ch = metrics.nodes[e.source]?.channels?.[slot];
+        const sub = ch?.subscribers?.[e.target];
+        return {
+          ...e,
+          data: { byteDelta: sub?.byte_count_delta ?? 0 },
+        };
+      })
+    );
+  }, [metrics, setNodes, setEdges]);
 
   // Wrap node changes — detect removals and call backend
   const onNodesChange: OnNodesChange = useCallback(
@@ -208,28 +219,26 @@ function AppInner() {
       const item = JSON.parse(raw) as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      const newNode: Node<PipelineNodeData> = {
-        id: item.name,
-        type: "pipeline",
-        position,
-        data: {
-          label: item.name,
-          category: item.category,
-          inputs: Object.keys(item.inputs),
-          outputs: Object.keys(item.outputs),
-          inputTypes: item.inputs,
-          outputTypes: item.outputs,
-          status: "startup",
-          nodeMetrics: null,
-        },
-      };
-
-      setNodes((nds) => {
-        if (nds.some((n) => n.id === newNode.id)) return nds;
-        return [...nds, newNode];
-      });
-
-      apiCreateNode(item.name, item.name).catch(console.error);
+      apiCreateNode(item.name)
+        .then((res) => {
+          const newNode: Node<PipelineNodeData> = {
+            id: res.id,
+            type: "pipeline",
+            position,
+            data: {
+              label: item.name,
+              category: item.category,
+              inputs: Object.keys(item.inputs),
+              outputs: Object.keys(item.outputs),
+              inputTypes: item.inputs,
+              outputTypes: item.outputs,
+              status: "startup",
+              nodeMetrics: null,
+            },
+          };
+          setNodes((nds) => [...nds, newNode]);
+        })
+        .catch(console.error);
     },
     [screenToFlowPosition, setNodes]
   );

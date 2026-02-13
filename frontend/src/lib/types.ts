@@ -8,13 +8,19 @@ export interface ComponentInfo {
   outputs: Record<string, string>;
 }
 
+export interface SubscriberSnapshot {
+  lag: number;
+  msg_count_delta: number;
+  byte_count_delta: number;
+}
+
 export interface ChannelMetrics {
   name: string;
-  msg_count: number;
-  byte_count: number;
+  msg_count_delta: number;
+  byte_count_delta: number;
   last_send_time: number;
   buffer_depth: number;
-  subscribers: number;
+  subscribers: Record<string, SubscriberSnapshot>;
 }
 
 export interface NodeMetrics {
