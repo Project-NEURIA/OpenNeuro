@@ -5,6 +5,17 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
+/** Map byte throughput delta to a color from cold (idle) to hot (busy). */
+function throughputColor(byteDelta: number): string {
+  if (byteDelta === 0) return "var(--edge)";
+  // Normalize: ~10 KB/tick = full intensity
+  const t = Math.min(byteDelta / 10_000, 1);
+  // Interpolate hue from 120 (green/idle) → 0 (red/hot)
+  const hue = Math.round(120 * (1 - t));
+  const lightness = 45 + t * 15;
+  return `hsl(${hue} 80% ${lightness}%)`;
+}
+
 function PipelineEdgeComponent({
   id,
   sourceX,
@@ -15,9 +26,9 @@ function PipelineEdgeComponent({
   targetPosition,
   data,
 }: EdgeProps) {
-  const msgPerSec = (data as Record<string, unknown>)?.msgPerSec as number ?? 0;
-  const thickness = Math.min(1.5 + msgPerSec * 0.3, 5);
-  const opacity = Math.min(0.3 + msgPerSec * 0.07, 1);
+  const byteDelta = (data as Record<string, unknown>)?.byteDelta as number ?? 0;
+  const color = throughputColor(byteDelta);
+  const thickness = Math.min(1.5 + (byteDelta / 10_000) * 2.5, 4);
 
   const [edgePath] = getBezierPath({
     sourceX,
@@ -29,20 +40,15 @@ function PipelineEdgeComponent({
   });
 
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={{
-          stroke: `color-mix(in srgb, var(--edge) ${opacity * 100}%, transparent)`,
-          strokeWidth: thickness,
-        }}
-      />
-      {/* Animated flowing dot */}
-      <circle r={3} fill="var(--edge-dot)" opacity={0.8}>
-        <animateMotion dur={`${Math.max(3 - msgPerSec * 0.2, 0.5)}s`} repeatCount="indefinite" path={edgePath} />
-      </circle>
-    </>
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      style={{
+        stroke: color,
+        strokeWidth: thickness,
+        transition: "stroke 0.3s ease, stroke-width 0.3s ease",
+      }}
+    />
   );
 }
 

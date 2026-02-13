@@ -15,21 +15,18 @@ def get_node(graph: Graph, node_id: str) -> Node | None:
     return graph.nodes.get(node_id)
 
 
-def create_node(graph: Graph, node_type: str, node_id: str | None = None) -> Node:
+def create_node(graph: Graph, node_type: str) -> tuple[str, Node]:
     classes = Component.registered_subclasses()
     cls = classes.get(node_type)
     if cls is None:
         raise ValueError(f"Unknown node type: {node_type}")
 
-    node_id = node_id or node_type
-    if node_id in graph.nodes:
-        return graph.nodes[node_id]
-
     comp = cls()
-    comp.name = node_id
+    node_id = str(id(comp))
+    comp.name = node_type
     node = Node(inner=comp)
     graph.nodes[node_id] = node
-    return node
+    return node_id, node
 
 
 def delete_node(graph: Graph, node_id: str) -> None:

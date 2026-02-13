@@ -69,7 +69,7 @@ class STS(Component[[Channel[bytes]], STSOutputs]):
     def _send_loop(self, ws: Connection, audio: Channel[bytes]) -> None:
         from websockets.exceptions import ConnectionClosed
 
-        for data in audio.stream(self.stop_event):
+        for data in audio.stream(self):
             if data is None:
                 break
             pcm48 = np.frombuffer(data, dtype=np.int16)

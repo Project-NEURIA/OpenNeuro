@@ -30,10 +30,9 @@ def get_node(node_id: str, graph: Graph = Depends(get_graph)) -> NodeResponse:
 @router.post("/nodes", status_code=201)
 def create_node(req: NodeCreateRequest, graph: Graph = Depends(get_graph)) -> NodeResponse:
     try:
-        node = service.create_node(graph, req.type, req.id)
+        node_id, node = service.create_node(graph, req.type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    node_id = req.id or req.type
     return _node_response(node_id, node)
 
 

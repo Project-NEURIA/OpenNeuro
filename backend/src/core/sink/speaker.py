@@ -33,7 +33,7 @@ class Speaker(Component[[Channel[bytes]], SpeakerOutputs]):
             channels=self._channels,
             dtype="int16",
         ) as stream:
-            for pcm in audio.stream(self.stop_event):
+            for pcm in audio.stream(self):
                 if pcm is None:
                     break
                 data = np.frombuffer(pcm, dtype=np.int16)

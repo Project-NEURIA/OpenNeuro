@@ -24,7 +24,7 @@ class LLM(Component[[Channel[str]], LLMOutputs]):
         return {"text": self._output_text}
 
     def run(self, text: Channel[str]) -> None:
-        for chunk in text.stream(self.stop_event):
+        for chunk in text.stream(self):
             if chunk is None:
                 break
             self._messages.append({"role": "user", "content": chunk})

@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 class NodeCreateRequest(BaseModel):
     type: str
-    id: str | None = None
 
 
 class NodeResponse(BaseModel):
