@@ -27,7 +27,7 @@ class Mic(Component[[], MicOutputs]):
         self._frame_samples = int(sample_rate * frame_ms / 1000)
         self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def output_channels(self) -> MicOutputs:
+    def get_output_channels(self) -> MicOutputs:
         return {"audio": self._output_audio}
 
     def run(self) -> None:

@@ -129,7 +129,7 @@ def start_all(graph: Graph) -> None:
 
     for edge in graph.edges:
         source = graph.nodes[edge.source_node].inner
-        channel = source.output_channels()[edge.source_slot]
+        channel = source.get_output_channels()[edge.source_slot]
         comp_inputs[edge.target_node][edge.target_slot] = channel
 
     for node_id, node in graph.nodes.items():

@@ -47,7 +47,7 @@ class VAD(Component[[Channel[bytes]], VADOutputs]):
 
         self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def output_channels(self) -> VADOutputs:
+    def get_output_channels(self) -> VADOutputs:
         return {"audio": self._output_audio}
 
     def _load_silero(self) -> None:

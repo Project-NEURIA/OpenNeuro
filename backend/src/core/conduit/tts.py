@@ -107,7 +107,7 @@ class TTS(Component[[Channel[str]], TTSOutputs]):
         self._filter = StreamFilter()
         self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def output_channels(self) -> TTSOutputs:
+    def get_output_channels(self) -> TTSOutputs:
         return {"audio": self._output_audio}
 
     def run(self, text: Channel[str]) -> None:
