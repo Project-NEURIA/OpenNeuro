@@ -20,7 +20,7 @@ class LLM(Component[[Channel[str]], LLMOutputs]):
         ]
         self._output_text: Channel[str] = Channel(name="text")
 
-    def output_channels(self) -> LLMOutputs:
+    def get_output_channels(self) -> LLMOutputs:
         return {"text": self._output_text}
 
     def run(self, text: Channel[str]) -> None:

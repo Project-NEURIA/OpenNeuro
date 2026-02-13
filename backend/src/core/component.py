@@ -47,7 +47,7 @@ class Component[**P, O: Mapping[str, Any]](ABC):
     def run(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 
     @abstractmethod
-    def output_channels(self) -> O: ...
+    def get_output_channels(self) -> O: ...
 
     def _safe_run(self, *args: P.args, **kwargs: P.kwargs) -> None:
         self._status = Status.RUNNING
@@ -80,7 +80,7 @@ class Component[**P, O: Mapping[str, Any]](ABC):
             name=self.name,
             status=self.status.value,
             started_at=self._started_at,
-            channels={n: ch.snapshot() for n, ch in self.output_channels().items()},
+            channels={n: ch.snapshot() for n, ch in self.get_output_channels().items()},
         )
 
     @classmethod
@@ -99,8 +99,8 @@ class Component[**P, O: Mapping[str, Any]](ABC):
 
     @classmethod
     def get_output_types(cls) -> dict[str, type]:
-        """Introspect output_channels()'s return type (TypedDict) for output types."""
-        hints = get_type_hints(cls.output_channels)
+        """Introspect get_output_channels()'s return type (TypedDict) for output types."""
+        hints = get_type_hints(cls.get_output_channels)
         td = hints.get("return")
         if td is None:
             return {}

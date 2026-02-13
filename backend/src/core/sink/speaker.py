@@ -24,7 +24,7 @@ class Speaker(Component[[Channel[bytes]], SpeakerOutputs]):
         self._sample_rate = sample_rate
         self._channels = channels
 
-    def output_channels(self) -> SpeakerOutputs:
+    def get_output_channels(self) -> SpeakerOutputs:
         return {}
 
     def run(self, audio: Channel[bytes]) -> None:

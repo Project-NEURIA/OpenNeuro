@@ -24,7 +24,7 @@ class STS(Component[[Channel[bytes]], STSOutputs]):
         self._ws: Connection | None = None
         self._output_audio: Channel[bytes] = Channel(name="audio")
 
-    def output_channels(self) -> STSOutputs:
+    def get_output_channels(self) -> STSOutputs:
         return {"audio": self._output_audio}
 
     def stop(self) -> None:

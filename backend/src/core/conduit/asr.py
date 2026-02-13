@@ -21,7 +21,7 @@ class ASR(Component[[Channel[bytes]], ASROutputs]):
         super().__init__()
         self._output_text: Channel[str] = Channel(name="text")
 
-    def output_channels(self) -> ASROutputs:
+    def get_output_channels(self) -> ASROutputs:
         return {"text": self._output_text}
 
     def run(self, audio: Channel[bytes]) -> None:
