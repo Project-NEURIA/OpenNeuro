@@ -1,0 +1,20 @@
+{
+  "system_prompt": "You are Donald Trump. You are at your desk, the phone rang. Keep your response short and conversational, words only, no actions or **.",
+  "user_name": "Caller",
+  "chatbot_name": "Donald",
+  "discord": {
+    "guild_ids": [1228073384345079951, 1459362547164778581]
+  },
+  "tts": {
+    "url": "https://api.inworld.ai/tts/v1/voice:stream",
+    "voice_id": "default-emqelqrpeb-xfbkcxv40uw__donald",
+    "model_id": "inworld-tts-1.5-mini"
+  },
+  "yapper_llm": {
+    "url": "https://api.groq.com/openai/v1/chat/completions",
+    "model_id": "moonshotai/kimi-k2-instruct-0905",
+    "top_p": 0.97,
+    "temperature": 1.0,
+    "max_tokens": 350
+  }
+}

@@ -14,6 +14,7 @@ import {
 import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
 import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
 import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
+import { FramesInspector } from "@/components/frames/FramesInspector";
 import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
 import { useComponents } from "@/hooks/useComponents";
 import { layoutNodes } from "@/lib/layout";
@@ -81,10 +82,15 @@ function AppInner() {
               id: n.id,
               type: "pipeline",
               position: { x: pos.x, y: pos.y },
+              style: {
+                width: 200,
+                height: Math.max(80, 40 + ((info?.input_names?.length || 0) * 40)),
+              },
               data: {
                 label: n.id,
                 category: info?.category ?? "conduit",
                 inputs: info?.inputs ?? [],
+                input_names: info?.input_names ?? [],
                 outputs: info?.outputs ?? [],
                 status: n.status,
                 nodeMetrics: null,
@@ -210,10 +216,15 @@ function AppInner() {
         id: item.name,
         type: "pipeline",
         position,
+        style: {
+          width: 200,
+          height: Math.max(80, 40 + (item.input_names.length * 40)),
+        },
         data: {
           label: item.name,
           category: item.category,
           inputs: item.inputs,
+          input_names: item.input_names,
           outputs: item.outputs,
           status: "startup",
           nodeMetrics: null,
@@ -245,6 +256,7 @@ function AppInner() {
           onDragOver={onDragOver}
         />
       </div>
+      <FramesInspector />
     </div>
   );
 }

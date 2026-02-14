@@ -4,6 +4,7 @@ export interface ComponentInfo {
   name: string;
   category: NodeCategory;
   inputs: string[];
+  input_names: string[];  // Human-readable names for each input slot
   outputs: string[];
 }
 
@@ -25,5 +26,18 @@ export interface NodeMetrics {
 
 export interface MetricsSnapshot {
   nodes: Record<string, NodeMetrics>;
+  timestamp: number;
+}
+
+export interface FrameSnapshot {
+  id: number;
+  frame_type_string: string;
+  pts: number;
+  size_bytes: number;
+  message: string; // __str__ representation
+}
+
+export interface FramesSnapshot {
+  frames: FrameSnapshot[];
   timestamp: number;
 }

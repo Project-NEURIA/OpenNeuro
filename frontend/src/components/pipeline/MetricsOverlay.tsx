@@ -60,7 +60,10 @@ export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
       <div className="w-px h-3 bg-zinc-700" />
 
       <button
-        onClick={() => startAll().catch(console.error)}
+        onClick={() => {
+          startAll().catch(console.error);
+          window.dispatchEvent(new CustomEvent('pipeline-start'));
+        }}
         disabled={isRunning}
         className={cn(
           "p-1 rounded transition-colors",
@@ -72,7 +75,10 @@ export function MetricsOverlay({ connected, metrics }: MetricsOverlayProps) {
         <Play className="w-3.5 h-3.5" />
       </button>
       <button
-        onClick={() => stopAll().catch(console.error)}
+        onClick={() => {
+          stopAll().catch(console.error);
+          window.dispatchEvent(new CustomEvent('pipeline-stop'));
+        }}
         disabled={!isRunning}
         className={cn(
           "p-1 rounded transition-colors",

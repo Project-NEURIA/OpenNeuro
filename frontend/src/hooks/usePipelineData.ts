@@ -6,6 +6,7 @@ export interface PipelineNodeData extends Record<string, unknown> {
   label: string;
   category: "source" | "conduit" | "sink";
   inputs: string[];
+  input_names: string[];
   outputs: string[];
   status: string;
   nodeMetrics: NodeMetrics | null;
