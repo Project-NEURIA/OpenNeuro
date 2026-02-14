@@ -16,7 +16,7 @@ from src.core.config import BaseConfig
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
 
-class YapperConfig(BaseConfig):
+class LLMConfig(BaseConfig):
     url: str = "https://api.groq.com/openai/v1/chat/completions"
     model_id: str = "llama3-8b-8192"
     top_p: float = 0.97
@@ -24,17 +24,17 @@ class YapperConfig(BaseConfig):
     max_tokens: int = 350
 
 
-class YapperOutputs(TypedDict):
+class LLMOutputs(TypedDict):
     text: Channel[TextFrame]
     interrupt: Channel[InterruptFrame]
 
 
-class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], YapperOutputs]):
+class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutputs]):
     """LLM text generation component using Groq API."""
 
-    def __init__(self, config: YapperConfig | None = None) -> None:
-        super().__init__(config or YapperConfig())
-        self.config: YapperConfig
+    def __init__(self, config: LLMConfig | None = None) -> None:
+        super().__init__(config or LLMConfig())
+        self.config: LLMConfig
         self._output_text = Channel[TextFrame](name="text")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
         
@@ -45,14 +45,14 @@ class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], Yapper
         # Task queue for worker thread
         self._task_queue: Queue[tuple[int, MessagesFrame]] = Queue()
 
-    def get_output_channels(self) -> YapperOutputs:
+    def get_output_channels(self) -> LLMOutputs:
         return {
             "text": self._output_text,
             "interrupt": self._output_interrupt
         }
 
     def _worker(self) -> None:
-        print("[Yapper] Worker thread started")
+        print("[LLM] Worker thread started")
         while not self.stop_event.is_set():
             try:
                 gen, frame = self._task_queue.get(timeout=0.1)
@@ -65,10 +65,10 @@ class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], Yapper
             except Empty:
                 continue
             except Exception as e:
-                print(f"[Yapper] Worker error: {e}")
+                print(f"[LLM] Worker error: {e}")
 
     def run(self, messages: Channel[MessagesFrame] | None = None, interrupt: Channel[InterruptFrame] | None = None) -> None:
-        print("[Yapper] Starting LLM generation")
+        print("[LLM] Starting LLM generation")
         
         worker_thread = threading.Thread(target=self._worker, daemon=True)
         worker_thread.start()
@@ -77,7 +77,7 @@ class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], Yapper
             if not interrupt: return
             for frame in interrupt.stream(self):
                 if frame is None: break
-                print(f"[Yapper] Interrupt received: {frame.get()}")
+                print(f"[LLM] Interrupt received: {frame.get()}")
                 
                 # Signal interruption to generation loop
                 with self._gen_lock:
@@ -102,12 +102,12 @@ class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], Yapper
                 self._task_queue.put((gen, frame))
         
         worker_thread.join(timeout=1)
-        print("[Yapper] LLM generation stopped")
+        print("[LLM] LLM generation stopped")
 
     def _process_generation(self, gen: int, frame: MessagesFrame) -> None:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
-            print("[Yapper] GROQ_API_KEY not set")
+            print("[LLM] GROQ_API_KEY not set")
             return
         
         headers = {
@@ -159,4 +159,4 @@ class Yapper(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], Yapper
                     self._output_text.send(TextFrame(display_name="llm_chunk", text=text))
                     
         except Exception as e:
-            print(f"[Yapper] Generation error: {e}")
+            print(f"[LLM] Generation error: {e}")
