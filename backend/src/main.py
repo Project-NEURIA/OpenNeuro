@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.graph.controller import router as graph_router
 from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
+from src.api.video.controller import router as video_router
 from src.api.graph.domain.graph import Graph
 
 
@@ -33,6 +34,7 @@ app.add_middleware(
 app.include_router(graph_router)
 app.include_router(metrics_router)
 app.include_router(component_router)
+app.include_router(video_router)
 
 
 def main() -> None:

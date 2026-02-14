@@ -1,4 +1,4 @@
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Puzzle } from "lucide-react";
+import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Puzzle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo } from "@/lib/types";
 
@@ -10,6 +10,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   TTS: Volume2,
   STS: Radio,
   Speaker,
+  VRChatVideo: Video,
+  VideoStream: Monitor,
 };
 
 const catAccent: Record<string, { icon: string }> = {
