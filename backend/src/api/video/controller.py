@@ -1,30 +1,27 @@
 from __future__ import annotations
 
-import asyncio
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
+from src.api.dep import get_graph
 from src.api.graph.domain.graph import Graph
 from src.core.sink.video_stream import VideoStream
 
 router = APIRouter(prefix="/video")
 
 
-@router.websocket("/ws/{node_id}")
-async def video_stream(websocket: WebSocket, node_id: str) -> None:
-    graph: Graph = websocket.app.state.graph
+@router.get("/{node_id}/frame")
+def get_frame(node_id: str, graph: Graph = Depends(get_graph)) -> Response:
     node = graph.nodes.get(node_id)
     if node is None or not isinstance(node.inner, VideoStream):
-        await websocket.close(code=4004, reason="Not a VideoStream node")
-        return
+        raise HTTPException(status_code=404, detail="Not a VideoStream node")
 
-    sink: VideoStream = node.inner
-    await websocket.accept()
+    frame = node.inner.latest_frame
+    if frame is None:
+        raise HTTPException(status_code=204)
 
-    try:
-        while True:
-            frame = await asyncio.to_thread(sink.wait_for_frame, 1.0)
-            if frame is not None:
-                await websocket.send_bytes(frame)
-    except WebSocketDisconnect:
-        pass
+    return Response(
+        content=frame,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "no-store"},
+    )
