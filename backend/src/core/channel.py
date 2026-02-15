@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
 from pydantic import BaseModel
 
@@ -27,7 +27,6 @@ class ChannelSnapshot(BaseModel):
 
 
 class Channel[T]:
-
     def __init__(self, *, name: str | None = None) -> None:
         self._items: list[T] = []
         self._offset = 0
@@ -42,7 +41,9 @@ class Channel[T]:
 
     def send(self, item: T) -> None:
         with self._condition:
-            if not self._cursors: # stop data from accumulating when no one is listening
+            if (
+                not self._cursors
+            ):  # stop data from accumulating when no one is listening
                 return
             self._items.append(item)
             self._msg_count_delta += 1
@@ -78,7 +79,9 @@ class Channel[T]:
             subscribers=subs,
         )
 
-    def stream(self, subscriber: Component[..., ...]) -> Generator[T | None, None, None]:
+    def stream(
+        self, subscriber: "Component[Any, Any]"
+    ) -> Generator[T | None, None, None]:
         """On GeneratorExit, stream is unregistered."""
         stop_event = subscriber.stop_event
         sub_id = self._register(subscriber)
@@ -90,7 +93,7 @@ class Channel[T]:
         finally:
             self._unregister(sub_id)
 
-    def _register(self, subscriber: Component[..., ...]) -> int:
+    def _register(self, subscriber: "Component[Any, Any]") -> int:
         sub_id = id(subscriber)
         with self._condition:
             self._cursors[sub_id] = self._offset + len(self._items)
@@ -107,8 +110,12 @@ class Channel[T]:
                     return None
             item = self._items[index - self._offset]
             self._cursors[sub_id] = index + 1
-            self._sub_msg_count_delta[sub_id] = self._sub_msg_count_delta.get(sub_id, 0) + 1
-            self._sub_byte_count_delta[sub_id] = self._sub_byte_count_delta.get(sub_id, 0) + sys.getsizeof(item)
+            self._sub_msg_count_delta[sub_id] = (
+                self._sub_msg_count_delta.get(sub_id, 0) + 1
+            )
+            self._sub_byte_count_delta[sub_id] = self._sub_byte_count_delta.get(
+                sub_id, 0
+            ) + sys.getsizeof(item)
             self._gc()
         return item
 

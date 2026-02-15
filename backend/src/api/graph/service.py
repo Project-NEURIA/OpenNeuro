@@ -44,18 +44,20 @@ def load_graph(path: str | Path = "saves/graph.json") -> Graph:
                     config_cls_name = config_cls.split("|")[0].strip()
                 else:
                     config_cls_name = config_cls
-                
+
                 # Get the module where the class is defined
                 module = inspect.getmodule(cls)
                 if module:
                     config_cls = getattr(module, config_cls_name)
-            
+
             if hasattr(config_cls, "from_dict"):
                 config = config_cls.from_dict(node_data["config"])
 
         comp = cls(config=config)
         comp.name = node_type
-        nodes[node_id] = Node(inner=comp, x=node_data.get("x", 0.0), y=node_data.get("y", 0.0))
+        nodes[node_id] = Node(
+            inner=comp, x=node_data.get("x", 0.0), y=node_data.get("y", 0.0)
+        )
 
     edges = [Edge(**e) for e in data.get("edges", [])]
     return Graph(nodes=nodes, edges=edges)
@@ -104,8 +106,7 @@ def delete_node(graph: Graph, node_id: str) -> None:
             affected.add(edge.source_node)
 
     graph.edges = [
-        e for e in graph.edges
-        if e.source_node != node_id and e.target_node != node_id
+        e for e in graph.edges if e.source_node != node_id and e.target_node != node_id
     ]
 
     for affected_id in affected:
@@ -139,12 +140,16 @@ def create_edge(
     # Validate source_slot exists in source's output types
     source_types = type(source.inner).get_output_types()
     if source_slot not in source_types:
-        raise ValueError(f"source_slot '{source_slot}' not found in {source_node}'s outputs ({list(source_types)})")
+        raise ValueError(
+            f"source_slot '{source_slot}' not found in {source_node}'s outputs ({list(source_types)})"
+        )
 
     # Validate target_slot exists in target's input types
     target_types = type(target.inner).get_input_types()
     if target_slot not in target_types:
-        raise ValueError(f"target_slot '{target_slot}' not found in {target_node}'s inputs ({list(target_types)})")
+        raise ValueError(
+            f"target_slot '{target_slot}' not found in {target_node}'s inputs ({list(target_types)})"
+        )
 
     edge = Edge(
         source_node=source_node,

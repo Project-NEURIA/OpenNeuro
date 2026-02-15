@@ -66,7 +66,9 @@ class Component[**P, O: Mapping[str, Any]](ABC):
         if self.status == Status.RUNNING:
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._safe_run, args=args, kwargs=kwargs, daemon=True)
+        self._thread = threading.Thread(
+            target=self._safe_run, args=args, kwargs=kwargs, daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:

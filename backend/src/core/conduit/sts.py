@@ -4,7 +4,7 @@ import base64
 import json
 import os
 import threading
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from websockets.sync.client import connect, Connection
 
@@ -41,7 +41,11 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
     def get_output_channels(self) -> STSOutputs:
         return {"audio": self._output_audio}
 
-    def run(self, audio: Channel[AudioFrame] | None = None, interrupt: Channel[InterruptFrame] | None = None) -> None:
+    def run(
+        self,
+        audio: Channel[AudioFrame] | None = None,
+        interrupt: Channel[InterruptFrame] | None = None,
+    ) -> None:
         url = f"wss://api.openai.com/v1/realtime?model={self.config.model}"
         headers = {
             "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
@@ -50,24 +54,32 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
 
         with connect(url, additional_headers=headers) as ws:
             self._ws = ws
-            ws.send(json.dumps({
-                "type": "session.update",
-                "session": {
-                    "modalities": ["text", "audio"],
-                    "voice": self.config.voice,
-                    "input_audio_format": "pcm16",
-                    "output_audio_format": "pcm16",
-                    "turn_detection": {"type": "server_vad"},
-                },
-            }))
+            ws.send(
+                json.dumps(
+                    {
+                        "type": "session.update",
+                        "session": {
+                            "modalities": ["text", "audio"],
+                            "voice": self.config.voice,
+                            "input_audio_format": "pcm16",
+                            "output_audio_format": "pcm16",
+                            "turn_detection": {"type": "server_vad"},
+                        },
+                    }
+                )
+            )
 
             if audio:
-                threading.Thread(target=self._send_loop, args=(ws, audio), daemon=True).start()
+                threading.Thread(
+                    target=self._send_loop, args=(ws, audio), daemon=True
+                ).start()
 
             if interrupt:
+
                 def listen_interrupts():
                     for frame in interrupt.stream(self):
-                        if frame is None: break
+                        if frame is None:
+                            break
                         # Use .get() instead of .reason
                         print(f"[STS] Interrupt received: {frame.get()}")
                         # Clear the audio buffer on the server
@@ -78,7 +90,7 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
             for msg in ws:
                 if self.stop_event.is_set():
                     break
-                
+
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])
@@ -91,15 +103,18 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                     )
                     self._output_audio.send(frame)
 
-    def _send_loop(self, ws: Connection, audio: Channel[AudioFrame] | None = None) -> None:
+    def _send_loop(
+        self, ws: Connection, audio: Channel[AudioFrame] | None = None
+    ) -> None:
         from websockets.exceptions import ConnectionClosed
+
         if not audio:
             return
 
         for frame in audio.stream(self):
             if frame is None:
                 break
-            
+
             # OpenAI expects 24kHz pcm16 base64
             pcm_bytes = frame.get(
                 sample_rate=24000,
@@ -107,11 +122,15 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                 data_format=AudioDataFormat.PCM16,
             )
             b64 = base64.b64encode(pcm_bytes).decode("utf-8")
-            
+
             try:
-                ws.send(json.dumps({
-                    "type": "input_audio_buffer.append",
-                    "audio": b64,
-                }))
+                ws.send(
+                    json.dumps(
+                        {
+                            "type": "input_audio_buffer.append",
+                            "audio": b64,
+                        }
+                    )
+                )
             except ConnectionClosed:
                 break
