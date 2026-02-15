@@ -253,21 +253,19 @@ function AppInner() {
       const item = JSON.parse(raw) as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      // Check if the config init param has object properties to configure
-      const configSchema = item.init.config;
-      let hasConfig = false;
-      if (configSchema && typeof configSchema === "object") {
-        const s = configSchema as Record<string, unknown>;
-        if (s.properties) {
-          hasConfig = true;
-        } else if (Array.isArray(s.anyOf)) {
-          hasConfig = (s.anyOf as Record<string, unknown>[]).some(
+      // Check if any init param has configurable properties
+      const hasConfig = Object.values(item.init).some((schema) => {
+        if (!schema || typeof schema !== "object") return false;
+        const s = schema as Record<string, unknown>;
+        if (s.properties) return true;
+        if (s.$ref) return true;
+        if (Array.isArray(s.anyOf)) {
+          return (s.anyOf as Record<string, unknown>[]).some(
             (branch) => branch.type === "object" || branch.$ref,
           );
-        } else if (s.$ref) {
-          hasConfig = true;
         }
-      }
+        return false;
+      });
 
       if (!hasConfig) {
         createPipelineNode(item, position);

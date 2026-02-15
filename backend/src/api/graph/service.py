@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Union
 
 from src.api.graph.domain.graph import Graph, Node, Edge
 from src.core.channel import Channel
@@ -44,18 +44,20 @@ def load_graph(path: str | Path = "saves/graph.json") -> Graph:
                     config_cls_name = config_cls.split("|")[0].strip()
                 else:
                     config_cls_name = config_cls
-                
+
                 # Get the module where the class is defined
                 module = inspect.getmodule(cls)
                 if module:
                     config_cls = getattr(module, config_cls_name)
-            
+
             if hasattr(config_cls, "from_dict"):
                 config = config_cls.from_dict(node_data["config"])
 
         comp = cls(config=config)
         comp.name = node_type
-        nodes[node_id] = Node(inner=comp, x=node_data.get("x", 0.0), y=node_data.get("y", 0.0))
+        nodes[node_id] = Node(
+            inner=comp, x=node_data.get("x", 0.0), y=node_data.get("y", 0.0)
+        )
 
     edges = [Edge(**e) for e in data.get("edges", [])]
     return Graph(nodes=nodes, edges=edges)
@@ -73,7 +75,22 @@ def get_node(graph: Graph, node_id: str) -> Node | None:
     return graph.nodes.get(node_id)
 
 
-def create_node(graph: Graph, node_type: str, config: dict[str, Any] | None = None) -> tuple[str, Node]:
+def _resolve_annotation(cls: type, annotation: Any) -> type:
+    """Resolve a string or Union annotation to a concrete type."""
+    if isinstance(annotation, str):
+        name = annotation.split("|")[0].strip() if "|" in annotation else annotation
+        module = inspect.getmodule(cls)
+        if module:
+            return getattr(module, name)
+    origin = getattr(annotation, "__origin__", None)
+    if origin is Union:
+        return next(a for a in annotation.__args__ if a is not type(None))
+    return annotation
+
+
+def create_node(
+    graph: Graph, node_type: str, config: dict[str, Any] | None = None
+) -> tuple[str, Node]:
     classes = Component.registered_subclasses()
     cls = classes.get(node_type)
     if cls is None:
@@ -81,23 +98,17 @@ def create_node(graph: Graph, node_type: str, config: dict[str, Any] | None = No
 
     if config is not None:
         sig = inspect.signature(cls.__init__)
-        config_param = sig.parameters.get("config")
-        if config_param and config_param.annotation is not inspect.Parameter.empty:
-            config_cls = config_param.annotation
-            if isinstance(config_cls, str):
-                if "|" in config_cls:
-                    config_cls_name = config_cls.split("|")[0].strip()
-                else:
-                    config_cls_name = config_cls
-                module = inspect.getmodule(cls)
-                if module:
-                    config_cls = getattr(module, config_cls_name)
-            if hasattr(config_cls, "from_dict"):
-                comp = cls(config=config_cls.from_dict(config))
+        kwargs: dict[str, Any] = {}
+        for param_name, param_value in config.items():
+            param = sig.parameters.get(param_name)
+            if param is None or param.annotation is inspect.Parameter.empty:
+                continue
+            param_cls = _resolve_annotation(cls, param.annotation)
+            if isinstance(param_value, dict) and hasattr(param_cls, "from_dict"):
+                kwargs[param_name] = param_cls.from_dict(param_value)
             else:
-                comp = cls()
-        else:
-            comp = cls()
+                kwargs[param_name] = param_value
+        comp = cls(**kwargs) if kwargs else cls()
     else:
         comp = cls()
 
@@ -125,8 +136,7 @@ def delete_node(graph: Graph, node_id: str) -> None:
             affected.add(edge.source_node)
 
     graph.edges = [
-        e for e in graph.edges
-        if e.source_node != node_id and e.target_node != node_id
+        e for e in graph.edges if e.source_node != node_id and e.target_node != node_id
     ]
 
     for affected_id in affected:
@@ -160,12 +170,16 @@ def create_edge(
     # Validate source_slot exists in source's output types
     source_types = type(source.inner).get_output_types()
     if source_slot not in source_types:
-        raise ValueError(f"source_slot '{source_slot}' not found in {source_node}'s outputs ({list(source_types)})")
+        raise ValueError(
+            f"source_slot '{source_slot}' not found in {source_node}'s outputs ({list(source_types)})"
+        )
 
     # Validate target_slot exists in target's input types
     target_types = type(target.inner).get_input_types()
     if target_slot not in target_types:
-        raise ValueError(f"target_slot '{target_slot}' not found in {target_node}'s inputs ({list(target_types)})")
+        raise ValueError(
+            f"target_slot '{target_slot}' not found in {target_node}'s inputs ({list(target_types)})"
+        )
 
     edge = Edge(
         source_node=source_node,
