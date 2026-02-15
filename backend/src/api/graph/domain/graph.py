@@ -15,6 +15,7 @@ class Node(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     inner: Component[..., Any]
+    config: dict[..., ...]
     x: float = 0.0
     y: float = 0.0
 
