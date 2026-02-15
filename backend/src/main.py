@@ -12,9 +12,12 @@ from src.api.component.controller import router as component_router
 from src.api.graph.domain.graph import Graph
 
 
+from src.api.graph import service
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.graph = Graph(nodes={}, edges=[])
+    app.state.graph = service.load_graph()
     yield
 
 

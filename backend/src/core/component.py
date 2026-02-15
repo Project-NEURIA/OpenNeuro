@@ -13,11 +13,15 @@ from pydantic import BaseModel
 from src.core.channel import ChannelSnapshot
 
 
+from src.core.config import BaseConfig
+
+
 class ComponentSnapshot(BaseModel):
     name: str
     status: str
     started_at: float | None
     channels: dict[str, ChannelSnapshot]
+    config: dict[str, Any]
 
 
 class Status(Enum):
@@ -27,13 +31,14 @@ class Status(Enum):
 
 
 class Component[**P, O: Mapping[str, Any]](ABC):
-    def __init__(self) -> None:
+    def __init__(self, config: BaseConfig | None = None) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP
         self._started_at: float | None = None
         self._error: str | None = None
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self.config = config or BaseConfig()
 
     @property
     def status(self) -> Status:
@@ -81,6 +86,7 @@ class Component[**P, O: Mapping[str, Any]](ABC):
             status=self.status.value,
             started_at=self._started_at,
             channels={n: ch.snapshot() for n, ch in self.get_output_channels().items()},
+            config=self.config.to_dict(),
         )
 
     @classmethod
