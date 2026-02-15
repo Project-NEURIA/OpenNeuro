@@ -33,7 +33,7 @@ class ASROutputs(TypedDict):
 
 
 class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs]):
-    def __init__(self, config: ASRConfig | None = None) -> None:
+    def __init__(self, test: int, config: ASRConfig | None = None) -> None:
         super().__init__(config or ASRConfig())
         self.config: ASRConfig
         self._output_text = Channel[TextFrame](name="text")
