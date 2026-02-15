@@ -52,23 +52,61 @@ function resolveSchema(schema: SchemaObj): ResolvedSchema | null {
 
 function getDefaultValue(prop: SchemaObj): unknown {
   if (prop.default !== undefined) return prop.default;
-  if (prop.type === "number" || prop.type === "integer") return 0;
   if (prop.type === "boolean") return false;
   return "";
+}
+
+/** Collect all fields from every init parameter's schema. */
+function collectFields(init: Record<string, unknown>): Record<string, SchemaObj> {
+  const fields: Record<string, SchemaObj> = {};
+  for (const [paramName, rawSchema] of Object.entries(init)) {
+    if (!rawSchema || typeof rawSchema !== "object") continue;
+    const schema = rawSchema as SchemaObj;
+    const resolved = resolveSchema(schema);
+    if (resolved) {
+      // Object schema — each property becomes a field
+      for (const [prop, propSchema] of Object.entries(resolved.properties)) {
+        fields[`${paramName}.${prop}`] = propSchema;
+      }
+    } else {
+      // Simple type — the param itself is a field
+      fields[paramName] = schema;
+    }
+  }
+  return fields;
+}
+
+/** Rebuild the nested init values dict from flat "param.prop" keys. */
+function buildInitValues(
+  fields: Record<string, SchemaObj>,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(fields)) {
+    const dotIdx = key.indexOf(".");
+    if (dotIdx !== -1) {
+      const param = key.slice(0, dotIdx);
+      const prop = key.slice(dotIdx + 1);
+      if (!result[param] || typeof result[param] !== "object") {
+        result[param] = {};
+      }
+      (result[param] as Record<string, unknown>)[prop] = values[key];
+    } else {
+      result[key] = values[key];
+    }
+  }
+  return result;
 }
 
 function ConfiguringNodeComponent({ data }: NodeProps) {
   const d = data as unknown as ConfiguringNodeData;
   const { componentInfo, onConfirm, onCancel } = d;
 
-  // Resolve the config schema from init
-  const configSchema = componentInfo.init.config as SchemaObj | undefined;
-  const resolved = configSchema ? resolveSchema(configSchema) : null;
-  const properties = resolved?.properties ?? {};
+  const fields = collectFields(componentInfo.init);
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
-    for (const [key, prop] of Object.entries(properties)) {
+    for (const [key, prop] of Object.entries(fields)) {
       initial[key] = getDefaultValue(prop);
     }
     return initial;
@@ -76,7 +114,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onConfirm(values);
+    onConfirm(buildInitValues(fields, values));
   };
 
   return (
@@ -99,7 +137,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="pt-4 flex flex-col gap-3">
-        {Object.entries(properties).map(([key, prop]) => {
+        {Object.entries(fields).map(([key, prop]) => {
           const propType = prop.type ?? "string";
 
           if (propType === "boolean") {
