@@ -13,9 +13,11 @@ import {
 import "@xyflow/react/dist/style.css";
 import { PipelineNode } from "./PipelineNode";
 import { PipelineEdge } from "./PipelineEdge";
+import { ConfiguringNode } from "./ConfiguringNode";
 
 const nodeTypes: NodeTypes = {
   pipeline: PipelineNode,
+  configuring: ConfiguringNode,
 };
 
 const edgeTypes: EdgeTypes = {

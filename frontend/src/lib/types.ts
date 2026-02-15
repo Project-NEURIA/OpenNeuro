@@ -3,7 +3,7 @@ export type NodeCategory = "source" | "conduit" | "sink";
 export interface ComponentInfo {
   name: string;
   category: NodeCategory;
-  init: Record<string, string>;
+  init: Record<string, unknown>;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
 }

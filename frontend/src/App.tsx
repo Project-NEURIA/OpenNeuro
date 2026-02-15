@@ -156,6 +156,9 @@ function AppInner() {
 
       for (const r of removals) {
         if (r.type === "remove") {
+          // Configuring nodes are local-only — no backend call needed
+          if (r.id.startsWith("configuring-")) continue;
+
           setEdges((currentEdges) => {
             for (const e of currentEdges) {
               if (e.source === r.id || e.target === r.id) {
@@ -215,16 +218,9 @@ function AppInner() {
     e.dataTransfer.dropEffect = "move";
   }, []);
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const raw = e.dataTransfer.getData("application/pipeline-node");
-      if (!raw) return;
-
-      const item = JSON.parse(raw) as ComponentInfo;
-      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-
-      apiCreateNode(item.name)
+  const createPipelineNode = useCallback(
+    (item: ComponentInfo, position: { x: number; y: number }, config?: Record<string, unknown>) => {
+      apiCreateNode(item.name, config)
         .then((res) => {
           const newNode: Node<PipelineNodeData> = {
             id: res.id,
@@ -245,7 +241,59 @@ function AppInner() {
         })
         .catch(console.error);
     },
-    [screenToFlowPosition, setNodes]
+    [setNodes],
+  );
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const raw = e.dataTransfer.getData("application/pipeline-node");
+      if (!raw) return;
+
+      const item = JSON.parse(raw) as ComponentInfo;
+      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+
+      // Check if the config init param has object properties to configure
+      const configSchema = item.init.config;
+      let hasConfig = false;
+      if (configSchema && typeof configSchema === "object") {
+        const s = configSchema as Record<string, unknown>;
+        if (s.properties) {
+          hasConfig = true;
+        } else if (Array.isArray(s.anyOf)) {
+          hasConfig = (s.anyOf as Record<string, unknown>[]).some(
+            (branch) => branch.type === "object" || branch.$ref,
+          );
+        } else if (s.$ref) {
+          hasConfig = true;
+        }
+      }
+
+      if (!hasConfig) {
+        createPipelineNode(item, position);
+        return;
+      }
+
+      // Add a temporary "configuring" node with the form
+      const tempId = `configuring-${Date.now()}`;
+      const configuringNode: Node = {
+        id: tempId,
+        type: "configuring",
+        position,
+        data: {
+          componentInfo: item,
+          onConfirm: (config: Record<string, unknown>) => {
+            setNodes((nds) => nds.filter((n) => n.id !== tempId));
+            createPipelineNode(item, position, config);
+          },
+          onCancel: () => {
+            setNodes((nds) => nds.filter((n) => n.id !== tempId));
+          },
+        },
+      };
+      setNodes((nds) => [...nds, configuringNode]);
+    },
+    [screenToFlowPosition, setNodes, createPipelineNode],
   );
 
   return (

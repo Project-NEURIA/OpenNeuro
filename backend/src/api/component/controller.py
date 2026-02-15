@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+from pydantic import TypeAdapter
 
 from src.api.component.dto import ComponentInfo
 from src.api.component import service
@@ -37,7 +38,7 @@ def list_components() -> list[ComponentInfo]:
         result.append(ComponentInfo(
             name=name,
             category=category,
-            init={k: _type_name(v) for k, v in init.items()},
+            init={k: TypeAdapter(v).json_schema() for k, v in init.items()},
             inputs={k: _type_name(v) for k, v in inputs.items()},
             outputs={k: _type_name(v) for k, v in outputs.items()},
         ))

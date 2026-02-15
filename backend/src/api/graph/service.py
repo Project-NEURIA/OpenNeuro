@@ -73,13 +73,34 @@ def get_node(graph: Graph, node_id: str) -> Node | None:
     return graph.nodes.get(node_id)
 
 
-def create_node(graph: Graph, node_type: str) -> tuple[str, Node]:
+def create_node(graph: Graph, node_type: str, config: dict[str, Any] | None = None) -> tuple[str, Node]:
     classes = Component.registered_subclasses()
     cls = classes.get(node_type)
     if cls is None:
         raise ValueError(f"Unknown node type: {node_type}")
 
-    comp = cls()
+    if config is not None:
+        sig = inspect.signature(cls.__init__)
+        config_param = sig.parameters.get("config")
+        if config_param and config_param.annotation is not inspect.Parameter.empty:
+            config_cls = config_param.annotation
+            if isinstance(config_cls, str):
+                if "|" in config_cls:
+                    config_cls_name = config_cls.split("|")[0].strip()
+                else:
+                    config_cls_name = config_cls
+                module = inspect.getmodule(cls)
+                if module:
+                    config_cls = getattr(module, config_cls_name)
+            if hasattr(config_cls, "from_dict"):
+                comp = cls(config=config_cls.from_dict(config))
+            else:
+                comp = cls()
+        else:
+            comp = cls()
+    else:
+        comp = cls()
+
     node_id = str(id(comp))
     comp.name = node_type
     node = Node(inner=comp)

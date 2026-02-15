@@ -25,11 +25,11 @@ export async function fetchEdges(): Promise<EdgeData[]> {
   return res.json();
 }
 
-export async function createNode(type: string) {
+export async function createNode(type: string, config?: Record<string, unknown>) {
   const res = await fetch("/graph/nodes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type }),
+    body: JSON.stringify({ type, config }),
   });
   if (!res.ok) throw new Error(`Create node failed: ${res.status}`);
   return res.json() as Promise<{ id: string; type: string; status: string }>;
