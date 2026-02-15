@@ -8,24 +8,31 @@ from src.core.component import Component
 from src.core.channel import Channel
 
 
+from src.core.config import BaseConfig
+
+
+from src.core.frames import AudioFrame
+
+
+class MicConfig(BaseConfig):
+    sample_rate: int = 48000
+    channels: int = 1
+    frame_ms: int = 20
+
+
 class MicOutputs(TypedDict):
-    audio: Channel[bytes]
+    audio: Channel[AudioFrame]
 
 
 class Mic(Component[[], MicOutputs]):
 
-    def __init__(
-        self,
-        *,
-        sample_rate: int = 48000,
-        channels: int = 1,
-        frame_ms: int = 20,
-    ) -> None:
-        super().__init__()
-        self._sample_rate = sample_rate
-        self._channels = channels
-        self._frame_samples = int(sample_rate * frame_ms / 1000)
-        self._output_audio: Channel[bytes] = Channel(name="audio")
+    def __init__(self, config: MicConfig | None = None) -> None:
+        super().__init__(config or MicConfig())
+        self.config: MicConfig  # Type hint for IDE
+        self._sample_rate = self.config.sample_rate
+        self._channels = self.config.channels
+        self._frame_samples = int(self._sample_rate * self.config.frame_ms / 1000)
+        self._output_audio: Channel[AudioFrame] = Channel(name="audio")
 
     def get_output_channels(self) -> MicOutputs:
         return {"audio": self._output_audio}
@@ -39,4 +46,9 @@ class Mic(Component[[], MicOutputs]):
         ) as stream:
             while not self.stop_event.is_set():
                 data, _ = stream.read(self._frame_samples)
-                self._output_audio.send(data.tobytes())
+                frame = AudioFrame(
+                    data=data,
+                    sample_rate=self._sample_rate,
+                    channels=self._channels,
+                )
+                self._output_audio.send(frame)

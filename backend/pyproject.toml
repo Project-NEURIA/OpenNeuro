@@ -20,6 +20,8 @@ dependencies = [
     "types-requests>=2.32.4.20260107",
     "uvicorn[standard]>=0.30.0",
     "websockets>=16.0",
+    "py-cord",
+    "py-cord[voice]",
 ]
 
 [tool.mypy]
