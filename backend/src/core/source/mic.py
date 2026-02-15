@@ -25,7 +25,6 @@ class MicOutputs(TypedDict):
 
 
 class Mic(Component[[], MicOutputs]):
-
     def __init__(self, config: MicConfig | None = None) -> None:
         super().__init__(config or MicConfig())
         self.config: MicConfig  # Type hint for IDE

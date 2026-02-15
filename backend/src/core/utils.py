@@ -2,7 +2,9 @@ import collections
 import itertools
 import threading
 
-_COUNTS = collections.defaultdict(itertools.count)
+_COUNTS: collections.defaultdict[str, itertools.count[int]] = collections.defaultdict(
+    itertools.count
+)
 _COUNTS_LOCK = threading.Lock()
 _ID = itertools.count()
 _ID_LOCK = threading.Lock()

@@ -9,9 +9,6 @@ from src.api.metrics.dto import MetricsResponse
 def collect(graph: Graph) -> MetricsResponse:
     nodes = dict(graph.nodes)
     return MetricsResponse(
-        nodes={
-            nid: node.inner.snapshot()
-            for nid, node in nodes.items()
-        },
+        nodes={nid: node.inner.snapshot() for nid, node in nodes.items()},
         timestamp=time.time(),
     )
