@@ -38,7 +38,7 @@ class Speaker(Component[[Channel[AudioFrame]], SpeakerOutputs]):
         if not audio:
             print("[Speaker] No audio channel connected, skipping")
             return
-            
+
         with sd.OutputStream(
             samplerate=self._sample_rate,
             channels=self._channels,
@@ -47,12 +47,14 @@ class Speaker(Component[[Channel[AudioFrame]], SpeakerOutputs]):
             for frame in audio.stream(self):
                 if frame is None:
                     break
-                
+
                 # AudioFrame.get handles resampling and channel mixing automatically
                 pcm_bytes = frame.get(
                     sample_rate=self._sample_rate,
                     num_channels=self._channels,
-                    data_format=AudioDataFormat.PCM16
+                    data_format=AudioDataFormat.PCM16,
                 )
-                
-                stream.write(np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, self._channels))
+
+                stream.write(
+                    np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, self._channels)
+                )

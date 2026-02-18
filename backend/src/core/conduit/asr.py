@@ -3,15 +3,12 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
-import traceback
 import wave
-import time
 from datetime import datetime
 from pathlib import Path
 from queue import Queue, Empty
 from typing import TypedDict
 
-import numpy as np
 import requests
 
 from src.core.component import Component
@@ -41,10 +38,12 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
 
         self._api_key = self.config.groq_api_key or os.getenv("GROQ_API_KEY")
         if not self._api_key:
-            raise ValueError("GROQ_API_KEY must be provided either as parameter or environment variable")
-        
+            raise ValueError(
+                "GROQ_API_KEY must be provided either as parameter or environment variable"
+            )
+
         self._url = "https://api.groq.com/openai/v1/audio/transcriptions"
-        
+
         self._task_queue: Queue[AudioFrame] = Queue()
         self._worker_thread: threading.Thread | None = None
 
@@ -56,7 +55,9 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
 
     def _prepare_audio_for_transcription(self, frame: AudioFrame) -> str:
         # Whisper prefers 16kHz mono PCM16
-        pcm_16k = frame.get(sample_rate=16000, num_channels=1, data_format=AudioDataFormat.PCM16)
+        pcm_16k = frame.get(
+            sample_rate=16000, num_channels=1, data_format=AudioDataFormat.PCM16
+        )
 
         temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         temp_path = temp_file.name
@@ -78,12 +79,12 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
         """Save a copy of the audio file to the debug directory."""
         debug_dir = Path("debug")
         debug_dir.mkdir(exist_ok=True)
-        
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         debug_path = debug_dir / f"groq_audio_{timestamp}.wav"
-        
+
         try:
-            with open(wav_path, 'rb') as src, open(debug_path, 'wb') as dst:
+            with open(wav_path, "rb") as src, open(debug_path, "wb") as dst:
                 dst.write(src.read())
             print(f"[ASR] Debug audio saved to: {debug_path}")
         except Exception as e:
@@ -95,14 +96,14 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
             try:
                 # # Save debug audio before sending to Groq
                 # self._save_debug_audio(wav_path)
-                
+
                 headers = {"Authorization": f"Bearer {self._api_key}"}
                 data = {
                     "model": self.config.model,
                     "language": self.config.language,
-                    "response_format": "json"
+                    "response_format": "json",
                 }
-                
+
                 with open(wav_path, "rb") as audio_file:
                     files = {"file": ("audio.wav", audio_file, "audio/wav")}
                     response = requests.post(
@@ -110,12 +111,12 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
                         headers=headers,
                         files=files,
                         data=data,
-                        timeout=self.config.timeout
+                        timeout=self.config.timeout,
                     )
-                
+
                 response.raise_for_status()
                 result = response.json()
-                
+
                 text = result.get("text", "").strip()
                 if text:
                     print(f"[ASR] Transcription: '{text}'")
@@ -123,7 +124,7 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
                         display_name="asr_transcription",
                         text=text,
                         language=self.config.language,
-                        pts=frame.pts
+                        pts=frame.pts,
                     )
                 return None
             finally:
@@ -146,15 +147,21 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
                 print(f"[ASR] Worker error: {e}")
                 continue
 
-    def run(self, audio: Channel[AudioFrame] | None = None, interrupt: Channel[InterruptFrame] | None = None) -> None:
+    def run(
+        self,
+        audio: Channel[AudioFrame] | None = None,
+        interrupt: Channel[InterruptFrame] | None = None,
+    ) -> None:
         print("[ASR] Starting Automatic Speech Recognition")
         self._worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self._worker_thread.start()
-        
+
         if interrupt:
+
             def passthrough():
                 for frame in interrupt.stream(self):
-                    if frame is None: break
+                    if frame is None:
+                        break
                     self._output_interrupt.send(frame)
 
             threading.Thread(target=passthrough, daemon=True).start()
@@ -164,13 +171,13 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
                 for frame in audio.stream(self):
                     if frame is None:
                         break
-                    
+
                     # Handle speech segments from VAD
                     if frame.display_name == "vad_speech_segment":
                         self._task_queue.put(frame)
             finally:
                 pass
-        
+
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=1.0)
         print("[ASR] Automatic Speech Recognition stopped")

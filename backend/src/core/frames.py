@@ -42,6 +42,10 @@ class Frame(ABC):
 class AudioFrame(Frame):
     """Audio frame with immutable data and on-the-fly reformatting/resampling."""
 
+    _data: np.ndarray
+    _sample_rate: int
+    _channels: int
+
     def __init__(
         self,
         display_name: str = "audio",
@@ -102,14 +106,16 @@ class AudioFrame(Frame):
         if sample_rate and sample_rate != current_sr:
             num_samples = int(arr.shape[1] * sample_rate / current_sr)
             # Linear interpolation for resampling
-            arr = np.stack([
-                np.interp(
-                    np.linspace(0, arr.shape[1], num_samples, endpoint=False),
-                    np.arange(arr.shape[1]),
-                    ch_data
-                )
-                for ch_data in arr
-            ])
+            arr = np.stack(
+                [
+                    np.interp(
+                        np.linspace(0, arr.shape[1], num_samples, endpoint=False),
+                        np.arange(arr.shape[1]),
+                        ch_data,
+                    )
+                    for ch_data in arr
+                ]
+            )
 
         # 2. Change channels if needed
         if num_channels and num_channels != current_ch:
@@ -128,14 +134,18 @@ class AudioFrame(Frame):
         # arr is (channels, samples) — transpose to (samples, channels) for interleaved output
         if data_format == AudioDataFormat.FLOAT32:
             return arr
-        
+
         if data_format == AudioDataFormat.PCM16:
             interleaved = arr.T.flatten() if arr.shape[0] > 1 else arr.flatten()
-            return np.clip(interleaved * 32768.0, -32768, 32767).astype(np.int16).tobytes()
-        
+            return (
+                np.clip(interleaved * 32768.0, -32768, 32767).astype(np.int16).tobytes()
+            )
+
         if data_format == AudioDataFormat.PCM8:
             interleaved = arr.T.flatten() if arr.shape[0] > 1 else arr.flatten()
-            return np.clip((interleaved + 1.0) * 127.5, 0, 255).astype(np.uint8).tobytes()
+            return (
+                np.clip((interleaved + 1.0) * 127.5, 0, 255).astype(np.uint8).tobytes()
+            )
 
         raise ValueError(f"Unsupported data format: {data_format}")
 
@@ -146,6 +156,8 @@ class AudioFrame(Frame):
 
 class TextFrame(Frame):
     """Frame containing text data."""
+
+    _text: str
 
     def __init__(
         self,
@@ -172,6 +184,8 @@ class TextFrame(Frame):
 class InterruptFrame(Frame):
     """Frame representing an interrupt event."""
 
+    _reason: str
+
     def __init__(
         self,
         display_name: str = "interrupt",
@@ -194,6 +208,9 @@ class InterruptFrame(Frame):
 
 class MessagesFrame(Frame):
     """Frame containing conversation history (messages) for LLM consumption."""
+
+    _text: str
+    _messages: list[dict[str, str]]
 
     def __init__(
         self,

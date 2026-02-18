@@ -9,9 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.graph.controller import router as graph_router
 from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
-from src.api.graph.domain.graph import Graph
-
-
 from src.api.graph import service
 
 
@@ -39,6 +36,7 @@ def main() -> None:
     load_dotenv(override=True)
 
     import uvicorn
+
     print("[backend] API server starting on http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 
