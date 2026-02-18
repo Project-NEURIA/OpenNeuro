@@ -6,65 +6,18 @@ from src.api.graph.domain.graph import Graph, Node, Edge
 from src.core.channel import Channel
 from src.core.component import Component
 from pathlib import Path
-import json
 
 
 import inspect
 
 
-def load_graph(path: str | Path = "saves/graph.json") -> Graph:
+def load_graph(_: str | Path = "saves/graph.json") -> Graph:
     """Loads a graph from a JSON file, reconstructing nodes and edges."""
-    path = Path(path)
-    if not path.exists():
-        return Graph(nodes={}, edges=[])
-
-    with open(path, "r") as f:
-        data = json.load(f)
-
-    classes = Component.registered_subclasses()
-    nodes: dict[str, Node] = {}
-    for node_id, node_data in data.get("nodes", {}).items():
-        node_type = node_data["type"]
-        cls = classes.get(node_type)
-        if cls is None:
-            print(f"Warning: Unknown node type {node_type}")
-            continue
-
-        # Inspect __init__ to find config class
-        sig = inspect.signature(cls.__init__)
-        config_param = sig.parameters.get("config")
-        config = None
-        if config_param and config_param.annotation is not inspect.Parameter.empty:
-            config_cls = config_param.annotation
-            # Handle string type hints
-            if isinstance(config_cls, str):
-                # Handle Union types like "DiscordConfig | None"
-                if "|" in config_cls:
-                    # Take the first part before the | (the actual config class)
-                    config_cls_name = config_cls.split("|")[0].strip()
-                else:
-                    config_cls_name = config_cls
-
-                # Get the module where the class is defined
-                module = inspect.getmodule(cls)
-                if module:
-                    config_cls = getattr(module, config_cls_name)
-
-            if hasattr(config_cls, "from_dict"):
-                config = config_cls.from_dict(node_data["config"])
-
-        comp = cls(config=config)
-        comp.name = node_type
-        nodes[node_id] = Node(
-            inner=comp, x=node_data.get("x", 0.0), y=node_data.get("y", 0.0)
-        )
-
-    edges = [Edge(**e) for e in data.get("edges", [])]
-    return Graph(nodes=nodes, edges=edges)
+    return Graph(edges=[],nodes={})
 
 
 def _auto_save(graph: Graph) -> None:
-    graph.save_to_file()
+    pass
 
 
 def list_nodes(graph: Graph) -> dict[str, Node]:
@@ -89,7 +42,7 @@ def _resolve_annotation(cls: type, annotation: Any) -> type:
 
 
 def create_node(
-    graph: Graph, node_type: str, config: dict[str, Any] | None = None
+    graph: Graph, node_type: str, config: dict[str, Any]
 ) -> tuple[str, Node]:
     classes = Component.registered_subclasses()
     cls = classes.get(node_type)
@@ -104,17 +57,17 @@ def create_node(
             if param is None or param.annotation is inspect.Parameter.empty:
                 continue
             param_cls = _resolve_annotation(cls, param.annotation)
-            if isinstance(param_value, dict) and hasattr(param_cls, "from_dict"):
-                kwargs[param_name] = param_cls.from_dict(param_value)
+            if isinstance(param_value, dict) and hasattr(param_cls, "model_validate"):
+                kwargs[param_name] = param_cls.model_validate(param_value)
             else:
                 kwargs[param_name] = param_value
-        comp = cls(**kwargs) if kwargs else cls()
+        comp = cls(**kwargs) if kwargs else cls()  # type: ignore
     else:
         comp = cls()
 
     node_id = str(id(comp))
     comp.name = node_type
-    node = Node(inner=comp)
+    node = Node(inner=comp, config=config)
     graph.nodes[node_id] = node
     _auto_save(graph)
     return node_id, node

@@ -14,7 +14,7 @@ import requests
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import AudioFrame, InterruptFrame, TextFrame
-from src.core.config import BaseConfig
+from pydantic import BaseModel
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
@@ -109,7 +109,7 @@ class StreamFilter:
             i += 1
 
 
-class TTSConfig(BaseConfig):
+class TTSConfig(BaseModel):
     url: str = "https://api.inworld.ai/v1/tts/stream"
     voice_id: str = "default"
     model_id: str = "default"
@@ -124,9 +124,9 @@ class TTSOutputs(TypedDict):
 class TTS(Component[[Channel[TextFrame], Channel[InterruptFrame]], TTSOutputs]):
     """Text-to-Speech component using Inworld API."""
 
-    def __init__(self, config: TTSConfig | None = None) -> None:
-        super().__init__(config or TTSConfig())
-        self.config: TTSConfig
+    def __init__(self, config: TTSConfig) -> None:
+        super().__init__()
+        self.config: TTSConfig = config
         self._output_audio = Channel[AudioFrame](name="audio")
         self._output_text = Channel[TextFrame](name="text")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
@@ -211,7 +211,7 @@ class TTS(Component[[Channel[TextFrame], Channel[InterruptFrame]], TTSOutputs]):
 
     def run(
         self,
-        text_input: Channel[TextFrame] | None = None,
+        text_input: Channel[TextFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         print("[TTS] Starting TTS")
@@ -242,21 +242,20 @@ class TTS(Component[[Channel[TextFrame], Channel[InterruptFrame]], TTSOutputs]):
 
         threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        if text_input:
-            for frame in text_input.stream(self):
-                if frame is None:
-                    break
-                # Use .get() instead of .text
-                t = frame.get()
-                out = (
-                    self._stream_filter.feed("", force=True)
-                    if t == GENERATE_END_FLAG
-                    else self._stream_filter.feed(t)
-                )
-                if out and out.strip():
-                    with self._gen_lock:
-                        gen = self._generation
-                    self._task_queue.put((gen, out))
+        for frame in text_input.stream(self):
+            if frame is None:
+                break
+            # Use .get() instead of .text
+            t = frame.get()
+            out = (
+                self._stream_filter.feed("", force=True)
+                if t == GENERATE_END_FLAG
+                else self._stream_filter.feed(t)
+            )
+            if out and out.strip():
+                with self._gen_lock:
+                    gen = self._generation
+                self._task_queue.put((gen, out))
 
         worker_thread.join(timeout=1)
         print("[TTS] TTS stopped")

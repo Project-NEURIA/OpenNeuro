@@ -8,13 +8,12 @@ from src.core.component import Component
 from src.core.channel import Channel
 
 
-from src.core.config import BaseConfig
-
+from pydantic import BaseModel
 
 from src.core.frames import AudioFrame
 
 
-class MicConfig(BaseConfig):
+class MicConfig(BaseModel):
     sample_rate: int = 48000
     channels: int = 1
     frame_ms: int = 20
@@ -25,9 +24,9 @@ class MicOutputs(TypedDict):
 
 
 class Mic(Component[[], MicOutputs]):
-    def __init__(self, config: MicConfig | None = None) -> None:
-        super().__init__(config or MicConfig())
-        self.config: MicConfig  # Type hint for IDE
+    def __init__(self, config: MicConfig) -> None:
+        super().__init__()
+        self.config: MicConfig = config
         self._sample_rate = self.config.sample_rate
         self._channels = self.config.channels
         self._frame_samples = int(self._sample_rate * self.config.frame_ms / 1000)

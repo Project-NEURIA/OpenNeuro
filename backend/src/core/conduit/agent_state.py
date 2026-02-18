@@ -6,10 +6,9 @@ from typing import TypedDict
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import MessagesFrame, InterruptFrame, TextFrame
-from src.core.config import BaseConfig
 
 
-class AgentStateConfig(BaseConfig):
+class AgentStateConfig:
     system_prompt: str = "You are a helpful AI assistant."
     user_name: str = "User"
     chatbot_name: str = "Assistant"
@@ -28,9 +27,9 @@ class AgentState(
 ):
     """Agent state component that manages conversation history."""
 
-    def __init__(self, config: AgentStateConfig | None = None) -> None:
-        super().__init__(config or AgentStateConfig())
-        self.config: AgentStateConfig
+    def __init__(self, config: AgentStateConfig) -> None:
+        super().__init__()
+        self.config: AgentStateConfig = config
 
         self._output_messages = Channel[MessagesFrame](name="messages")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
@@ -62,15 +61,13 @@ class AgentState(
 
     def run(
         self,
-        asr: Channel[TextFrame] | None = None,
-        feedback: Channel[TextFrame] | None = None,
+        asr: Channel[TextFrame],
+        feedback: Channel[TextFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         print("[AgentState] Starting Agent State management")
 
         def process_asr():
-            if not asr:
-                return
             for text_frame in asr.stream(self):
                 if text_frame is None:
                     break
@@ -95,8 +92,6 @@ class AgentState(
                 )
 
         def process_feedback():
-            if not feedback:
-                return
             for text_frame in feedback.stream(self):
                 if text_frame is None:
                     break
