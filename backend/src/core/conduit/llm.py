@@ -7,16 +7,16 @@ from queue import Empty, Queue
 from typing import TypedDict
 
 import requests
+from pydantic import BaseModel
 
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import MessagesFrame, InterruptFrame, TextFrame, MessagesDataFormat
-from src.core.config import BaseConfig
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
 
-class LLMConfig(BaseConfig):
+class LLMConfig(BaseModel):
     url: str = "https://api.groq.com/openai/v1/chat/completions"
     model_id: str = "llama3-8b-8192"
     top_p: float = 0.97
@@ -32,9 +32,9 @@ class LLMOutputs(TypedDict):
 class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutputs]):
     """LLM text generation component using Groq API."""
 
-    def __init__(self, config: LLMConfig | None = None) -> None:
-        super().__init__(config or LLMConfig())
-        self.config: LLMConfig
+    def __init__(self, config: LLMConfig) -> None:
+        super().__init__()
+        self.config: LLMConfig = config
         self._output_text = Channel[TextFrame](name="text")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
 
@@ -66,7 +66,7 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
 
     def run(
         self,
-        messages: Channel[MessagesFrame] | None = None,
+        messages: Channel[MessagesFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         print("[LLM] Starting LLM generation")
@@ -98,14 +98,13 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
 
         threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        if messages:
-            for frame in messages.stream(self):
-                if frame is None:
-                    break
+        for frame in messages.stream(self):
+            if frame is None:
+                break
 
-                with self._gen_lock:
-                    gen = self._generation
-                self._task_queue.put((gen, frame))
+            with self._gen_lock:
+                gen = self._generation
+            self._task_queue.put((gen, frame))
 
         worker_thread.join(timeout=1)
         print("[LLM] LLM generation stopped")

@@ -9,13 +9,12 @@ from src.core.component import Component
 from src.core.channel import Channel
 
 
-from src.core.config import BaseConfig
-
+from pydantic import BaseModel
 
 from src.core.frames import AudioFrame, AudioDataFormat
 
 
-class SpeakerConfig(BaseConfig):
+class SpeakerConfig(BaseModel):
     sample_rate: int = 24000
     channels: int = 1
 
@@ -25,20 +24,16 @@ class SpeakerOutputs(TypedDict):
 
 
 class Speaker(Component[[Channel[AudioFrame]], SpeakerOutputs]):
-    def __init__(self, config: SpeakerConfig | None = None) -> None:
-        super().__init__(config or SpeakerConfig())
-        self.config: SpeakerConfig  # Type hint for IDE
+    def __init__(self, config: SpeakerConfig) -> None:
+        super().__init__()
+        self.config: SpeakerConfig = config
         self._sample_rate = self.config.sample_rate
         self._channels = self.config.channels
 
     def get_output_channels(self) -> SpeakerOutputs:
         return {}
 
-    def run(self, audio: Channel[AudioFrame] | None = None) -> None:
-        if not audio:
-            print("[Speaker] No audio channel connected, skipping")
-            return
-
+    def run(self, audio: Channel[AudioFrame]) -> None:
         with sd.OutputStream(
             samplerate=self._sample_rate,
             channels=self._channels,

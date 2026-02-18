@@ -10,11 +10,12 @@ from websockets.sync.client import connect, Connection
 
 from src.core.component import Component
 from src.core.channel import Channel
-from src.core.config import BaseConfig
+from pydantic import BaseModel
+
 from src.core.frames import AudioFrame, AudioDataFormat, InterruptFrame
 
 
-class STSConfig(BaseConfig):
+class STSConfig(BaseModel):
     model: str = "gpt-4o-realtime-preview-2024-10-01"
     voice: str = "alloy"
 
@@ -24,9 +25,9 @@ class STSOutputs(TypedDict):
 
 
 class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs]):
-    def __init__(self, config: STSConfig | None = None) -> None:
-        super().__init__(config or STSConfig())
-        self.config: STSConfig  # Type hint for IDE
+    def __init__(self, config: STSConfig) -> None:
+        super().__init__()
+        self.config: STSConfig = config
         self._ws: Connection | None = None
         self._output_audio: Channel[AudioFrame] = Channel(name="audio")
 
@@ -43,7 +44,7 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
 
     def run(
         self,
-        audio: Channel[AudioFrame] | None = None,
+        audio: Channel[AudioFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         url = f"wss://api.openai.com/v1/realtime?model={self.config.model}"
@@ -69,10 +70,9 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                 )
             )
 
-            if audio:
-                threading.Thread(
-                    target=self._send_loop, args=(ws, audio), daemon=True
-                ).start()
+            threading.Thread(
+                target=self._send_loop, args=(ws, audio), daemon=True
+            ).start()
 
             if interrupt:
 
