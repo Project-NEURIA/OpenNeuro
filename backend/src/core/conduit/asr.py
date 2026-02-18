@@ -13,11 +13,12 @@ import requests
 
 from src.core.component import Component
 from src.core.channel import Channel
+from pydantic import BaseModel
+
 from src.core.frames import AudioFrame, InterruptFrame, TextFrame, AudioDataFormat
-from src.core.config import BaseConfig
 
 
-class ASRConfig(BaseConfig):
+class ASRConfig(BaseModel):
     groq_api_key: str | None = None
     model: str = "whisper-large-v3-turbo"
     language: str = "en"
@@ -30,9 +31,9 @@ class ASROutputs(TypedDict):
 
 
 class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs]):
-    def __init__(self, config: ASRConfig | None = None) -> None:
-        super().__init__(config or ASRConfig())
-        self.config: ASRConfig
+    def __init__(self, config: ASRConfig) -> None:
+        super().__init__()
+        self.config: ASRConfig = config
         self._output_text = Channel[TextFrame](name="text")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
 
@@ -149,7 +150,7 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
 
     def run(
         self,
-        audio: Channel[AudioFrame] | None = None,
+        audio: Channel[AudioFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         print("[ASR] Starting Automatic Speech Recognition")
@@ -166,17 +167,16 @@ class ASR(Component[[Channel[AudioFrame], Channel[InterruptFrame]], ASROutputs])
 
             threading.Thread(target=passthrough, daemon=True).start()
 
-        if audio:
-            try:
-                for frame in audio.stream(self):
-                    if frame is None:
-                        break
+        try:
+            for frame in audio.stream(self):
+                if frame is None:
+                    break
 
-                    # Handle speech segments from VAD
-                    if frame.display_name == "vad_speech_segment":
-                        self._task_queue.put(frame)
-            finally:
-                pass
+                # Handle speech segments from VAD
+                if frame.display_name == "vad_speech_segment":
+                    self._task_queue.put(frame)
+        finally:
+            pass
 
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=1.0)

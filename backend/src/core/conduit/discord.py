@@ -11,8 +11,9 @@ from discord.sinks import Sink
 
 from src.core.component import Component
 from src.core.channel import Channel
+from pydantic import BaseModel
+
 from src.core.frames import AudioFrame, InterruptFrame, AudioDataFormat
-from src.core.config import BaseConfig
 
 # Global Discord bot instance and event loop
 _discord_bot: discord.Bot | None = None
@@ -22,7 +23,7 @@ _discord_running = False
 _discord_lock = threading.Lock()
 
 
-class DiscordConfig(BaseConfig):
+class DiscordConfig(BaseModel):
     token: str | None = None
     sample_rate: int = 48000
     channels: int = 2
@@ -39,9 +40,9 @@ class DiscordIO(
 ):
     """Discord audio conduit that handles both input and output."""
 
-    def __init__(self, config: DiscordConfig | None = None) -> None:
-        super().__init__(config or DiscordConfig())
-        self.config: DiscordConfig
+    def __init__(self, config: DiscordConfig) -> None:
+        super().__init__()
+        self.config: DiscordConfig = config
 
         self.token = self.config.token or os.getenv("DISCORD_TOKEN")
         if not self.token:
@@ -165,7 +166,7 @@ class DiscordIO(
 
     def run(
         self,
-        audio: Channel[AudioFrame] | None = None,
+        audio: Channel[AudioFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         print("[DiscordIO] Starting Discord processing")
@@ -181,20 +182,19 @@ class DiscordIO(
 
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        if audio:
-            for frame in audio.stream(self):
-                if frame is None:
-                    break
+        for frame in audio.stream(self):
+            if frame is None:
+                break
 
-                # Use AudioFrame.get for resampling/reformatting
-                pcm_data = frame.get(
-                    sample_rate=self.config.sample_rate,
-                    num_channels=self.config.channels,
-                    data_format=AudioDataFormat.PCM16,
-                )
+            # Use AudioFrame.get for resampling/reformatting
+            pcm_data = frame.get(
+                sample_rate=self.config.sample_rate,
+                num_channels=self.config.channels,
+                data_format=AudioDataFormat.PCM16,
+            )
 
-                for buffer in self._buffer.values():
-                    buffer.append(pcm_data)
+            for buffer in self._buffer.values():
+                buffer.append(pcm_data)
 
         print("[DiscordIO] Discord processing stopped")
 

@@ -14,10 +14,10 @@ from transformers import WhisperFeatureExtractor
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import AudioFrame, InterruptFrame, AudioDataFormat
-from src.core.config import BaseConfig
+from pydantic import BaseModel
 
 
-class VADConfig(BaseConfig):
+class VADConfig(BaseModel):
     silence_seconds: float = 0.9
     max_silence_seconds: float = 1.4
     pre_speech_seconds: float = 1.0
@@ -33,9 +33,9 @@ class VADOutputs(TypedDict):
 
 
 class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
-    def __init__(self, config: VADConfig | None = None) -> None:
-        super().__init__(config or VADConfig())
-        self.config: VADConfig
+    def __init__(self, config: VADConfig) -> None:
+        super().__init__()
+        self.config: VADConfig = config
 
         self._output_audio = Channel[AudioFrame](name="audio")
         self._output_interrupt = Channel[InterruptFrame](name="interrupt")
@@ -259,18 +259,17 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                             )
                             self._finalize_segment()
 
-    def run(self, audio: Channel[AudioFrame] | None = None) -> None:
+    def run(self, audio: Channel[AudioFrame]) -> None:
         print("[VAD] Starting Voice Activity Detection")
 
         # Start proactive silence monitor
         monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         monitor_thread.start()
 
-        if audio:
-            for frame in audio.stream(self):
-                if frame is None:
-                    break
-                self._process_audio_frame(frame)
+        for frame in audio.stream(self):
+            if frame is None:
+                break
+            self._process_audio_frame(frame)
 
         if self._current_segment:
             with self._lock:
