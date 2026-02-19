@@ -10,11 +10,14 @@ import {
   type OnConnect,
   type Node,
   type Edge,
+  type OnNodeDrag,
 } from "@xyflow/react";
+import { Home } from "lucide-react";
 import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
 import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
 import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
 import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
+import { ProjectChooser } from "@/components/project/ProjectChooser";
 import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
 import { useComponents } from "@/hooks/useComponents";
 import { useMetricsHistory } from "@/hooks/useMetricsHistory";
@@ -23,9 +26,14 @@ import {
   fetchNodes as apiFetchNodes,
   fetchEdges as apiFetchEdges,
   createNode as apiCreateNode,
+  updateNode as apiUpdateNode,
   deleteNode as apiDeleteNode,
   createEdge as apiCreateEdge,
   deleteEdge as apiDeleteEdge,
+  fetchCurrentProject,
+  startProject as apiStartProject,
+  closeProject as apiCloseProject,
+  saveGraph,
 } from "@/lib/api";
 import type { ComponentInfo } from "@/lib/types";
 
@@ -41,13 +49,15 @@ function deleteEdgeFromReactFlow(edge: Edge) {
   apiDeleteEdge(edge.source, sourceSlot, edge.target, targetSlot).catch(console.error);
 }
 
-function AppInner() {
+function AppInner({
+  projectName,
+  onGoHome,
+}: {
+  projectName: string;
+  onGoHome: () => void;
+}) {
   const components = useComponents();
-  const {
-    connected,
-    metrics,
-    componentMap,
-  } = usePipelineData(components);
+  const { connected, metrics, componentMap } = usePipelineData(components);
 
   const [metricsOpen, setMetricsOpen] = useState(false);
   const history = useMetricsHistory(metrics);
@@ -56,6 +66,10 @@ function AppInner() {
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([] as Edge[]);
   const initialized = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
+
+  const triggerSave = useCallback(() => {
+    saveGraph().catch(console.error);
+  }, []);
 
   // Initialize: fetch existing graph from backend
   useEffect(() => {
@@ -69,13 +83,20 @@ function AppInner() {
           apiFetchEdges(),
         ]);
 
-        const nodeSpecs = backendNodes.map((n) => ({ id: n.id, type: n.type }));
-        const edgeSpecs = backendEdges.map((e) => ({
-          source: e.source_node,
-          target: e.target_node,
-        }));
-        const positions = layoutNodes(nodeSpecs, edgeSpecs);
-        const posMap = new Map(positions.map((p) => [p.id, p]));
+        const allZero = backendNodes.every((n) => n.x === 0 && n.y === 0);
+
+        let posMap: Map<string, { x: number; y: number }>;
+        if (allZero && backendNodes.length > 0) {
+          const nodeSpecs = backendNodes.map((n) => ({ id: n.id, type: n.type }));
+          const edgeSpecs = backendEdges.map((e) => ({
+            source: e.source_node,
+            target: e.target_node,
+          }));
+          const positions = layoutNodes(nodeSpecs, edgeSpecs);
+          posMap = new Map(positions.map((p) => [p.id, p]));
+        } else {
+          posMap = new Map(backendNodes.map((n) => [n.id, { x: n.x, y: n.y }]));
+        }
 
         setNodes(
           backendNodes.map((n) => {
@@ -97,7 +118,7 @@ function AppInner() {
                 nodeMetrics: null,
               } satisfies PipelineNodeData,
             };
-          })
+          }),
         );
 
         setEdges(
@@ -109,7 +130,7 @@ function AppInner() {
             targetHandle: `in-${e.target_slot}`,
             type: "pipeline",
             data: {},
-          }))
+          })),
         );
       } catch (err) {
         console.error("[pipeline] Init failed:", err);
@@ -133,7 +154,7 @@ function AppInner() {
             nodeMetrics,
           },
         };
-      })
+      }),
     );
     setEdges((prev) =>
       prev.map((e) => {
@@ -144,7 +165,7 @@ function AppInner() {
           ...e,
           data: { byteDelta: sub?.byte_count_delta ?? 0 },
         };
-      })
+      }),
     );
   }, [metrics, setNodes, setEdges]);
 
@@ -156,7 +177,6 @@ function AppInner() {
 
       for (const r of removals) {
         if (r.type === "remove") {
-          // Configuring nodes are local-only — no backend call needed
           if (r.id.startsWith("configuring-")) continue;
 
           setEdges((currentEdges) => {
@@ -166,19 +186,22 @@ function AppInner() {
               }
             }
             return currentEdges.filter(
-              (e) => e.source !== r.id && e.target !== r.id
+              (e) => e.source !== r.id && e.target !== r.id,
             );
           });
-          apiDeleteNode(r.id).catch(console.error);
+          apiDeleteNode(r.id)
+            .then(() => triggerSave())
+            .catch(console.error);
         }
       }
     },
-    [onNodesChangeRaw, setEdges]
+    [onNodesChangeRaw, setEdges, triggerSave],
   );
 
   // Wrap edge changes — detect removals and call backend
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
+      const hasRemovals = changes.some((c) => c.type === "remove");
       setEdges((currentEdges) => {
         for (const c of changes) {
           if (c.type === "remove") {
@@ -191,26 +214,41 @@ function AppInner() {
         return currentEdges;
       });
       onEdgesChangeRaw(changes);
+      if (hasRemovals) triggerSave();
     },
-    [onEdgesChangeRaw, setEdges]
+    [onEdgesChangeRaw, setEdges, triggerSave],
   );
 
   // Handle new edge connections
   const onConnect: OnConnect = useCallback(
     (connection) => {
       setEdges((eds) =>
-        addEdge(
-          { ...connection, type: "pipeline", data: {} },
-          eds
-        )
+        addEdge({ ...connection, type: "pipeline", data: {} }, eds),
       );
       if (connection.source && connection.target) {
         const sourceSlot = parseSlot(connection.sourceHandle);
         const targetSlot = parseSlot(connection.targetHandle);
-        apiCreateEdge(connection.source, sourceSlot, connection.target, targetSlot).catch(console.error);
+        apiCreateEdge(
+          connection.source,
+          sourceSlot,
+          connection.target,
+          targetSlot,
+        )
+          .then(() => triggerSave())
+          .catch(console.error);
       }
     },
-    [setEdges]
+    [setEdges, triggerSave],
+  );
+
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (_event, node) => {
+      apiUpdateNode(node.id, { x: node.position.x, y: node.position.y }).catch(
+        console.error,
+      );
+      triggerSave();
+    },
+    [triggerSave],
   );
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -219,8 +257,12 @@ function AppInner() {
   }, []);
 
   const createPipelineNode = useCallback(
-    (item: ComponentInfo, position: { x: number; y: number }, config?: Record<string, unknown>) => {
-      apiCreateNode(item.name, config)
+    (
+      item: ComponentInfo,
+      position: { x: number; y: number },
+      initArgs?: Record<string, unknown>,
+    ) => {
+      apiCreateNode(item.name, initArgs)
         .then((res) => {
           const newNode: Node<PipelineNodeData> = {
             id: res.id,
@@ -238,10 +280,11 @@ function AppInner() {
             },
           };
           setNodes((nds) => [...nds, newNode]);
+          triggerSave();
         })
         .catch(console.error);
     },
-    [setNodes],
+    [setNodes, triggerSave],
   );
 
   const onDrop = useCallback(
@@ -253,7 +296,6 @@ function AppInner() {
       const item = JSON.parse(raw) as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
-      // Check if any init param has configurable properties
       const hasConfig = Object.values(item.init).some((schema) => {
         if (!schema || typeof schema !== "object") return false;
         const s = schema as Record<string, unknown>;
@@ -272,7 +314,6 @@ function AppInner() {
         return;
       }
 
-      // Add a temporary "configuring" node with the form
       const tempId = `configuring-${Date.now()}`;
       const configuringNode: Node = {
         id: tempId,
@@ -280,9 +321,9 @@ function AppInner() {
         position,
         data: {
           componentInfo: item,
-          onConfirm: (config: Record<string, unknown>) => {
+          onConfirm: (initArgs: Record<string, unknown>) => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
-            createPipelineNode(item, position, config);
+            createPipelineNode(item, position, initArgs);
           },
           onCancel: () => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
@@ -294,6 +335,11 @@ function AppInner() {
     [screenToFlowPosition, setNodes, createPipelineNode],
   );
 
+  const handleGoHome = useCallback(async () => {
+    await apiCloseProject();
+    onGoHome();
+  }, [onGoHome]);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <PipelineCanvas
@@ -304,8 +350,20 @@ function AppInner() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeDragStop={onNodeDragStop}
       />
       <NodeSidebar components={components} />
+
+      {/* Home button */}
+      <button
+        onClick={handleGoHome}
+        className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-lg bg-[var(--glass)] px-3 py-1.5 text-sm text-[var(--muted-foreground)] backdrop-blur transition-colors hover:bg-[var(--glass-hover)] hover:text-[var(--foreground)]"
+        title="Back to projects"
+      >
+        <Home size={16} />
+        <span>{projectName}</span>
+      </button>
+
       <MetricsOverlay
         connected={connected}
         metrics={metrics}
@@ -324,9 +382,63 @@ function AppInner() {
 }
 
 export default function App() {
+  // undefined = loading, null = no project, string = project name
+  const [currentProject, setCurrentProject] = useState<
+    string | null | undefined
+  >(undefined);
+  const [showChooser, setShowChooser] = useState(false);
+
+  useEffect(() => {
+    fetchCurrentProject()
+      .then(async ({ current_project }) => {
+        if (current_project) {
+          await apiStartProject(current_project);
+          setCurrentProject(current_project);
+        } else {
+          setCurrentProject(null);
+          setShowChooser(true);
+        }
+      })
+      .catch(() => {
+        setCurrentProject(null);
+        setShowChooser(true);
+      });
+  }, []);
+
+  // Loading
+  if (currentProject === undefined && !showChooser) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
+        <span className="text-[var(--muted-foreground)]">Loading...</span>
+      </div>
+    );
+  }
+
+  // Project chooser
+  if (showChooser || currentProject === null) {
+    return (
+      <ProjectChooser
+        hadProject={currentProject !== null}
+        onOpen={(name) => {
+          setCurrentProject(name);
+          setShowChooser(false);
+        }}
+        onCancel={() => setShowChooser(false)}
+      />
+    );
+  }
+
+  // Editor
   return (
     <ReactFlowProvider>
-      <AppInner />
+      <AppInner
+        key={currentProject}
+        projectName={currentProject!}
+        onGoHome={() => {
+          setCurrentProject(null);
+          setShowChooser(true);
+        }}
+      />
     </ReactFlowProvider>
   );
 }
