@@ -17,20 +17,31 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
-    "torch>=2.10.0",
-    "torchaudio>=2.10.0",
+    "torch>=2.6.0",
+    "torchaudio>=2.6.0",
     "transformers>=5.1.0",
     "types-requests>=2.32.4.20260107",
     "uvicorn[standard]>=0.30.0",
     "websockets>=16.0",
     "py-cord",
     "py-cord[voice]",
+    "pyyaml>=6.0",
+    "tyro>=0.9.0",
 ]
 
 [tool.mypy]
 [[tool.mypy.overrides]]
 module = ["sounddevice", "onnxruntime"]
 ignore_missing_imports = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchaudio = { index = "pytorch-cu124" }
 
 [dependency-groups]
 dev = [
