@@ -66,7 +66,9 @@ def delete_project(name: str) -> None:
         shutil.rmtree(d)
 
 
-def start_project(name: str, config: AppConfig, current_graph: Graph | None = None) -> Graph:
+def start_project(
+    name: str, config: AppConfig, current_graph: Graph | None = None
+) -> Graph:
     if current_graph is not None:
         from src.api.graph.run.service import stop_all
 

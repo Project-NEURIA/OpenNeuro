@@ -22,5 +22,3 @@ class SavedEdge(BaseModel):
 class SavedGraph(BaseModel):
     nodes: dict[str, SavedNode]
     edges: list[SavedEdge]
-
-
