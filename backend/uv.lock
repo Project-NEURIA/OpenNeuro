@@ -1340,7 +1340,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.24.1" },
     { name = "openai", specifier = ">=2.17.0" },
     { name = "opencv-python-headless", specifier = ">=4.13.0.92" },
-    { name = "openvr-virtual-driver-client", specifier = ">=0.0.7" },
+    { name = "openvr-virtual-driver-client", specifier = ">=0.0.8" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "py-cord" },
     { name = "py-cord", extras = ["voice"] },
@@ -1360,15 +1360,15 @@ dev = [{ name = "ruff", specifier = ">=0.15.1" }]
 
 [[package]]
 name = "openvr-virtual-driver-client"
-version = "0.0.7"
+version = "0.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "pygame-ce" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/55/08442be134697903ea7f943c943234eeadbea8d92b7b75863e18dae31540/openvr_virtual_driver_client-0.0.7.tar.gz", hash = "sha256:7d89059d1c686420b031af75300cdf6225815fccbb5592711483bd3c79df6b84", size = 22066, upload-time = "2026-02-14T11:49:32.29Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/5c/2b47809c0cec46ed86ee99d628e6430593127161b7a9ae5ea5f9265241fc/openvr_virtual_driver_client-0.0.8.tar.gz", hash = "sha256:3a560f20f2fffbb741fbf8deea1bc4fff8aded9bb51a4a498cfcfe6ba9b4b9ac", size = 26587, upload-time = "2026-02-19T10:59:26.632Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/43/de877e8c728e1d40982323a965ca7b06c7f41f2d940300d2e25f09de93c1/openvr_virtual_driver_client-0.0.7-py3-none-any.whl", hash = "sha256:0d6c248a6766fd8f63f7d535d11c225fa08d547b0f15841e220098dcebf9c204", size = 10592, upload-time = "2026-02-14T11:49:31.173Z" },
+    { url = "https://files.pythonhosted.org/packages/92/35/bedabc8bc945c52e4b84e74e1ef10cf262272e5d71a319bd2079b388fcb9/openvr_virtual_driver_client-0.0.8-py3-none-any.whl", hash = "sha256:e1fcc3d8ef3272e1de880e9f1c45b328132565cdf51fe081443795e5cc244edd", size = 11315, upload-time = "2026-02-19T10:59:24.82Z" },
 ]
 
 [[package]]

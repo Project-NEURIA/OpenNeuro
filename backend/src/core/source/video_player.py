@@ -47,7 +47,9 @@ class VideoPlayer(Component[[], VideoPlayerOutputs]):
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
 
-                _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._quality])
+                _, buf = cv2.imencode(
+                    ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._quality]
+                )
                 self._output_video.send(buf.tobytes())
 
                 next_time += interval
