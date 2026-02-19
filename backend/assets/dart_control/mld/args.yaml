@@ -1,0 +1,7 @@
+"# tyro YAML.\n!dataclass:MLDArgs\ndenoiser_args: !dataclass:DenoiserArgs\n  diffusion_args:\
+  \ !dataclass:DiffusionArgs\n    diffusion_steps: 10\n    noise_schedule: cosine\n\
+  \    respacing: ''\n    sigma_small: true\n  model_args: !dataclass:DenoiserTransformerArgs\n\
+  \    activation: gelu\n    clip_dim: 512\n    cond_mask_prob: 0.1\n    dropout:\
+  \ 0.1\n    ff_size: 1024\n    h_dim: 512\n    history_shape: !!python/tuple\n  \
+  \  - 2\n    - 276\n    noise_shape: !!python/tuple\n    - 1\n    - 256\n    num_heads:\
+  \ 4\n    num_layers: 8\n  model_type: transformer\n  rescale_latent: 1\n"

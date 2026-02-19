@@ -1,0 +1,4 @@
+"# tyro YAML.\n!dataclass:MVAEArgs\nmodel_args: !dataclass:VAEArgs\n  activation:\
+  \ gelu\n  arch: all_encoder\n  dropout: 0.1\n  ff_size: 1024\n  h_dim: 256\n  latent_dim:\
+  \ !!python/tuple\n  - 1\n  - 256\n  nfeats: 276\n  normalize_before: false\n  num_heads:\
+  \ 4\n  num_layers: 7\n  position_embedding: learned\n"
