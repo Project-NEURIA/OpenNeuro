@@ -9,14 +9,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.graph.node.controller import router as node_router
 from src.api.graph.edge.controller import router as edge_router
 from src.api.graph.run.controller import router as run_router
-from src.api.graph.save import service as save_service
+from src.api.graph.save.controller import router as save_router
 from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
+from src.api.project.controller import router as project_router
+from src.api.project.config import load_config
+from src.api.project.paths import PROJECTS_DIR
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.graph = save_service.load_graph()
+    PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    config = load_config()
+    app.state.config = config
+
+    app.state.current_project = config.current_project
+
     yield
 
 
@@ -32,8 +41,10 @@ app.add_middleware(
 app.include_router(node_router)
 app.include_router(edge_router)
 app.include_router(run_router)
+app.include_router(save_router)
 app.include_router(metrics_router)
 app.include_router(component_router)
+app.include_router(project_router)
 
 
 def main() -> None:

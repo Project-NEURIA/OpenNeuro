@@ -3,12 +3,14 @@ from __future__ import annotations
 import threading
 from typing import TypedDict
 
+from pydantic import BaseModel
+
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import MessagesFrame, InterruptFrame, TextFrame
 
 
-class AgentStateConfig:
+class AgentStateConfig(BaseModel):
     system_prompt: str = "You are a helpful AI assistant."
     user_name: str = "User"
     chatbot_name: str = "Assistant"

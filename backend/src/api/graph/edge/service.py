@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from src.api.graph.domain.graph import Edge, Graph
-from src.api.graph.save.service import _auto_save
 
 
 def list_edges(graph: Graph) -> list[Edge]:
@@ -48,7 +47,6 @@ def create_edge(
         raise ValueError(f"Edge already exists: {edge}")
 
     graph.edges.append(edge)
-    _auto_save(graph)
 
 
 def delete_edge(
@@ -72,6 +70,5 @@ def delete_edge(
             node = graph.nodes.get(nid)
             if node:
                 node.inner.stop()
-        _auto_save(graph)
     except ValueError:
         raise KeyError(f"Edge not found: {edge}")
