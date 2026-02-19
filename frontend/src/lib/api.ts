@@ -13,7 +13,9 @@ export async function fetchComponents(): Promise<ComponentInfo[]> {
   return res.json();
 }
 
-export async function fetchNodes(): Promise<{ id: string; type: string; status: string }[]> {
+export async function fetchNodes(): Promise<
+  { id: string; type: string; status: string; x: number; y: number }[]
+> {
   const res = await fetch("/graph/nodes");
   if (!res.ok) throw new Error(`Fetch nodes failed: ${res.status}`);
   return res.json();
@@ -25,14 +27,29 @@ export async function fetchEdges(): Promise<EdgeData[]> {
   return res.json();
 }
 
-export async function createNode(type: string, config?: Record<string, unknown>) {
+export async function createNode(type: string, init_args?: Record<string, unknown>) {
   const res = await fetch("/graph/nodes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type, config }),
+    body: JSON.stringify({ type, init_args }),
   });
   if (!res.ok) throw new Error(`Create node failed: ${res.status}`);
-  return res.json() as Promise<{ id: string; type: string; status: string }>;
+  return res.json() as Promise<{
+    id: string;
+    type: string;
+    status: string;
+    x: number;
+    y: number;
+  }>;
+}
+
+export async function updateNode(id: string, data: { x?: number; y?: number }) {
+  const res = await fetch(`/graph/nodes/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Update node failed: ${res.status}`);
 }
 
 export async function deleteNode(id: string) {
@@ -77,4 +94,65 @@ export async function startAll() {
 export async function stopAll() {
   const res = await fetch("/graph/stop", { method: "POST" });
   if (!res.ok) throw new Error(`Stop failed: ${res.status}`);
+}
+
+// --- Project API ---
+
+export interface ProjectSummary {
+  name: string;
+  has_thumbnail: boolean;
+}
+
+export async function fetchProjects(): Promise<ProjectSummary[]> {
+  const res = await fetch("/projects");
+  if (!res.ok) throw new Error(`Fetch projects failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createProject(name: string) {
+  const res = await fetch("/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`Create project failed: ${res.status}`);
+}
+
+export async function deleteProject(name: string) {
+  const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Delete project failed: ${res.status}`);
+}
+
+export async function startProject(
+  name: string,
+): Promise<{ current_project: string | null }> {
+  const res = await fetch(`/projects/${encodeURIComponent(name)}/start`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`Start project failed: ${res.status}`);
+  return res.json();
+}
+
+export async function closeProject() {
+  const res = await fetch("/project/close", { method: "POST" });
+  if (!res.ok) throw new Error(`Close project failed: ${res.status}`);
+}
+
+export async function fetchCurrentProject(): Promise<{
+  current_project: string | null;
+}> {
+  const res = await fetch("/project/current");
+  if (!res.ok) throw new Error(`Fetch current project failed: ${res.status}`);
+  return res.json();
+}
+
+export function projectThumbnailUrl(name: string): string {
+  return `/projects/${encodeURIComponent(name)}/thumbnail`;
+}
+
+export async function saveGraph() {
+  const res = await fetch("/graph/save", { method: "POST" });
+  if (!res.ok) throw new Error(`Save graph failed: ${res.status}`);
 }
