@@ -13,6 +13,7 @@ from src.api.graph.save.controller import router as save_router
 from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
+from src.api.video.controller import router as video_router
 from src.api.project.config import load_config
 from src.api.project.paths import PROJECTS_DIR
 
@@ -45,6 +46,7 @@ app.include_router(save_router)
 app.include_router(metrics_router)
 app.include_router(component_router)
 app.include_router(project_router)
+app.include_router(video_router)
 
 
 def main() -> None:
