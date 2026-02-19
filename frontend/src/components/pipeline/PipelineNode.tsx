@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { formatCount, formatBytes, formatUptime } from "@/lib/format";
+import { useVideoStream } from "@/hooks/useVideoStream";
 import type { PipelineNodeData } from "@/hooks/usePipelineData";
 import type { ChannelMetrics } from "@/lib/types";
 
@@ -77,9 +78,11 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PipelineNodeComponent({ data }: NodeProps) {
+function PipelineNodeComponent({ id, data }: NodeProps) {
   const d = data as PipelineNodeData;
   const colors = categoryColors[d.category]!;
+  const isVideoStream = d.label === "VideoStream";
+  const frameUrl = useVideoStream(isVideoStream ? id : null);
 
   const dot = statusDot[d.status] ?? "bg-status-stopped";
 
@@ -118,6 +121,38 @@ function PipelineNodeComponent({ data }: NodeProps) {
           {d.category}
         </span>
       </div>
+
+      {/* Video display for VideoStream nodes */}
+      {isVideoStream && (
+        <div className="py-4 border-b border-white/[0.06]">
+          <div
+            className="relative w-full rounded-lg overflow-hidden bg-black/60 border border-white/[0.04]"
+            style={{ aspectRatio: "16/9" }}
+          >
+            {frameUrl ? (
+              <img
+                src={frameUrl}
+                alt="Video stream"
+                className="w-full h-full object-contain"
+                draggable={false}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-muted-foreground/40 text-[11px] font-mono uppercase tracking-wider">
+                  no signal
+                </span>
+              </div>
+            )}
+            {/* Scanline overlay */}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.03]"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.1) 1px, rgba(255,255,255,0.1) 2px)",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Type rows with inline handles */}
       <div className="flex flex-col gap-3 py-5">
