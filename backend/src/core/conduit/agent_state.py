@@ -8,7 +8,10 @@ from src.core.channel import Channel
 from src.core.frames import MessagesFrame, InterruptFrame, TextFrame
 
 
-class AgentStateConfig:
+from pydantic import BaseModel
+
+
+class AgentStateConfig(BaseModel):
     system_prompt: str = "You are a helpful AI assistant."
     user_name: str = "User"
     chatbot_name: str = "Assistant"
