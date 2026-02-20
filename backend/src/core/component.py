@@ -109,6 +109,19 @@ class Component[**P, O: Mapping[str, Any]](ABC):
         return get_type_hints(td)
 
     @classmethod
+    def from_args(cls, init_args: dict[str, Any]) -> Component[..., Any]:
+        """Construct a component instance, deserializing any BaseModel init params."""
+        kwargs: dict[str, Any] = {}
+        for k, v in cls.get_init_types().items():
+            if k not in init_args:
+                continue
+            if isinstance(v, type) and issubclass(v, BaseModel):
+                kwargs[k] = v(**init_args[k])
+            else:
+                kwargs[k] = init_args[k]
+        return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
+
+    @classmethod
     def registered_subclasses(cls) -> dict[str, type[Component[..., Any]]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
         from src.core import source, sink, conduit  # noqa: F401

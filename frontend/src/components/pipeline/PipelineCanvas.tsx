@@ -9,6 +9,7 @@ import {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type OnNodeDrag,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { PipelineNode } from "./PipelineNode";
@@ -32,6 +33,7 @@ interface PipelineCanvasProps {
   onConnect?: OnConnect;
   onDrop?: (event: React.DragEvent) => void;
   onDragOver?: (event: React.DragEvent) => void;
+  onNodeDragStop?: OnNodeDrag;
 }
 
 export function PipelineCanvas({
@@ -42,6 +44,7 @@ export function PipelineCanvas({
   onConnect,
   onDrop,
   onDragOver,
+  onNodeDragStop,
 }: PipelineCanvasProps) {
   return (
     <div className="w-full h-full">
@@ -61,6 +64,7 @@ export function PipelineCanvas({
         proOptions={{ hideAttribution: true }}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeDragStop={onNodeDragStop}
       >
         <Background color="var(--grid)" gap={40} size={3} />
         <Controls

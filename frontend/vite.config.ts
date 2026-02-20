@@ -24,6 +24,18 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      "/projects": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/project": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/video": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });

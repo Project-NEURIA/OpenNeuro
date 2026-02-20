@@ -3,12 +3,11 @@ from __future__ import annotations
 import threading
 from typing import TypedDict
 
+from pydantic import BaseModel
+
 from src.core.component import Component
 from src.core.channel import Channel
 from src.core.frames import MessagesFrame, InterruptFrame, TextFrame
-
-
-from pydantic import BaseModel
 
 
 class AgentStateConfig(BaseModel):
