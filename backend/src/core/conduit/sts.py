@@ -47,7 +47,7 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
         audio: Channel[AudioFrame],
         interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
-        url = f"wss://api.openai.com/v1/realtime?model={self.config.model}"
+        url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
         headers = {
             "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
             "OpenAI-Beta": "realtime=v1",
@@ -61,7 +61,7 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                         "type": "session.update",
                         "session": {
                             "modalities": ["text", "audio"],
-                            "voice": self.config.voice,
+                            "voice": "alloy",
                             "input_audio_format": "pcm16",
                             "output_audio_format": "pcm16",
                             "turn_detection": {"type": "server_vad"},
