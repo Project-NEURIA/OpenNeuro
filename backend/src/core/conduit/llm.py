@@ -18,7 +18,7 @@ GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
 class LLMConfig(BaseModel):
     url: str = "https://api.groq.com/openai/v1/chat/completions"
-    model_id: str = "llama3-8b-8192"
+    model_id: str = "llama-3.3-70b-versatile"
     top_p: float = 0.97
     temperature: float = 1.08
     max_tokens: int = 350
