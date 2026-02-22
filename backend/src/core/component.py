@@ -2,21 +2,12 @@ from __future__ import annotations
 
 import inspect
 import threading
-import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
-
-from src.core.channel import ChannelSnapshot, Receiver, Sender
-
-
-class ComponentSnapshot(BaseModel):
-    name: str
-    status: str
-    started_at: float | None
-    channels: dict[str, ChannelSnapshot]
+from src.core.channel import Receiver, Sender
 
 
 class Status(Enum):
@@ -29,8 +20,6 @@ class Component[I: tuple[Receiver[Any], ...], O: tuple[Sender[Any], ...]](ABC):
     def __init__(self) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP
-        self._started_at: float | None = None
-        self._error: str | None = None
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
@@ -47,7 +36,6 @@ class Component[I: tuple[Receiver[Any], ...], O: tuple[Sender[Any], ...]](ABC):
 
     def _safe_run(self, inputs: I, outputs: O) -> None:
         self._status = Status.RUNNING
-        self._started_at = time.time()
         try:
             self.run(inputs, outputs)
         finally:
@@ -72,14 +60,6 @@ class Component[I: tuple[Receiver[Any], ...], O: tuple[Sender[Any], ...]](ABC):
         if self.status == Status.STOPPED:
             return
         self._stop_event.set()
-
-    def snapshot(self) -> ComponentSnapshot:
-        return ComponentSnapshot(
-            name=self.name,
-            status=self.status.value,
-            started_at=self._started_at,
-            channels={n: ch.snapshot() for n, ch in self.get_output_channels().items()},
-        )
 
     @classmethod
     def get_init_types(cls) -> dict[str, type]:
