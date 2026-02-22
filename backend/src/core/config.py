@@ -17,8 +17,8 @@ class AppConfig(BaseModel):
     def load_config(cls) -> Self:
         if CONFIG_PATH.exists():
             data = json.loads(CONFIG_PATH.read_text())
-            return AppConfig.model_validate(data)
-        return AppConfig()
+            return cls.model_validate(data)
+        return cls()
 
     def save_config(self) -> None:
         CONFIG_PATH.write_text(self.model_dump_json(indent=2))
