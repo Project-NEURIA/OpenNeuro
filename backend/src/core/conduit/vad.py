@@ -4,17 +4,17 @@ import os
 import threading
 import time
 from collections import deque
-from typing import TypedDict
+from typing import NamedTuple
 
 import numpy as np
 import onnxruntime as ort
 import torch
+from pydantic import BaseModel
 from transformers import WhisperFeatureExtractor
 
+from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.channel import Channel
-from src.core.frames import AudioFrame, InterruptFrame, AudioDataFormat
-from pydantic import BaseModel
+from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame
 
 
 class VADConfig(BaseModel):
@@ -27,18 +27,19 @@ class VADConfig(BaseModel):
     smart_turn_onnx: str = "assets/smart-turn-v3.0.onnx"
 
 
-class VADOutputs(TypedDict):
-    audio: Channel[AudioFrame]
-    interrupt: Channel[InterruptFrame]
+class VADInputs(NamedTuple):
+    audio: Receiver[AudioFrame]
 
 
-class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
+class VADOutputs(NamedTuple):
+    audio: Sender[AudioFrame]
+    interrupt: Sender[InterruptFrame]
+
+
+class VAD(Component[VADInputs, VADOutputs]):
     def __init__(self, config: VADConfig) -> None:
         super().__init__()
         self.config: VADConfig = config
-
-        self._output_audio = Channel[AudioFrame](name="audio")
-        self._output_interrupt = Channel[InterruptFrame](name="interrupt")
 
         # Load models
         self._load_silero_vad()
@@ -55,12 +56,6 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
         # Buffer for Silero VAD (always 16kHz mono)
         self._vad_buffer: deque[float] = deque(maxlen=4000)
         self._lock = threading.Lock()
-
-    def get_output_channels(self) -> VADOutputs:
-        return {
-            "audio": self._output_audio,
-            "interrupt": self._output_interrupt,
-        }
 
     def _load_silero_vad(self) -> None:
         self._silero_model, utils = torch.hub.load(
@@ -117,7 +112,7 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                     pcm_16k, (max_samples - len(pcm_16k), 0), mode="constant"
                 )
 
-            inputs = self._feature_extractor(
+            features = self._feature_extractor(
                 pcm_16k,
                 sampling_rate=16000,
                 return_tensors="np",
@@ -127,13 +122,13 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                 do_normalize=True,
             )
 
-            input_features = inputs.input_features.squeeze(0).astype(np.float32)
+            input_features = features.input_features.squeeze(0).astype(np.float32)
             input_features = np.expand_dims(input_features, axis=0)
 
-            outputs = self._smart_turn_session.run(
+            results = self._smart_turn_session.run(
                 None, {"input_features": input_features}
             )
-            turn_probability = outputs[0][0].item()
+            turn_probability = results[0][0].item()
 
             return turn_probability > self.config.turn_threshold
 
@@ -141,7 +136,7 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
             print(f"[VAD] Error in Smart Turn detection: {e}")
             return False
 
-    def _process_audio_frame(self, frame: AudioFrame) -> None:
+    def _process_audio_frame(self, frame: AudioFrame, outputs: VADOutputs) -> None:
         with self._lock:
             # 1. Prepare data for VAD (16kHz mono)
             pcm_16k = frame.get(
@@ -158,7 +153,7 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                 vad_result = self._vad_iterator(chunk, return_seconds=False)
 
                 if vad_result and "start" in vad_result and not self._speaking:
-                    self._handle_speech_start()
+                    self._handle_speech_start(outputs)
 
                 if vad_result and "end" in vad_result and self._speaking:
                     if self._silence_start is None:
@@ -171,13 +166,13 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                     silence_duration = time.time() - self._silence_start
                     if silence_duration >= self.config.max_silence_seconds:
                         print(f"[VAD] Max silence reached: {silence_duration:.2f}s")
-                        self._finalize_segment()
+                        self._finalize_segment(outputs)
                     elif silence_duration >= self.config.silence_seconds:
                         if self._check_smart_turn():
                             print(
                                 f"[VAD] Smart Turn detected after silence: {silence_duration:.2f}s"
                             )
-                            self._finalize_segment()
+                            self._finalize_segment(outputs)
             else:
                 self._pre_buffer.append(frame)
                 # Keep pre-buffer within limits (seconds based)
@@ -191,19 +186,19 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                     f_removed = self._pre_buffer.pop(0)
                     total_ms -= f_removed._data.shape[1] / f_removed._sample_rate * 1000
 
-    def _handle_speech_start(self) -> None:
+    def _handle_speech_start(self, outputs: VADOutputs) -> None:
         print("[VAD] Speech started")
         self._speaking = True
         self._silence_start = None
 
-        self._output_interrupt.send(
+        outputs.interrupt.send(
             InterruptFrame(display_name="vad_interrupt", reason="speech_detected")
         )
 
         self._current_segment = list(self._pre_buffer)
         self._pre_buffer = []
 
-    def _finalize_segment(self) -> None:
+    def _finalize_segment(self, outputs: VADOutputs) -> None:
         if not self._current_segment:
             return
 
@@ -233,14 +228,14 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                 sample_rate=sr,
                 channels=ch,
             )
-            self._output_audio.send(output_frame)
+            outputs.audio.send(output_frame)
             print(
                 f"[VAD] Speech segment finalized: {duration:.2f}s ({all_data.shape[1]} samples at {sr}Hz)"
             )
         else:
             print(f"[VAD] Segment too short: {duration:.2f}s")
 
-    def _monitor_loop(self) -> None:
+    def _monitor_loop(self, outputs: VADOutputs) -> None:
         """Background thread to finalize segments if the source is silent."""
         while not self.stop_event.is_set():
             time.sleep(0.1)
@@ -251,28 +246,30 @@ class VAD(Component[[Channel[AudioFrame]], VADOutputs]):
                         print(
                             f"[VAD] Monitor: Max silence reached ({silence_duration:.2f}s)"
                         )
-                        self._finalize_segment()
+                        self._finalize_segment(outputs)
                     elif silence_duration >= self.config.silence_seconds:
                         if self._check_smart_turn():
                             print(
                                 f"[VAD] Monitor: Smart Turn detected after silence ({silence_duration:.2f}s)"
                             )
-                            self._finalize_segment()
+                            self._finalize_segment(outputs)
 
-    def run(self, audio: Channel[AudioFrame]) -> None:
+    def run(self, inputs: VADInputs, outputs: VADOutputs) -> None:
         print("[VAD] Starting Voice Activity Detection")
 
         # Start proactive silence monitor
-        monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        monitor_thread = threading.Thread(
+            target=self._monitor_loop, args=(outputs,), daemon=True
+        )
         monitor_thread.start()
 
-        for frame in audio.stream(self):
+        for frame in inputs.audio(self):
             if frame is None:
                 break
-            self._process_audio_frame(frame)
+            self._process_audio_frame(frame, outputs)
 
         if self._current_segment:
             with self._lock:
-                self._finalize_segment()
+                self._finalize_segment(outputs)
 
         print("[VAD] Voice Activity Detection stopped")

@@ -1,26 +1,23 @@
 from __future__ import annotations
 
 import threading
-from typing import TypedDict
+from typing import NamedTuple
 
+from src.core.channel import Receiver
 from src.core.component import Component
-from src.core.channel import Channel
 
 
-class VideoStreamOutputs(TypedDict):
-    pass
+class VideoStreamInputs(NamedTuple):
+    video: Receiver[bytes]
 
 
-class VideoStream(Component[[Channel[bytes]], VideoStreamOutputs]):
+class VideoStream(Component[VideoStreamInputs, tuple[()]]):
     """Receives JPEG video frames and makes them available for frontend streaming."""
 
     def __init__(self) -> None:
         super().__init__()
         self._latest_frame: bytes | None = None
         self._frame_event = threading.Event()
-
-    def get_output_channels(self) -> VideoStreamOutputs:
-        return {}
 
     @property
     def latest_frame(self) -> bytes | None:
@@ -32,8 +29,8 @@ class VideoStream(Component[[Channel[bytes]], VideoStreamOutputs]):
         self._frame_event.clear()
         return self._latest_frame
 
-    def run(self, video: Channel[bytes]) -> None:
-        for frame in video.stream(self):
+    def run(self, inputs: VideoStreamInputs, outputs: tuple[()]) -> None:
+        for frame in inputs.video(self):
             if frame is None:
                 break
             self._latest_frame = frame
