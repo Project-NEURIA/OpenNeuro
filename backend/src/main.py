@@ -15,8 +15,7 @@ from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.video.controller import router as video_router
 from src.core.graph import Graph
-from src.api.project.config import load_config
-from src.api.project.paths import PROJECTS_DIR
+from src.core.config import PROJECTS_DIR, AppConfig
 from src.core.graph import GraphManager
 
 
@@ -24,9 +23,7 @@ from src.core.graph import GraphManager
 async def lifespan(app: FastAPI):
     PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    config = load_config()
-    app.state.config = config
-
+    config = AppConfig.load_config()
     app.state.current_project = config.current_project
 
     app.state.manager = GraphManager(Graph(edges=[], nodes={}))

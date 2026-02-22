@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from src.core.config import PROJECTS_DIR
 from src.core.graph import Graph
-from src.api.project.paths import graph_path
 
 
 def save_graph(project_name: str, graph: Graph) -> None:
-    path = graph_path(project_name)
+    path = PROJECTS_DIR / project_name / "graph.json"
     path.write_text(graph.model_dump_json(indent=2))
