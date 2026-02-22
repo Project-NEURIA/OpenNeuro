@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import NamedTuple
 
 import numpy as np
 import sounddevice as sd
-
-from src.core.component import Component
-from src.core.channel import Channel
-
-
 from pydantic import BaseModel
 
-from src.core.frames import AudioFrame, AudioDataFormat
+from src.core.channel import Receiver
+from src.core.component import Component
+from src.core.frames import AudioDataFormat, AudioFrame
 
 
 class SpeakerConfig(BaseModel):
@@ -19,31 +16,27 @@ class SpeakerConfig(BaseModel):
     channels: int = 1
 
 
-class SpeakerOutputs(TypedDict):
-    pass
+class SpeakerInputs(NamedTuple):
+    audio: Receiver[AudioFrame]
 
 
-class Speaker(Component[[Channel[AudioFrame]], SpeakerOutputs]):
+class Speaker(Component[SpeakerInputs, tuple[()]]):
     def __init__(self, config: SpeakerConfig) -> None:
         super().__init__()
         self.config: SpeakerConfig = config
         self._sample_rate = self.config.sample_rate
         self._channels = self.config.channels
 
-    def get_output_channels(self) -> SpeakerOutputs:
-        return {}
-
-    def run(self, audio: Channel[AudioFrame]) -> None:
+    def run(self, inputs: SpeakerInputs, outputs: tuple[()]) -> None:
         with sd.OutputStream(
             samplerate=self._sample_rate,
             channels=self._channels,
             dtype="int16",
         ) as stream:
-            for frame in audio.stream(self):
+            for frame in inputs.audio(self):
                 if frame is None:
                     break
 
-                # AudioFrame.get handles resampling and channel mixing automatically
                 pcm_bytes = frame.get(
                     sample_rate=self._sample_rate,
                     num_channels=self._channels,

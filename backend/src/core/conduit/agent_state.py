@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import threading
-from typing import TypedDict
+from typing import NamedTuple
 
 from pydantic import BaseModel
 
+from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.channel import Channel
-from src.core.frames import MessagesFrame, InterruptFrame, TextFrame
+from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 
 class AgentStateConfig(BaseModel):
@@ -16,32 +16,27 @@ class AgentStateConfig(BaseModel):
     chatbot_name: str = "Assistant"
 
 
-class AgentStateOutputs(TypedDict):
-    messages: Channel[MessagesFrame]
-    interrupt: Channel[InterruptFrame]
+class AgentStateInputs(NamedTuple):
+    asr: Receiver[TextFrame]
+    feedback: Receiver[TextFrame]
+    interrupt: Receiver[InterruptFrame] | None = None
 
 
-class AgentState(
-    Component[
-        [Channel[TextFrame], Channel[TextFrame], Channel[InterruptFrame]],
-        AgentStateOutputs,
-    ]
-):
+class AgentStateOutputs(NamedTuple):
+    messages: Sender[MessagesFrame]
+    interrupt: Sender[InterruptFrame]
+
+
+class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
     """Agent state component that manages conversation history."""
 
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
         self.config: AgentStateConfig = config
 
-        self._output_messages = Channel[MessagesFrame](name="messages")
-        self._output_interrupt = Channel[InterruptFrame](name="interrupt")
-
         # Conversation history as list of (speaker, text) tuples
         self._history: list[tuple[str, str]] = []
         self._lock = threading.Lock()
-
-    def get_output_channels(self) -> AgentStateOutputs:
-        return {"messages": self._output_messages, "interrupt": self._output_interrupt}
 
     def _build_context(self) -> str:
         """Build single prompt string."""
@@ -61,16 +56,11 @@ class AgentState(
                 messages.append({"role": role, "content": text})
             return messages
 
-    def run(
-        self,
-        asr: Channel[TextFrame],
-        feedback: Channel[TextFrame],
-        interrupt: Channel[InterruptFrame] | None = None,
-    ) -> None:
+    def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
 
-        def process_asr():
-            for text_frame in asr.stream(self):
+        def process_asr() -> None:
+            for text_frame in inputs.asr(self):
                 if text_frame is None:
                     break
 
@@ -84,7 +74,7 @@ class AgentState(
                 print(f"[AgentState] User: {text}")
 
                 # Output context as MessagesFrame
-                self._output_messages.send(
+                outputs.messages.send(
                     MessagesFrame(
                         display_name="agent_state",
                         text=self._build_context(),
@@ -93,8 +83,8 @@ class AgentState(
                     )
                 )
 
-        def process_feedback():
-            for text_frame in feedback.stream(self):
+        def process_feedback() -> None:
+            for text_frame in inputs.feedback(self):
                 if text_frame is None:
                     break
 
@@ -113,15 +103,15 @@ class AgentState(
                     else:
                         self._history.append((self.config.chatbot_name, chunk))
 
-        def process_interrupts():
-            if not interrupt:
+        def process_interrupts() -> None:
+            if inputs.interrupt is None:
                 return
-            for frame in interrupt.stream(self):
+            for frame in inputs.interrupt(self):
                 if frame is None:
                     break
                 print(f"[AgentState] Interrupt received: {frame.get()}")
                 # Forward the interrupt
-                self._output_interrupt.send(frame)
+                outputs.interrupt.send(frame)
 
         threads = [
             threading.Thread(target=process_asr, daemon=True),
