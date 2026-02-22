@@ -36,7 +36,7 @@ class Graph(BaseModel):
 class GraphManager:
     def __init__(self, graph: Graph) -> None:
         self._graph = graph
-        self._components: dict[str, Component[..., Any]] = {}
+        self._components: dict[str, Component[Any, Any]] = {}
         self._channel_map: dict[frozenset[SenderKey], Channel[Any]] = {}
         self._sender_handles: dict[SenderKey, Sender[Any]] = {}
         self._receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
@@ -112,10 +112,10 @@ class GraphManager:
     def graph(self) -> Graph:
         return self._graph
 
-    def component(self, node_id: str) -> Component[..., Any]:
+    def component(self, node_id: str) -> Component[Any, Any]:
         return self._components[node_id]
 
-    def components(self) -> dict[str, Component[..., Any]]:
+    def components(self) -> dict[str, Component[Any, Any]]:
         return self._components
 
     def get_node_output(self, node_id: str) -> dict[str, type]:
@@ -163,10 +163,10 @@ class GraphManager:
         create = new_keys - old_keys
 
         new_channel_map: dict[frozenset[SenderKey], Channel[Any]] = {}
-        for key in reuse:
-            new_channel_map[key] = self._channel_map[key]
-        for key in create:
-            new_channel_map[key] = Channel()
+        for ckey in reuse:
+            new_channel_map[ckey] = self._channel_map[ckey]
+        for ckey in create:
+            new_channel_map[ckey] = Channel()
 
         self._channel_map = new_channel_map
 
@@ -176,21 +176,21 @@ class GraphManager:
                 sender_channels[sender_key].append(channel)
 
         new_sender_handles: dict[SenderKey, Sender[Any]] = {}
-        for key, channels in sender_channels.items():
-            old = self._sender_handles.get(key)
-            if old is not None and set(old._channels) == set(channels):
-                new_sender_handles[key] = old
+        for skey, channels in sender_channels.items():
+            old_sender = self._sender_handles.get(skey)
+            if old_sender is not None and set(old_sender._channels) == set(channels):
+                new_sender_handles[skey] = old_sender
             else:
-                new_sender_handles[key] = Sender(*channels)
+                new_sender_handles[skey] = Sender(*channels)
         self._sender_handles = new_sender_handles
 
         new_receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
         for sender_set, recv_keys in groups.items():
             channel = self._channel_map[sender_set]
             for recv_key in recv_keys:
-                old = self._receiver_handles.get(recv_key)
-                if old is not None and old._channel is channel:
-                    new_receiver_handles[recv_key] = old
+                old_recv: Receiver[Any] | None = self._receiver_handles.get(recv_key)  # type: ignore[assignment]
+                if old_recv is not None and old_recv._channel is channel:
+                    new_receiver_handles[recv_key] = old_recv
                 else:
                     new_receiver_handles[recv_key] = Receiver(channel)
         self._receiver_handles = new_receiver_handles
@@ -211,15 +211,15 @@ class GraphManager:
 
             input_handles: dict[str, Receiver[Any]] = {}
             for slot in input_slots:
-                key: ReceiverKey = (node_id, slot)
-                if key in self._receiver_handles:
-                    input_handles[slot] = self._receiver_handles[key]
+                rkey: ReceiverKey = (node_id, slot)
+                if rkey in self._receiver_handles:
+                    input_handles[slot] = self._receiver_handles[rkey]
 
             output_handles: dict[str, Sender[Any]] = {}
             for slot in output_slots:
-                key: SenderKey = (node_id, slot)
-                if key in self._sender_handles:
-                    output_handles[slot] = self._sender_handles[key]
+                skey: SenderKey = (node_id, slot)
+                if skey in self._sender_handles:
+                    output_handles[slot] = self._sender_handles[skey]
 
             inputs = self._build_tuple(input_type, input_handles)
             outputs = self._build_tuple(output_type, output_handles)
