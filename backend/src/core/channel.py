@@ -39,11 +39,9 @@ class Channel[T]:
         self._byte_count_delta: int = 0
         self._last_send_time: float = 0.0
 
-    def send(self, item: T) -> None:
+    def _send(self, item: T) -> None:
         with self._condition:
-            if (
-                not self._cursors
-            ):  # stop data from accumulating when no one is listening
+            if not self._cursors:
                 return
             self._items.append(item)
             self._msg_count_delta += 1
@@ -79,27 +77,11 @@ class Channel[T]:
             subscribers=subs,
         )
 
-    def stream(
-        self, subscriber: "Component[Any, Any]"
-    ) -> Generator[T | None, None, None]:
-        """On GeneratorExit, stream is unregistered."""
-        stop_event = subscriber.stop_event
-        sub_id = self._register(subscriber)
-        try:
-            while not stop_event.is_set():
-                item = self._wait_and_get(sub_id, stop_event)
-                yield item
-            yield None
-        finally:
-            self._unregister(sub_id)
-
-    def _register(self, subscriber: "Component[Any, Any]") -> int:
-        sub_id = id(subscriber)
+    def _register(self, sub_id: int) -> None:
         with self._condition:
             self._cursors[sub_id] = self._offset + len(self._items)
             self._sub_msg_count_delta[sub_id] = 0
             self._sub_byte_count_delta[sub_id] = 0
-            return sub_id
 
     def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
         with self._condition:
@@ -136,3 +118,36 @@ class Channel[T]:
         if drop > 0:
             del self._items[:drop]
             self._offset += drop
+
+
+class Sender[T]:
+    """Handle for sending to one or more channels."""
+
+    def __init__(self, *channels: Channel[T]) -> None:
+        self._channels: list[Channel[T]] = list(channels)
+
+    def connect(self, channel: Channel[T]) -> None:
+        self._channels.append(channel)
+
+    def send(self, item: T) -> None:
+        for ch in self._channels:
+            ch._send(item)
+
+
+class Receiver[T]:
+    """Handle for receiving from a channel."""
+
+    def __init__(self, channel: Channel[T]) -> None:
+        self._channel = channel
+
+    def __call__(self, subscriber: Component[Any, Any]) -> Generator[T | None, None, None]:
+        stop_event = subscriber.stop_event
+        sub_id = id(subscriber)
+        self._channel._register(sub_id)
+        try:
+            while not stop_event.is_set():
+                item = self._channel._wait_and_get(sub_id, stop_event)
+                yield item
+            yield None
+        finally:
+            self._channel._unregister(sub_id)
