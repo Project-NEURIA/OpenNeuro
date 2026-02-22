@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlowProvider,
   useNodesState,
@@ -35,7 +35,8 @@ import {
   closeProject as apiCloseProject,
   saveGraph,
 } from "@/lib/api";
-import type { ComponentInfo } from "@/lib/types";
+import type { ComponentInfo, Graph, GraphEdge } from "@/lib/types";
+import { checkTypes, typeToString } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
   if (!handleId) return "";
@@ -70,6 +71,66 @@ function AppInner({
   const triggerSave = useCallback(() => {
     saveGraph().catch(console.error);
   }, []);
+
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+  const componentTypeInfo = useMemo(() => {
+    const inputs: Record<string, Record<string, string>> = {};
+    const outputs: Record<string, Record<string, string>> = {};
+    for (const c of components) {
+      inputs[c.name] = c.inputs;
+      outputs[c.name] = c.outputs;
+    }
+    return { inputs, outputs };
+  }, [components]);
+
+  const runTypeCheck = useCallback(() => {
+    const currentNodes = nodesRef.current;
+
+    setEdges((currentEdges) => {
+      const graph: Graph = {
+        nodes: Object.fromEntries(
+          currentNodes
+            .filter((n) => n.type === "pipeline")
+            .map((n) => {
+              const data = n.data as PipelineNodeData;
+              return [n.id, { type: data.label, init_args: {}, x: n.position.x, y: n.position.y }];
+            }),
+        ),
+        edges: currentEdges.map((e): GraphEdge => ({
+          source_node: e.source,
+          source_slot: parseSlot(e.sourceHandle),
+          target_node: e.target,
+          target_slot: parseSlot(e.targetHandle),
+        })),
+      };
+
+      const { errors } = checkTypes(graph, componentTypeInfo.inputs, componentTypeInfo.outputs);
+
+      const errorMap = new Map<string, string>();
+      for (const err of errors) {
+        if (err.constraint.origin.kind === "edge") {
+          const { sourceNode, sourceSlot, targetNode, targetSlot } = err.constraint.origin;
+          const edgeId = `${sourceNode}:${sourceSlot}->${targetNode}:${targetSlot}`;
+          errorMap.set(edgeId, `${typeToString(err.left)} ≠ ${typeToString(err.right)}`);
+        }
+      }
+
+      return currentEdges.map((e) => {
+        const srcSlot = parseSlot(e.sourceHandle);
+        const tgtSlot = parseSlot(e.targetHandle);
+        const key = `${e.source}:${srcSlot}->${e.target}:${tgtSlot}`;
+        return {
+          ...e,
+          data: {
+            ...(e.data as Record<string, unknown>),
+            typeError: errorMap.get(key) || undefined,
+          },
+        };
+      });
+    });
+  }, [setEdges, componentTypeInfo]);
 
   // Initialize: fetch existing graph from backend
   useEffect(() => {
@@ -132,11 +193,13 @@ function AppInner({
             data: {},
           })),
         );
+
+        runTypeCheck();
       } catch (err) {
         console.error("[pipeline] Init failed:", err);
       }
     })();
-  }, [components, componentMap, setNodes, setEdges]);
+  }, [components, componentMap, setNodes, setEdges, runTypeCheck]);
 
   // Update node and edge data with metrics
   useEffect(() => {
@@ -163,7 +226,7 @@ function AppInner({
         const sub = ch?.subscribers?.[e.target];
         return {
           ...e,
-          data: { byteDelta: sub?.byte_count_delta ?? 0 },
+          data: { ...(e.data as Record<string, unknown>), byteDelta: sub?.byte_count_delta ?? 0 },
         };
       }),
     );
@@ -190,12 +253,15 @@ function AppInner({
             );
           });
           apiDeleteNode(r.id)
-            .then(() => triggerSave())
+            .then(() => {
+              runTypeCheck();
+              triggerSave();
+            })
             .catch(console.error);
         }
       }
     },
-    [onNodesChangeRaw, setEdges, triggerSave],
+    [onNodesChangeRaw, setEdges, triggerSave, runTypeCheck],
   );
 
   // Wrap edge changes — detect removals and call backend
@@ -214,9 +280,12 @@ function AppInner({
         return currentEdges;
       });
       onEdgesChangeRaw(changes);
-      if (hasRemovals) triggerSave();
+      if (hasRemovals) {
+        runTypeCheck();
+        triggerSave();
+      }
     },
-    [onEdgesChangeRaw, setEdges, triggerSave],
+    [onEdgesChangeRaw, setEdges, triggerSave, runTypeCheck],
   );
 
   // Handle new edge connections
@@ -225,6 +294,7 @@ function AppInner({
       setEdges((eds) =>
         addEdge({ ...connection, type: "pipeline", data: {} }, eds),
       );
+      runTypeCheck();
       if (connection.source && connection.target) {
         const sourceSlot = parseSlot(connection.sourceHandle);
         const targetSlot = parseSlot(connection.targetHandle);
@@ -238,7 +308,7 @@ function AppInner({
           .catch(console.error);
       }
     },
-    [setEdges, triggerSave],
+    [setEdges, triggerSave, runTypeCheck],
   );
 
   const onNodeDragStop: OnNodeDrag = useCallback(
@@ -280,11 +350,12 @@ function AppInner({
             },
           };
           setNodes((nds) => [...nds, newNode]);
+          runTypeCheck();
           triggerSave();
         })
         .catch(console.error);
     },
-    [setNodes, triggerSave],
+    [setNodes, triggerSave, runTypeCheck],
   );
 
   const onDrop = useCallback(
