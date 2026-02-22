@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import time
-from typing import TypedDict
+from typing import NamedTuple
 
 import cv2
 
+from src.core.channel import Sender
 from src.core.component import Component
-from src.core.channel import Channel
 
 
-class VideoPlayerOutputs(TypedDict):
-    video: Channel[bytes]
+class VideoPlayerOutputs(NamedTuple):
+    video: Sender[bytes]
 
 
-class VideoPlayer(Component[[], VideoPlayerOutputs]):
+class VideoPlayer(Component[tuple[()], VideoPlayerOutputs]):
     """Plays a local video file and sends JPEG frames through the pipeline."""
 
     def __init__(
@@ -25,12 +25,8 @@ class VideoPlayer(Component[[], VideoPlayerOutputs]):
         super().__init__()
         self._path = path
         self._quality = quality
-        self._output_video: Channel[bytes] = Channel(name="video")
 
-    def get_output_channels(self) -> VideoPlayerOutputs:
-        return {"video": self._output_video}
-
-    def run(self) -> None:
+    def run(self, inputs: tuple[()], outputs: VideoPlayerOutputs) -> None:
         cap = cv2.VideoCapture(self._path)
         if not cap.isOpened():
             raise RuntimeError(f"Cannot open video: {self._path}")
@@ -50,7 +46,7 @@ class VideoPlayer(Component[[], VideoPlayerOutputs]):
                 _, buf = cv2.imencode(
                     ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._quality]
                 )
-                self._output_video.send(buf.tobytes())
+                outputs.video.send(buf.tobytes())
 
                 next_time += interval
                 sleep = next_time - time.monotonic()
