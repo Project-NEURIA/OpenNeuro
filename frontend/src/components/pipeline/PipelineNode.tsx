@@ -1,10 +1,10 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { formatCount, formatBytes, formatUptime } from "@/lib/format";
+import { formatCount, formatBytes } from "@/lib/format";
 import { useVideoStream } from "@/hooks/useVideoStream";
 import type { PipelineNodeData } from "@/hooks/usePipelineData";
-import type { ChannelMetrics } from "@/lib/types";
+import type { SenderMetrics, ReceiverMetrics } from "@/lib/types";
 
 const categoryColors: Record<string, { border: string; bg: string; badge: string; badgeText: string }> = {
   source: {
@@ -55,15 +55,27 @@ function TypeLabel({ name, type }: { name: string; type: string }) {
   );
 }
 
-function ChannelRow({ ch }: { ch: ChannelMetrics }) {
+function SenderRow({ sender }: { sender: SenderMetrics }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-foreground/60 font-medium">{ch.name}</span>
+      <span className="text-foreground/60 font-medium">{sender.name}</span>
       <div className="flex items-center gap-3">
-        <Stat label="msgs" value={formatCount(ch.msg_count_delta)} />
-        <Stat label="bytes" value={formatBytes(ch.byte_count_delta)} />
-        <Stat label="buf" value={String(ch.buffer_depth)} />
-        <Stat label="subs" value={String(Object.keys(ch.subscribers).length)} />
+        <Stat label="msgs" value={formatCount(sender.msg_count_delta)} />
+        <Stat label="bytes" value={formatBytes(sender.byte_count_delta)} />
+        <Stat label="buf" value={String(sender.buffer_depth)} />
+      </div>
+    </div>
+  );
+}
+
+function ReceiverRow({ receiver }: { receiver: ReceiverMetrics }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-foreground/60 font-medium">{receiver.name}</span>
+      <div className="flex items-center gap-3">
+        <Stat label="msgs" value={formatCount(receiver.msg_count_delta)} />
+        <Stat label="bytes" value={formatBytes(receiver.byte_count_delta)} />
+        <Stat label="lag" value={String(receiver.lag)} />
       </div>
     </div>
   );
@@ -88,9 +100,11 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
 
   const maxSlots = Math.max(d.inputs.length, d.outputs.length, 1);
 
-  const channels = d.nodeMetrics?.channels;
-  const channelEntries = channels ? Object.values(channels) : [];
-  const uptime = formatUptime(d.nodeMetrics?.started_at ?? null);
+  const senders = d.nodeMetrics?.senders;
+  const receivers = d.nodeMetrics?.receivers;
+  const senderEntries = senders ? Object.values(senders) : [];
+  const receiverEntries = receivers ? Object.values(receivers) : [];
+  const hasMetrics = senderEntries.length > 0 || receiverEntries.length > 0;
 
   return (
     <div
@@ -190,15 +204,11 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
 
       {/* Metrics */}
       <div className="pt-5 border-t border-white/[0.06] text-[10px] font-mono space-y-2">
-        {/* Uptime bar */}
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground/60 uppercase tracking-wider">uptime</span>
-          <span className="text-foreground/70 tabular-nums">{uptime}</span>
-        </div>
-
-        {/* Channel metrics */}
-        {channelEntries.length > 0 ? (
-          channelEntries.map((ch) => <ChannelRow key={ch.name} ch={ch} />)
+        {hasMetrics ? (
+          <>
+            {senderEntries.map((s) => <SenderRow key={s.name} sender={s} />)}
+            {receiverEntries.map((r) => <ReceiverRow key={r.name} receiver={r} />)}
+          </>
         ) : (
           <div className="text-muted-foreground/40 text-center py-1">awaiting data</div>
         )}

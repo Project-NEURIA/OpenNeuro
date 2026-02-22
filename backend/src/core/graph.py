@@ -118,6 +118,12 @@ class GraphManager:
     def components(self) -> dict[str, Component[Any, Any]]:
         return self._components
 
+    def sender_handles(self) -> dict[SenderKey, Sender[Any]]:
+        return self._sender_handles
+
+    def receiver_handles(self) -> dict[ReceiverKey, Receiver[Any]]:
+        return self._receiver_handles
+
     def get_node_output(self, node_id: str) -> dict[str, type]:
         return type(self._components[node_id]).get_output_types()
 

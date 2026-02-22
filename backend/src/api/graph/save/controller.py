@@ -14,4 +14,7 @@ router = APIRouter(prefix="/graph")
 def save_graph(
     manager: GraphManager = Depends(get_manager),
 ) -> None:
-    service.save_graph(AppConfig.load_config().current_project, manager.graph)
+    project = AppConfig.load_config().current_project
+    if project is None:
+        return
+    service.save_graph(project, manager.graph)

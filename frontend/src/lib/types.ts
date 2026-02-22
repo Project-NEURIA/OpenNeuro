@@ -27,26 +27,26 @@ export interface Graph {
   edges: GraphEdge[];
 }
 
-export interface SubscriberSnapshot {
-  lag: number;
-  msg_count_delta: number;
-  byte_count_delta: number;
-}
-
-export interface ChannelMetrics {
+export interface SenderMetrics {
   name: string;
   msg_count_delta: number;
   byte_count_delta: number;
   last_send_time: number;
   buffer_depth: number;
-  subscribers: Record<string, SubscriberSnapshot>;
+}
+
+export interface ReceiverMetrics {
+  name: string;
+  msg_count_delta: number;
+  byte_count_delta: number;
+  lag: number;
 }
 
 export interface NodeMetrics {
   name: string;
   status: string;
-  started_at: number | null;
-  channels: Record<string, ChannelMetrics>;
+  senders: Record<string, SenderMetrics>;
+  receivers: Record<string, ReceiverMetrics>;
 }
 
 export interface MetricsSnapshot {

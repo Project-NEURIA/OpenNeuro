@@ -221,12 +221,11 @@ function AppInner({
     );
     setEdges((prev) =>
       prev.map((e) => {
-        const slot = parseSlot(e.sourceHandle);
-        const ch = metrics.nodes[e.source]?.channels?.[slot];
-        const sub = ch?.subscribers?.[e.target];
+        const targetSlot = parseSlot(e.targetHandle);
+        const recv = metrics.nodes[e.target]?.receivers?.[targetSlot];
         return {
           ...e,
-          data: { ...(e.data as Record<string, unknown>), byteDelta: sub?.byte_count_delta ?? 0 },
+          data: { ...(e.data as Record<string, unknown>), byteDelta: recv?.byte_count_delta ?? 0 },
         };
       }),
     );
