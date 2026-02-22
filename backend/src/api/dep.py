@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from fastapi import HTTPException, Request
 
-from src.api.graph.domain.graph import Graph
+from src.core.graph import GraphManager
 
 
-def get_graph(request: Request) -> Graph:
-    return request.app.state.graph
+def get_manager(request: Request) -> GraphManager:
+    return request.app.state.manager
 
 
 def get_current_project(request: Request) -> str:
