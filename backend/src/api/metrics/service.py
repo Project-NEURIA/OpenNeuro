@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import time
 
-from src.api.graph.domain.graph import Graph
 from src.api.metrics.dto import MetricsResponse
+from src.core.graph import GraphManager
 
 
-def collect(graph: Graph) -> MetricsResponse:
-    nodes = dict(graph.nodes)
+def collect(manager: GraphManager) -> MetricsResponse:
     return MetricsResponse(
-        nodes={nid: node.inner.snapshot() for nid, node in nodes.items()},
+        nodes={nid: comp.snapshot() for nid, comp in manager.components().items()},
         timestamp=time.time(),
     )

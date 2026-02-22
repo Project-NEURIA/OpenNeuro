@@ -74,7 +74,9 @@ class Receiver[T]:
     def __init__(self, channel: Channel[T]) -> None:
         self._channel = channel
 
-    def __call__(self, subscriber: Component[Any, Any]) -> Generator[T | None, None, None]:
+    def __call__(
+        self, subscriber: Component[Any, Any]
+    ) -> Generator[T | None, None, None]:
         stop_event = subscriber.stop_event
         sub_id = id(subscriber)
         self._channel._register(sub_id)
