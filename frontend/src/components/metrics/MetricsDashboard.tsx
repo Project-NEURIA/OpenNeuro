@@ -76,7 +76,7 @@ export function MetricsDashboard({ connected, history, componentMap, onClose }: 
             key={nodeId}
             nodeId={nodeId}
             metrics={nodes[nodeId]!}
-            history={nodeHistory[nodeId] ?? { msgThroughput: [], byteThroughput: [], channelHistory: {} }}
+            history={nodeHistory[nodeId] ?? { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} }}
             dt={dt}
             duration={duration}
             componentMap={componentMap}

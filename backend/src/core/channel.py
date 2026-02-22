@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import sys
 import threading
+import time
 from typing import TYPE_CHECKING, Any, Generator
 
 if TYPE_CHECKING:
@@ -59,6 +61,9 @@ class Sender[T]:
 
     def __init__(self, *channels: Channel[T]) -> None:
         self._channels: list[Channel[T]] = list(channels)
+        self._msg_count: int = 0
+        self._byte_count: int = 0
+        self._last_send_time: float = 0.0
 
     def connect(self, channel: Channel[T]) -> None:
         self._channels.append(channel)
@@ -66,6 +71,13 @@ class Sender[T]:
     def send(self, item: T) -> None:
         for ch in self._channels:
             ch._send(item)
+        self._msg_count += 1
+        self._byte_count += sys.getsizeof(item)
+        self._last_send_time = time.monotonic()
+
+    @property
+    def buffer_depth(self) -> int:
+        return sum(len(ch._items) for ch in self._channels)
 
 
 class Receiver[T]:
@@ -73,17 +85,37 @@ class Receiver[T]:
 
     def __init__(self, channel: Channel[T]) -> None:
         self._channel = channel
+        self._msg_count: int = 0
+        self._byte_count: int = 0
+        self._sub_id: int | None = None
 
     def __call__(
         self, subscriber: Component[Any, Any]
     ) -> Generator[T | None, None, None]:
         stop_event = subscriber.stop_event
         sub_id = id(subscriber)
+        self._sub_id = sub_id
         self._channel._register(sub_id)
         try:
             while not stop_event.is_set():
                 item = self._channel._wait_and_get(sub_id, stop_event)
                 yield item
+                if item is not None:
+                    self._msg_count += 1
+                    self._byte_count += sys.getsizeof(item)
             yield None
         finally:
             self._channel._unregister(sub_id)
+
+    @property
+    def lag(self) -> int:
+        sub_id = self._sub_id
+        if sub_id is None:
+            return 0
+        ch = self._channel
+        with ch._condition:
+            cursor = ch._cursors.get(sub_id)
+            if cursor is None:
+                return 0
+            head = ch._offset + len(ch._items)
+            return head - cursor

@@ -174,9 +174,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
                 delta = choice.get("delta") or {}
                 text = delta.get("content") or ""
                 if text:
-                    outputs.text.send(
-                        TextFrame(display_name="llm_chunk", text=text)
-                    )
+                    outputs.text.send(TextFrame(display_name="llm_chunk", text=text))
 
         except Exception as e:
             print(f"[LLM] Generation error: {e}")

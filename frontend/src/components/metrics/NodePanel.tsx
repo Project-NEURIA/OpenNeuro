@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 import { Waveform } from "./Waveform";
-import { ChannelSection } from "./ChannelSection";
-import { formatCount, formatBytes, formatUptime } from "@/lib/format";
+import { SenderSection } from "./SenderSection";
+import { ReceiverSection } from "./ReceiverSection";
+import { formatCount, formatBytes } from "@/lib/format";
 import type { NodeMetrics, ComponentInfo } from "@/lib/types";
 import type { NodeHistoryEntry } from "@/hooks/useMetricsHistory";
 
@@ -44,19 +45,11 @@ export function NodePanel({ nodeId, metrics, history, dt, duration, componentMap
   const category = info?.category ?? "conduit";
   const colors = categoryColors[category] ?? categoryColors.conduit!;
   const dot = statusDot[metrics.status] ?? "bg-status-stopped";
-  const uptime = formatUptime(metrics.started_at);
-
-  const startedTime = metrics.started_at
-    ? new Date(metrics.started_at * 1000).toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-    : "--";
 
   const currentMsg = history.msgThroughput[history.msgThroughput.length - 1] ?? 0;
   const currentBytes = history.byteThroughput[history.byteThroughput.length - 1] ?? 0;
-  const channels = Object.values(metrics.channels);
+  const senders = Object.values(metrics.senders);
+  const receivers = Object.values(metrics.receivers);
 
   return (
     <div
@@ -73,8 +66,6 @@ export function NodePanel({ nodeId, metrics, history, dt, duration, componentMap
         >
           {metrics.name}
         </span>
-        <span className="font-mono text-[9px] text-muted-foreground/60 tabular-nums">{uptime}</span>
-        <span className="font-mono text-[9px] text-muted-foreground/60 tabular-nums">{startedTime}</span>
         <span
           className={cn(
             "ml-auto text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider",
@@ -139,19 +130,29 @@ export function NodePanel({ nodeId, metrics, history, dt, duration, componentMap
         </div>
       </div>
 
-      {/* Per-channel sections */}
-      {channels.map((ch) => (
-        <ChannelSection
-          key={ch.name}
-          channel={ch}
+      {/* Per-sender sections */}
+      {senders.map((s) => (
+        <SenderSection
+          key={s.name}
+          sender={s}
           dt={dt}
           duration={duration}
-          channelHistory={history.channelHistory[ch.name]}
-          nodeMap={allNodes}
+          senderHistory={history.senderHistory[s.name]}
         />
       ))}
 
-      {channels.length === 0 && (
+      {/* Per-receiver sections */}
+      {receivers.map((r) => (
+        <ReceiverSection
+          key={r.name}
+          receiver={r}
+          dt={dt}
+          duration={duration}
+          receiverHistory={history.receiverHistory[r.name]}
+        />
+      ))}
+
+      {senders.length === 0 && receivers.length === 0 && (
         <div className="font-mono text-[10px] text-muted-foreground/40 text-center py-2">
           No channels
         </div>
