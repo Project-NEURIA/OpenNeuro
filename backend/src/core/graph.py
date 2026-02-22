@@ -35,11 +35,12 @@ class Graph(BaseModel):
 
 class GraphManager:
     def __init__(self, graph: Graph) -> None:
-        self._graph = graph
+        self._graph = Graph(edges=[], nodes={})
         self._components: dict[str, Component[Any, Any]] = {}
         self._channel_map: dict[frozenset[SenderKey], Channel[Any]] = {}
         self._sender_handles: dict[SenderKey, Sender[Any]] = {}
         self._receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
+        self.reset(graph)
 
     # --- node CRUD ---
 
@@ -138,6 +139,14 @@ class GraphManager:
         self._channel_map.clear()
         self._sender_handles.clear()
         self._receiver_handles.clear()
+
+        classes = Component.registered_subclasses()
+        for node_id, node in self._graph.nodes.items():
+            cls = classes.get(node.type)
+            if cls is not None:
+                self._components[node_id] = cls.from_args(node.init_args)
+
+        self._reconcile()
 
     @staticmethod
     def _group(

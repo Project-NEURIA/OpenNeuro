@@ -21,7 +21,7 @@ export interface TypeError {
   right: Type;
 }
 
-const CHANNEL_RE = /^Channel\[(.+)\]$/;
+const CHANNEL_RE = /^(?:Channel|Sender|Receiver)\[(.+)\]$/;
 
 function parseType(s: string): Type {
   const base = s.replace(/\s*\|\s*None$/, "").trim();
