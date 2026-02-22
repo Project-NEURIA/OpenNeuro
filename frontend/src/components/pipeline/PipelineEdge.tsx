@@ -1,6 +1,7 @@
 import { memo } from "react";
 import {
   BaseEdge,
+  EdgeLabelRenderer,
   getBezierPath,
   type EdgeProps,
 } from "@xyflow/react";
@@ -27,10 +28,12 @@ function PipelineEdgeComponent({
   data,
 }: EdgeProps) {
   const byteDelta = (data as Record<string, unknown>)?.byteDelta as number ?? 0;
-  const color = throughputColor(byteDelta);
-  const thickness = Math.min(1.5 + (byteDelta / 10_000) * 2.5, 4);
+  const typeError = (data as Record<string, unknown>)?.typeError as string | undefined;
 
-  const [edgePath] = getBezierPath({
+  const color = typeError ? "hsl(0 80% 50%)" : throughputColor(byteDelta);
+  const thickness = typeError ? 2.5 : Math.min(1.5 + (byteDelta / 10_000) * 2.5, 4);
+
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     targetX,
@@ -40,15 +43,39 @@ function PipelineEdgeComponent({
   });
 
   return (
-    <BaseEdge
-      id={id}
-      path={edgePath}
-      style={{
-        stroke: color,
-        strokeWidth: thickness,
-        transition: "stroke 0.3s ease, stroke-width 0.3s ease",
-      }}
-    />
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{
+          stroke: color,
+          strokeWidth: thickness,
+          transition: "stroke 0.3s ease, stroke-width 0.3s ease",
+        }}
+      />
+      {typeError && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan"
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: "all",
+              background: "hsl(0 60% 15%)",
+              color: "hsl(0 80% 70%)",
+              border: "1px solid hsl(0 60% 30%)",
+              borderRadius: "4px",
+              padding: "2px 6px",
+              fontSize: "11px",
+              fontFamily: "monospace",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {typeError}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 }
 
