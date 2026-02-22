@@ -5,5 +5,5 @@ from typing import Any
 from src.core.component import Component
 
 
-def list_components() -> dict[str, type[Component[..., Any]]]:
+def list_components() -> dict[str, type[Component[Any, Any]]]:
     return Component.registered_subclasses()

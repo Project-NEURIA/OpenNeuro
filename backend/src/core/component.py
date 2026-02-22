@@ -98,7 +98,7 @@ class Component[I: tuple[Receiver[Any], ...], O: tuple[Sender[Any], ...]](ABC):
         return cls._resolve_tuple_types(cls._get_type_param(1))
 
     @classmethod
-    def from_args(cls, init_args: dict[str, Any]) -> Component[..., Any]:
+    def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
         """Construct a component instance, deserializing any BaseModel init params."""
         kwargs: dict[str, Any] = {}
         for k, v in cls.get_init_types().items():
@@ -111,13 +111,13 @@ class Component[I: tuple[Receiver[Any], ...], O: tuple[Sender[Any], ...]](ABC):
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
 
     @classmethod
-    def registered_subclasses(cls) -> dict[str, type[Component[..., Any]]]:
+    def registered_subclasses(cls) -> dict[str, type[Component[Any, Any]]]:
         """Returns all concrete subclasses as {name: class}, walking the full hierarchy."""
         from src.core import source, sink, conduit  # noqa: F401
 
-        result: dict[str, type[Component[..., Any]]] = {}
+        result: dict[str, type[Component[Any, Any]]] = {}
 
-        def walk(subclass: type[Component[..., Any]]) -> None:
+        def walk(subclass: type[Component[Any, Any]]) -> None:
             if not inspect.isabstract(subclass):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():
