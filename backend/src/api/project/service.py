@@ -6,11 +6,10 @@ import struct
 import zlib
 from pathlib import Path
 
-from src.api.graph.domain.graph import Graph, Node, Edge
-from src.api.graph.save.dto import SavedGraph
-from src.api.project.config import AppConfig, save_config
+from src.core.config import PROJECTS_DIR, CONFIG_PATH, AppConfig
+from src.core.graph import Graph
 from src.api.project.dto import ProjectSummary
-from src.api.project.paths import PROJECTS_DIR, graph_path, project_dir, thumbnail_path
+from src.core.graph import GraphManager
 
 
 def _write_placeholder_png(path: str | Path) -> None:
@@ -43,75 +42,42 @@ def list_projects() -> list[ProjectSummary]:
             results.append(
                 ProjectSummary(
                     name=d.name,
-                    has_thumbnail=thumbnail_path(d.name).exists(),
+                    has_thumbnail=(
+                        PROJECTS_DIR / "graph.json" / "thumbnail.png"
+                    ).exists(),
                 )
             )
     return results
 
 
 def create_project(name: str) -> None:
-    d = project_dir(name)
+    d = PROJECTS_DIR / name
+    gp = d / "graph.json"
+    tp = d / "thumbnail.png"
+
     d.mkdir(parents=True, exist_ok=True)
-    gp = graph_path(name)
     if not gp.exists():
         gp.write_text('{"nodes": {}, "edges": []}')
-    tp = thumbnail_path(name)
     if not tp.exists():
         _write_placeholder_png(tp)
 
 
 def delete_project(name: str) -> None:
-    d = project_dir(name)
+    d = PROJECTS_DIR / name
     if d.exists():
         shutil.rmtree(d)
 
 
-def start_project(
-    name: str, config: AppConfig, current_graph: Graph | None = None
-) -> Graph:
-    if current_graph is not None:
-        from src.api.graph.run.service import stop_all
-
-        stop_all(current_graph)
-
-    config.current_project = name
-    save_config(config)
-    path = graph_path(name)
+def start_project(name: str, manager: GraphManager) -> None:
+    path = PROJECTS_DIR / name / "graph.json"
     if not path.exists():
-        return Graph(edges=[], nodes={})
-
+        raise ValueError("error starting project")
     data = json.loads(path.read_text())
-    saved = SavedGraph.model_validate(data)
-
-    from src.core.component import Component
-
-    classes = Component.registered_subclasses()
-
-    nodes: dict[str, Node] = {}
-    for nid, sn in saved.nodes.items():
-        cls = classes.get(sn.type)
-        if cls is None:
-            raise ValueError(f"Unknown node type: {sn.type}")
-        comp = cls.from_args(sn.init_args)
-        nodes[nid] = Node(inner=comp, init_args=sn.init_args, x=sn.x, y=sn.y)
-
-    edges = [
-        Edge(
-            source_node=se.source_node,
-            source_slot=se.source_slot,
-            target_node=se.target_node,
-            target_slot=se.target_slot,
-        )
-        for se in saved.edges
-    ]
-
-    return Graph(edges=edges, nodes=nodes)
+    graph = Graph.model_validate(data)
+    manager.reset(graph)
+    CONFIG_PATH.write_text(AppConfig(current_project=name).model_dump_json(indent=2))
 
 
-def close_project(config: AppConfig, current_graph: Graph | None = None) -> None:
-    if current_graph is not None:
-        from src.api.graph.run.service import stop_all
-
-        stop_all(current_graph)
-    config.current_project = None
-    save_config(config)
+def close_project(manager: GraphManager) -> None:
+    manager.reset(Graph(edges=[], nodes={}))
+    CONFIG_PATH.write_text(AppConfig(current_project=None).model_dump_json(indent=2))
