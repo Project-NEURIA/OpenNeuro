@@ -7,15 +7,16 @@ from fastapi import APIRouter, Depends
 from sse_starlette.sse import EventSourceResponse
 
 from src.api.dep import get_manager
-from src.api.metrics import service
+from src.api.metrics.service import MetricsCollector
 from src.core.graph import GraphManager
 
 router = APIRouter(prefix="/metrics")
 
 
 async def _stream(manager: GraphManager) -> AsyncGenerator[str, None]:
+    collector = MetricsCollector()
     while True:
-        yield service.collect(manager).model_dump_json()
+        yield collector.collect(manager).model_dump_json()
         await asyncio.sleep(0.1)
 
 
