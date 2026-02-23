@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
 import { useVideoStream } from "@/hooks/useVideoStream";
 import type { GraphNodeData } from "@/hooks/useGraphData";
-import type { SenderMetrics, ReceiverMetrics } from "@/lib/types";
+import type { SenderMetrics, ReceiverMetrics, SlotType } from "@/lib/types";
 
 const categoryColors: Record<string, { border: string; bg: string; badge: string; badgeText: string }> = {
   source: {
@@ -33,24 +33,15 @@ const statusDot: Record<string, string> = {
   stopped: "bg-status-stopped",
 };
 
-/** Renders `name: Type[T]` with syntax highlighting */
-function TypeLabel({ name, type }: { name: string; type: string }) {
-  const match = type.match(/^(\w+)\[(.+)]$/);
-
+function TypeLabel({ name, slot, side }: { name: string; slot: SlotType; side: "in" | "out" }) {
+  const asterisk = !slot.optional && <span style={{ color: "#ef4444" }}>* </span>;
   return (
     <span className="text-[12px] font-mono">
+      {side === "in" && asterisk}
       <span style={{ color: "var(--syn-param)" }}>{name}</span>
       <span style={{ color: "var(--syn-punct)" }}>: </span>
-      {match ? (
-        <>
-          <span style={{ color: "var(--syn-type)" }}>{match[1]}</span>
-          <span style={{ color: "var(--syn-punct)" }}>[</span>
-          <span style={{ color: "var(--syn-primitive)" }}>{match[2]}</span>
-          <span style={{ color: "var(--syn-punct)" }}>]</span>
-        </>
-      ) : (
-        <span style={{ color: "var(--syn-type)" }}>{type}</span>
-      )}
+      <span style={{ color: "var(--syn-type)" }}>{slot.name}</span>
+      {side === "out" && !slot.optional && <span style={{ color: "#ef4444" }}> *</span>}
     </span>
   );
 }
@@ -184,10 +175,10 @@ function GraphNodeComponent({ id, data }: NodeProps) {
                     className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-ml-[32px]"
                   />
                 )}
-                {inName && <TypeLabel name={inName} type={d.inputTypes[inName] ?? inName} />}
+                {inName && d.inputTypes[inName] && <TypeLabel name={inName} slot={d.inputTypes[inName]} side="in" />}
               </div>
               <div className="flex items-center gap-2">
-                {outName && <TypeLabel name={outName} type={d.outputTypes[outName] ?? outName} />}
+                {outName && d.outputTypes[outName] && <TypeLabel name={outName} slot={d.outputTypes[outName]} side="out" />}
                 {outName && (
                   <Handle
                     id={`out-${outName}`}

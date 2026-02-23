@@ -1,9 +1,8 @@
-import type { Graph } from "./types";
+import type { Graph, SlotType } from "./types";
 
 export type Type =
-  | { kind: "concrete"; name: "int" | "str" | "Frame" }
-  | { kind: "var"; name: string }
-  | { kind: "channel"; inner: Type };
+  | { kind: "concrete"; name: string }
+  | { kind: "var"; name: string };
 
 export type Origin =
   | { kind: "node_slot"; nodeId: string; direction: "in" | "out"; slot: string }
@@ -21,27 +20,14 @@ export interface TypeError {
   right: Type;
 }
 
-const CHANNEL_RE = /^(?:Channel|Sender|Receiver)\[(.+)\]$/;
-
 function parseType(s: string): Type {
-  const base = s.replace(/\s*\|\s*None$/, "").trim();
-
-  const m = base.match(CHANNEL_RE);
-  if (m) {
-    return { kind: "channel", inner: parseType(m[1]!) };
-  }
-
-  if (base === "int" || base === "str" || base === "Frame") {
-    return { kind: "concrete", name: base };
-  }
-
-  return { kind: "concrete", name: base as "int" | "str" | "Frame" };
+  return { kind: "concrete", name: s };
 }
 
 export function getConstraints(
   graph: Graph,
-  componentInputs: Record<string, Record<string, string>>,
-  componentOutputs: Record<string, Record<string, string>>,
+  componentInputs: Record<string, Record<string, SlotType>>,
+  componentOutputs: Record<string, Record<string, SlotType>>,
 ): Constraint[] {
   const constraints: Constraint[] = [];
 
@@ -51,19 +37,19 @@ export function getConstraints(
 
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const inputs = componentInputs[node.type] ?? {};
-    for (const [slot, typeStr] of Object.entries(inputs)) {
+    for (const [slot, slotType] of Object.entries(inputs)) {
       constraints.push({
         left: slotVar(nodeId, "in", slot),
-        right: parseType(typeStr),
+        right: parseType(slotType.name),
         origin: { kind: "node_slot", nodeId, direction: "in", slot },
       });
     }
 
     const outputs = componentOutputs[node.type] ?? {};
-    for (const [slot, typeStr] of Object.entries(outputs)) {
+    for (const [slot, slotType] of Object.entries(outputs)) {
       constraints.push({
         left: slotVar(nodeId, "out", slot),
-        right: parseType(typeStr),
+        right: parseType(slotType.name),
         origin: { kind: "node_slot", nodeId, direction: "out", slot },
       });
     }
@@ -91,32 +77,20 @@ type Subst = Map<string, Type>;
 function typeEquals(a: Type, b: Type): boolean {
   if (a.kind === "var" && b.kind === "var") return a.name === b.name;
   if (a.kind === "concrete" && b.kind === "concrete") return a.name === b.name;
-  if (a.kind === "channel" && b.kind === "channel") return typeEquals(a.inner, b.inner);
   return false;
 }
 
 function occursIn(varName: string, t: Type): boolean {
-  switch (t.kind) {
-    case "var":
-      return t.name === varName;
-    case "concrete":
-      return false;
-    case "channel":
-      return occursIn(varName, t.inner);
-  }
+  if (t.kind === "var") return t.name === varName;
+  return false;
 }
 
 function applySubst(subst: Subst, t: Type): Type {
-  switch (t.kind) {
-    case "var": {
-      const replacement = subst.get(t.name);
-      return replacement ? applySubst(subst, replacement) : t;
-    }
-    case "concrete":
-      return t;
-    case "channel":
-      return { kind: "channel", inner: applySubst(subst, t.inner) };
+  if (t.kind === "var") {
+    const replacement = subst.get(t.name);
+    return replacement ? applySubst(subst, replacement) : t;
   }
+  return t;
 }
 
 function applySubstToConstraints(subst: Subst, constraints: Constraint[]): Constraint[] {
@@ -150,14 +124,8 @@ export function unify(constraints: Constraint[]): UnifyResult {
   const l = first!.left;
   const r = first!.right;
 
-  // If already equal, delete and recurse
   if (typeEquals(l, r)) {
     return unify(rest);
-  }
-
-  // Both are constructors (concrete or channel) — decompose
-  if (l.kind === "channel" && r.kind === "channel") {
-    return unify([{ left: l.inner, right: r.inner, origin: first!.origin }, ...rest]);
   }
 
   if (l.kind === "concrete" && r.kind === "concrete") {
@@ -166,7 +134,6 @@ export function unify(constraints: Constraint[]): UnifyResult {
     return result;
   }
 
-  // One is a variable — substitute
   if (l.kind === "var") {
     if (occursIn(l.name, r)) {
       const result = unify(rest);
@@ -191,7 +158,6 @@ export function unify(constraints: Constraint[]): UnifyResult {
     return result;
   }
 
-  // Mismatched constructors (e.g. concrete vs channel)
   const result = unify(rest);
   result.errors.push({ constraint: first!, left: l, right: r });
   return result;
@@ -203,20 +169,13 @@ export interface CheckResult {
 }
 
 export function typeToString(t: Type): string {
-  switch (t.kind) {
-    case "concrete":
-      return t.name;
-    case "var":
-      return t.name;
-    case "channel":
-      return `Channel[${typeToString(t.inner)}]`;
-  }
+  return t.name;
 }
 
 export function checkTypes(
   graph: Graph,
-  componentInputs: Record<string, Record<string, string>>,
-  componentOutputs: Record<string, Record<string, string>>,
+  componentInputs: Record<string, Record<string, SlotType>>,
+  componentOutputs: Record<string, Record<string, SlotType>>,
 ): CheckResult {
   const constraints = getConstraints(graph, componentInputs, componentOutputs);
   const { subst, errors } = unify(constraints);

@@ -16,7 +16,7 @@ class Status(Enum):
     STOPPED = "stopped"
 
 
-class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
+class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]](
     ABC
 ):
     def __init__(self) -> None:

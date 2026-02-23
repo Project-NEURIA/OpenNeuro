@@ -53,3 +53,17 @@ export interface MetricsSnapshot {
   nodes: Record<string, NodeMetrics>;
   timestamp: number;
 }
+
+export interface SlotType {
+  name: string;
+  optional: boolean;
+}
+
+export function parseSlotType(raw: string): SlotType {
+  const optional = /Union\[.*,\s*NoneType\]/.test(raw) || raw.endsWith("| None");
+  const name = raw
+    .replace(/Union\[(.+),\s*NoneType\]/, "$1")
+    .replace(/\s*\|\s*None$/, "")
+    .replace(/^(?:Sender|Receiver)\[(.+)\]$/, "$1");
+  return { name, optional };
+}
