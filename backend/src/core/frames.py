@@ -16,7 +16,7 @@ class AudioDataFormat(Enum):
     FLOAT32 = "float32"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Frame:
     """Base frame class for all frames in the pipeline."""
 
@@ -27,7 +27,7 @@ class Frame:
         return f"{type(self).__name__}(id={self.id}, pts={self.pts})"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AudioFrame(Frame):
     """Audio frame with immutable data and on-the-fly reformatting/resampling."""
 
@@ -152,7 +152,7 @@ class AudioFrame(Frame):
         raise ValueError(f"Unsupported data format: {data_format}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TextFrame(Frame):
     """Frame containing text data."""
 
@@ -164,7 +164,7 @@ class TextFrame(Frame):
         return cls(pts=time.time_ns(), id=obj_id(), text=text, language=language)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class InterruptFrame(Frame):
     """Frame representing an interrupt event."""
 
@@ -183,7 +183,7 @@ class InterruptFrame(Frame):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MessagesFrame(Frame):
     """Frame containing conversation history (messages) for LLM consumption."""
 
