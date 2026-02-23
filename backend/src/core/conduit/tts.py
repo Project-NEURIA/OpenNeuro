@@ -184,8 +184,7 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                         raw = base64.b64decode(msg["result"]["audioContent"])
                         if len(raw) > 44:
                             outputs.audio.send(
-                                AudioFrame(
-                                    display_name="tts_audio",
+                                AudioFrame.new(
                                     data=raw[44:],
                                     sample_rate=48000,
                                     channels=1,
@@ -194,9 +193,7 @@ class TTS(Component[TTSInputs, TTSOutputs]):
 
                     with self._gen_lock:
                         if gen == self._generation:
-                            outputs.text.send(
-                                TextFrame(display_name="tts_text", text=text)
-                            )
+                            outputs.text.send(TextFrame.new(text=text))
                 except Exception as e:
                     print(f"[TTS] Generation error: {e}")
             except Empty:
@@ -217,7 +214,7 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                     if frame is None:
                         break
 
-                    print(f"[TTS] Interrupt received: {frame.get()}")
+                    print(f"[TTS] Interrupt received: {frame.reason}")
 
                     with self._gen_lock:
                         self._generation += 1
@@ -237,7 +234,7 @@ class TTS(Component[TTSInputs, TTSOutputs]):
         for frame in inputs.text(self):
             if frame is None:
                 break
-            t = frame.get()
+            t = frame.text
             out = (
                 self._stream_filter.feed("", force=True)
                 if t == GENERATE_END_FLAG

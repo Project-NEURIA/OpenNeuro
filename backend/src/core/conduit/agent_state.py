@@ -64,7 +64,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 if text_frame is None:
                     break
 
-                text = text_frame.get().strip()
+                text = text_frame.text.strip()
                 if not text:
                     continue
 
@@ -75,11 +75,9 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 # Output context as MessagesFrame
                 outputs.messages.send(
-                    MessagesFrame(
-                        display_name="agent_state",
+                    MessagesFrame.new(
                         text=self._build_context(),
                         messages=self._build_messages(),
-                        pts=text_frame.pts,
                     )
                 )
 
@@ -88,7 +86,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 if text_frame is None:
                     break
 
-                chunk = text_frame.get()
+                chunk = text_frame.text
                 if not chunk:
                     continue
 
@@ -109,7 +107,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
             for frame in inputs.interrupt(self):
                 if frame is None:
                     break
-                print(f"[AgentState] Interrupt received: {frame.get()}")
+                print(f"[AgentState] Interrupt received: {frame.reason}")
                 # Forward the interrupt
                 outputs.interrupt.send(frame)
 
