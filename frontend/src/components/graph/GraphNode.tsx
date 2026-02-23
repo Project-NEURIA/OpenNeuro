@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
 import { useVideoStream } from "@/hooks/useVideoStream";
-import type { PipelineNodeData } from "@/hooks/usePipelineData";
+import type { GraphNodeData } from "@/hooks/useGraphData";
 import type { SenderMetrics, ReceiverMetrics } from "@/lib/types";
 
 const categoryColors: Record<string, { border: string; bg: string; badge: string; badgeText: string }> = {
@@ -90,8 +90,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PipelineNodeComponent({ id, data }: NodeProps) {
-  const d = data as PipelineNodeData;
+function GraphNodeComponent({ id, data }: NodeProps) {
+  const d = data as GraphNodeData;
   const colors = categoryColors[d.category]!;
   const isVideoStream = d.label === "VideoStream";
   const frameUrl = useVideoStream(isVideoStream ? id : null);
@@ -217,4 +217,4 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
   );
 }
 
-export const PipelineNode = memo(PipelineNodeComponent);
+export const GraphNode = memo(GraphNodeComponent);

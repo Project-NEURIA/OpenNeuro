@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useSSE } from "./useSSE";
 import type { ComponentInfo, MetricsSnapshot, NodeMetrics } from "@/lib/types";
 
-export interface PipelineNodeData extends Record<string, unknown> {
+export interface GraphNodeData extends Record<string, unknown> {
   label: string;
   category: "source" | "conduit" | "sink";
   inputs: string[];
@@ -13,7 +13,7 @@ export interface PipelineNodeData extends Record<string, unknown> {
   nodeMetrics: NodeMetrics | null;
 }
 
-export function usePipelineData(components: ComponentInfo[]) {
+export function useGraphData(components: ComponentInfo[]) {
   const { data: metrics, connected } =
     useSSE<MetricsSnapshot>("/metrics");
 
