@@ -39,6 +39,23 @@ class Channel[T]:
             self._gc()
         return item
 
+    def _try_get(self, sub_id: int) -> T | None:
+        with self._condition:
+            index = self._cursors[sub_id]
+            if index >= self._offset + len(self._items):
+                return None
+            item = self._items[index - self._offset]
+            self._cursors[sub_id] = index + 1
+            self._gc()
+        return item
+
+    def _fast_forward(self, sub_id: int) -> None:
+        with self._condition:
+            head = self._offset + len(self._items)
+            if head > self._cursors[sub_id] + 1:
+                self._cursors[sub_id] = head - 1
+                self._gc()
+
     def _unregister(self, sub_id: int) -> None:
         """Idempotent."""
         with self._condition:
@@ -90,15 +107,30 @@ class Receiver[T]:
         self._sub_id: int | None = None
 
     def __call__(
-        self, subscriber: Component[Any, Any]
+        self,
+        subscriber: Component[Any, Any],
+        newest: bool = False,
+        no_block: bool = False,
     ) -> Generator[T | None, None, None]:
+        """Yield items from the channel.
+
+        newest: skip to the latest item, dropping everything in between.
+        no_block: return None immediately if nothing is available.
+
+        Yields None when the component is stopping or when no_block=True and there are no more new frames.
+        """
         stop_event = subscriber.stop_event
         sub_id = id(subscriber)
         self._sub_id = sub_id
         self._channel._register(sub_id)
         try:
             while not stop_event.is_set():
-                item = self._channel._wait_and_get(sub_id, stop_event)
+                if newest:
+                    self._channel._fast_forward(sub_id)
+                if no_block:
+                    item = self._channel._try_get(sub_id)
+                else:
+                    item = self._channel._wait_and_get(sub_id, stop_event)
                 yield item
                 if item is not None:
                     self._msg_count += 1
