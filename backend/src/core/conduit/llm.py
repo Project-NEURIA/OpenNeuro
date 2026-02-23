@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import InterruptFrame, MessagesDataFormat, MessagesFrame, TextFrame
+from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
@@ -79,7 +79,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
                 for frame in interrupt_recv(self):
                     if frame is None:
                         break
-                    print(f"[LLM] Interrupt received: {frame.get()}")
+                    print(f"[LLM] Interrupt received: {frame.reason}")
 
                     # Signal interruption to generation loop
                     with self._gen_lock:
@@ -123,7 +123,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
 
         payload = {
             "model": self.config.model_id,
-            "messages": frame.get(MessagesDataFormat.MESSAGES),
+            "messages": frame.messages,
             "stream": True,
             "top_p": self.config.top_p,
             "temperature": self.config.temperature,
@@ -140,9 +140,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
             for line in r.iter_lines():
                 with self._gen_lock:
                     if gen != self._generation:
-                        outputs.text.send(
-                            TextFrame(display_name="llm_chunk", text=GENERATE_END_FLAG)
-                        )
+                        outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
                         break
 
                 if not line:
@@ -166,15 +164,13 @@ class LLM(Component[LLMInputs, LLMOutputs]):
 
                 choice = choices[0]
                 if choice.get("finish_reason"):
-                    outputs.text.send(
-                        TextFrame(display_name="llm_chunk", text=GENERATE_END_FLAG)
-                    )
+                    outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
                     break
 
                 delta = choice.get("delta") or {}
                 text = delta.get("content") or ""
                 if text:
-                    outputs.text.send(TextFrame(display_name="llm_chunk", text=text))
+                    outputs.text.send(TextFrame.new(text=text))
 
         except Exception as e:
             print(f"[LLM] Generation error: {e}")

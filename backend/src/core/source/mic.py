@@ -37,7 +37,7 @@ class Mic(Component[tuple[()], MicOutputs]):
         ) as stream:
             while not self.stop_event.is_set():
                 data, _ = stream.read(self._frame_samples)
-                frame = AudioFrame(
+                frame = AudioFrame.new(
                     data=data,
                     sample_rate=self._sample_rate,
                     channels=self._channels,

@@ -114,11 +114,9 @@ class ASR(Component[ASRInputs, ASROutputs]):
                 text = result.get("text", "").strip()
                 if text:
                     print(f"[ASR] Transcription: '{text}'")
-                    return TextFrame(
-                        display_name="asr_transcription",
+                    return TextFrame.new(
                         text=text,
                         language=self.config.language,
-                        pts=frame.pts,
                     )
                 return None
             finally:
@@ -164,9 +162,7 @@ class ASR(Component[ASRInputs, ASROutputs]):
                 if frame is None:
                     break
 
-                # Handle speech segments from VAD
-                if frame.display_name == "vad_speech_segment":
-                    self._task_queue.put(frame)
+                self._task_queue.put(frame)
         finally:
             pass
 
