@@ -13,12 +13,12 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import { Home } from "lucide-react";
-import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
-import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
-import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
+import { GraphCanvas } from "@/components/graph/GraphCanvas";
+import { NodeSidebar } from "@/components/graph/NodeSidebar";
+import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
 import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { ProjectChooser } from "@/components/project/ProjectChooser";
-import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
+import { useGraphData, type GraphNodeData } from "@/hooks/useGraphData";
 import { useComponents } from "@/hooks/useComponents";
 import { useMetricsHistory } from "@/hooks/useMetricsHistory";
 import { layoutNodes } from "@/lib/layout";
@@ -58,7 +58,7 @@ function AppInner({
   onGoHome: () => void;
 }) {
   const components = useComponents();
-  const { connected, metrics, componentMap } = usePipelineData(components);
+  const { connected, metrics, componentMap } = useGraphData(components);
 
   const [metricsOpen, setMetricsOpen] = useState(false);
   const history = useMetricsHistory(metrics);
@@ -92,9 +92,9 @@ function AppInner({
       const graph: Graph = {
         nodes: Object.fromEntries(
           currentNodes
-            .filter((n) => n.type === "pipeline")
+            .filter((n) => n.type === "graph")
             .map((n) => {
-              const data = n.data as PipelineNodeData;
+              const data = n.data as GraphNodeData;
               return [n.id, { type: data.label, init_args: {}, x: n.position.x, y: n.position.y }];
             }),
         ),
@@ -166,7 +166,7 @@ function AppInner({
 
             return {
               id: n.id,
-              type: "pipeline",
+              type: "graph",
               position: { x: pos.x, y: pos.y },
               data: {
                 label: n.type,
@@ -177,7 +177,7 @@ function AppInner({
                 outputTypes: info?.outputs ?? {},
                 status: n.status,
                 nodeMetrics: null,
-              } satisfies PipelineNodeData,
+              } satisfies GraphNodeData,
             };
           }),
         );
@@ -189,14 +189,14 @@ function AppInner({
             sourceHandle: `out-${e.source_slot}`,
             target: e.target_node,
             targetHandle: `in-${e.target_slot}`,
-            type: "pipeline",
+            type: "graph",
             data: {},
           })),
         );
 
         runTypeCheck();
       } catch (err) {
-        console.error("[pipeline] Init failed:", err);
+        console.error("[graph] Init failed:", err);
       }
     })();
   }, [components, componentMap, setNodes, setEdges, runTypeCheck]);
@@ -207,12 +207,12 @@ function AppInner({
     setNodes((prev) =>
       prev.map((n) => {
         const nodeMetrics = metrics.nodes[n.id] ?? null;
-        const status = nodeMetrics?.status ?? (n.data as PipelineNodeData).status;
+        const status = nodeMetrics?.status ?? (n.data as GraphNodeData).status;
 
         return {
           ...n,
           data: {
-            ...(n.data as PipelineNodeData),
+            ...(n.data as GraphNodeData),
             status,
             nodeMetrics,
           },
@@ -291,7 +291,7 @@ function AppInner({
   const onConnect: OnConnect = useCallback(
     (connection) => {
       setEdges((eds) =>
-        addEdge({ ...connection, type: "pipeline", data: {} }, eds),
+        addEdge({ ...connection, type: "graph", data: {} }, eds),
       );
       runTypeCheck();
       if (connection.source && connection.target) {
@@ -325,7 +325,7 @@ function AppInner({
     e.dataTransfer.dropEffect = "move";
   }, []);
 
-  const createPipelineNode = useCallback(
+  const createGraphNode = useCallback(
     (
       item: ComponentInfo,
       position: { x: number; y: number },
@@ -333,9 +333,9 @@ function AppInner({
     ) => {
       apiCreateNode(item.name, initArgs)
         .then((res) => {
-          const newNode: Node<PipelineNodeData> = {
+          const newNode: Node<GraphNodeData> = {
             id: res.id,
-            type: "pipeline",
+            type: "graph",
             position,
             data: {
               label: item.name,
@@ -360,7 +360,7 @@ function AppInner({
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const raw = e.dataTransfer.getData("application/pipeline-node");
+      const raw = e.dataTransfer.getData("application/graph-node");
       if (!raw) return;
 
       const item = JSON.parse(raw) as ComponentInfo;
@@ -380,7 +380,7 @@ function AppInner({
       });
 
       if (!hasConfig) {
-        createPipelineNode(item, position);
+        createGraphNode(item, position);
         return;
       }
 
@@ -393,7 +393,7 @@ function AppInner({
           componentInfo: item,
           onConfirm: (initArgs: Record<string, unknown>) => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
-            createPipelineNode(item, position, initArgs);
+            createGraphNode(item, position, initArgs);
           },
           onCancel: () => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
@@ -402,7 +402,7 @@ function AppInner({
       };
       setNodes((nds) => [...nds, configuringNode]);
     },
-    [screenToFlowPosition, setNodes, createPipelineNode],
+    [screenToFlowPosition, setNodes, createGraphNode],
   );
 
   const handleGoHome = useCallback(async () => {
@@ -412,7 +412,7 @@ function AppInner({
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <PipelineCanvas
+      <GraphCanvas
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

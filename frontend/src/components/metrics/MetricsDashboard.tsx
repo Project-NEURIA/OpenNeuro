@@ -86,7 +86,7 @@ export function MetricsDashboard({ connected, history, componentMap, onClose }: 
 
         {sortedNodeIds.length === 0 && (
           <div className="flex items-center justify-center h-32 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Awaiting pipeline data
+            Awaiting graph data
           </div>
         )}
       </div>
