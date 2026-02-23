@@ -212,8 +212,7 @@ class _DiscordSink(Sink):
     def write(self, data: bytes, user: object) -> None:
         self.ring.append(data)
         self._discord_io._output_audio.send(
-            AudioFrame(
-                display_name="discord_audio",
+            AudioFrame.new(
                 data=data,
                 sample_rate=self.sr,
                 channels=self.ch,

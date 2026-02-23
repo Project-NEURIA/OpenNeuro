@@ -177,23 +177,21 @@ class VAD(Component[VADInputs, VADOutputs]):
                 self._pre_buffer.append(frame)
                 # Keep pre-buffer within limits (seconds based)
                 total_ms = sum(
-                    f._data.shape[1] / f._sample_rate * 1000 for f in self._pre_buffer
+                    f.data.shape[1] / f.sample_rate * 1000 for f in self._pre_buffer
                 )
                 while (
                     total_ms > (self.config.pre_speech_seconds * 1000)
                     and self._pre_buffer
                 ):
                     f_removed = self._pre_buffer.pop(0)
-                    total_ms -= f_removed._data.shape[1] / f_removed._sample_rate * 1000
+                    total_ms -= f_removed.data.shape[1] / f_removed.sample_rate * 1000
 
     def _handle_speech_start(self, outputs: VADOutputs) -> None:
         print("[VAD] Speech started")
         self._speaking = True
         self._silence_start = None
 
-        outputs.interrupt.send(
-            InterruptFrame(display_name="vad_interrupt", reason="speech_detected")
-        )
+        outputs.interrupt.send(InterruptFrame.new(reason="speech_detected"))
 
         self._current_segment = list(self._pre_buffer)
         self._pre_buffer = []
@@ -205,8 +203,8 @@ class VAD(Component[VADInputs, VADOutputs]):
         # Defer resampling to the end: concatenate internal float32 data from all frames.
         # We assume all frames in the segment have the same sample rate and channels.
         first_frame = self._current_segment[0]
-        sr = first_frame._sample_rate
-        ch = first_frame._channels
+        sr = first_frame.sample_rate
+        ch = first_frame.channels
 
         segment_data_list = []
         for f in self._current_segment:
@@ -222,8 +220,7 @@ class VAD(Component[VADInputs, VADOutputs]):
 
         duration = all_data.shape[1] / sr
         if duration >= self.config.min_speech_seconds:
-            output_frame = AudioFrame(
-                display_name="vad_speech_segment",
+            output_frame = AudioFrame.new(
                 data=all_data,
                 sample_rate=sr,
                 channels=ch,

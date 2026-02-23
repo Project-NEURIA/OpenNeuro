@@ -77,7 +77,7 @@ class STS(Component[STSInputs, STSOutputs]):
                     for frame in interrupt_recv(self):
                         if frame is None:
                             break
-                        print(f"[STS] Interrupt received: {frame.get()}")
+                        print(f"[STS] Interrupt received: {frame.reason}")
                         ws.send(json.dumps({"type": "input_audio_buffer.clear"}))
 
                 threading.Thread(target=listen_interrupts, daemon=True).start()
@@ -89,8 +89,7 @@ class STS(Component[STSInputs, STSOutputs]):
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])
-                    frame = AudioFrame(
-                        display_name="sts_audio",
+                    frame = AudioFrame.new(
                         data=pcm,
                         sample_rate=24000,
                         channels=1,
