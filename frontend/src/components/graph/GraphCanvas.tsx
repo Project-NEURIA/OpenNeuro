@@ -12,20 +12,20 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { PipelineNode } from "./PipelineNode";
-import { PipelineEdge } from "./PipelineEdge";
+import { GraphNode } from "./GraphNode";
+import { GraphEdge } from "./GraphEdge";
 import { ConfiguringNode } from "./ConfiguringNode";
 
 const nodeTypes: NodeTypes = {
-  pipeline: PipelineNode,
+  graph: GraphNode,
   configuring: ConfiguringNode,
 };
 
 const edgeTypes: EdgeTypes = {
-  pipeline: PipelineEdge,
+  graph: GraphEdge,
 };
 
-interface PipelineCanvasProps {
+interface GraphCanvasProps {
   nodes: Node[];
   edges: Edge[];
   onNodesChange: OnNodesChange;
@@ -36,7 +36,7 @@ interface PipelineCanvasProps {
   onNodeDragStop?: OnNodeDrag;
 }
 
-export function PipelineCanvas({
+export function GraphCanvas({
   nodes,
   edges,
   onNodesChange,
@@ -45,7 +45,7 @@ export function PipelineCanvas({
   onDrop,
   onDragOver,
   onNodeDragStop,
-}: PipelineCanvasProps) {
+}: GraphCanvasProps) {
   return (
     <div className="w-full h-full">
       <ReactFlow

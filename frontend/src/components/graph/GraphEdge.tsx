@@ -17,7 +17,7 @@ function throughputColor(byteDelta: number): string {
   return `hsl(${hue} 80% ${lightness}%)`;
 }
 
-function PipelineEdgeComponent({
+function GraphEdgeComponent({
   id,
   sourceX,
   sourceY,
@@ -79,4 +79,4 @@ function PipelineEdgeComponent({
   );
 }
 
-export const PipelineEdge = memo(PipelineEdgeComponent);
+export const GraphEdge = memo(GraphEdgeComponent);
