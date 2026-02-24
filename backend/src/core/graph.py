@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import BaseModel
 
@@ -224,11 +224,15 @@ class GraphManager:
             input_slots = cls.get_input_types()
             output_slots = cls.get_output_types()
 
-            input_handles: dict[str, Receiver[Any]] = {}
-            for slot in input_slots:
+            input_handles: dict[str, Receiver[Any] | None] = {}
+            for slot, slot_type in input_slots.items():
                 rkey: ReceiverKey = (node_id, slot)
                 if rkey in self._receiver_handles:
                     input_handles[slot] = self._receiver_handles[rkey]
+                elif type(None) in get_args(slot_type):
+                    # Optional inputs with no edge get None so NamedTuple
+                    # construction doesn't fail from a missing field.
+                    input_handles[slot] = None
 
             output_handles: dict[str, Sender[Any]] = {}
             for slot in output_slots:
