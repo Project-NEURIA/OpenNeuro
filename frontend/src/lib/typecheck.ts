@@ -2,7 +2,9 @@ import type { Graph, SlotType } from "./types";
 
 export type Type =
   | { kind: "concrete"; name: string }
-  | { kind: "var"; name: string };
+  | { kind: "var"; name: string }
+  | { kind: "union"; types: Type[] }
+  | { kind: "constructor"; name: string; inner: Type };
 
 export type Origin =
   | { kind: "node_slot"; nodeId: string; direction: "in" | "out"; slot: string }
@@ -18,6 +20,35 @@ export interface TypeError {
   constraint: Constraint;
   left: Type;
   right: Type;
+}
+
+// LUB — least upper bound (smallest common supertype)
+function join(_a: Type, _b: Type): Type | null {
+  return null;
+}
+
+// GLB — greatest lower bound (largest common subtype)
+function meet(_a: Type, _b: Type): Type | null {
+  return null;
+}
+
+// a <= b?
+function isSubtype(a: Type, b: Type): boolean {
+  if (a.kind === "concrete" && b.kind === "concrete") {
+    if (a.name === b.name) return true;
+    const j = join(a, b);
+    return j !== null && j.kind === "concrete" && j.name === b.name;
+  }
+  if (a.kind === "constructor" && b.kind === "constructor") {
+    return a.name === b.name && isSubtype(a.inner, b.inner);
+  }
+  if (b.kind === "union") {
+    return b.types.some((m) => isSubtype(a, m));
+  }
+  if (a.kind === "union") {
+    return a.types.every((m) => isSubtype(m, b));
+  }
+  return false;
 }
 
 function parseType(s: string): Type {
@@ -74,23 +105,32 @@ export function getConstraints(
 
 type Subst = Map<string, Type>;
 
-function typeEquals(a: Type, b: Type): boolean {
-  if (a.kind === "var" && b.kind === "var") return a.name === b.name;
-  if (a.kind === "concrete" && b.kind === "concrete") return a.name === b.name;
-  return false;
-}
-
 function occursIn(varName: string, t: Type): boolean {
-  if (t.kind === "var") return t.name === varName;
-  return false;
+  switch (t.kind) {
+    case "var":
+      return t.name === varName;
+    case "concrete":
+      return false;
+    case "constructor":
+      return occursIn(varName, t.inner);
+    case "union":
+      return t.types.some((m) => occursIn(varName, m));
+  }
 }
 
 function applySubst(subst: Subst, t: Type): Type {
-  if (t.kind === "var") {
-    const replacement = subst.get(t.name);
-    return replacement ? applySubst(subst, replacement) : t;
+  switch (t.kind) {
+    case "var": {
+      const replacement = subst.get(t.name);
+      return replacement ? applySubst(subst, replacement) : t;
+    }
+    case "concrete":
+      return t;
+    case "constructor":
+      return { kind: "constructor", name: t.name, inner: applySubst(subst, t.inner) };
+    case "union":
+      return { kind: "union", types: t.types.map((m) => applySubst(subst, m)) };
   }
-  return t;
 }
 
 function applySubstToConstraints(subst: Subst, constraints: Constraint[]): Constraint[] {
@@ -112,11 +152,24 @@ function composeSubst(s1: Subst, s2: Subst): Subst {
   return result;
 }
 
+function bindVar(varName: string, t: Type, first: Constraint, rest: Constraint[]): UnifyResult {
+  if (occursIn(varName, t)) {
+    const result = unify(rest);
+    result.errors.push({ constraint: first, left: first.left, right: first.right });
+    return result;
+  }
+  const s: Subst = new Map([[varName, t]]);
+  const result = unify(applySubstToConstraints(s, rest));
+  result.subst = composeSubst(s, result.subst);
+  return result;
+}
+
 interface UnifyResult {
   subst: Subst;
   errors: TypeError[];
 }
 
+// Constraints are l <= r (left is subtype of right).
 export function unify(constraints: Constraint[]): UnifyResult {
   if (constraints.length === 0) return { subst: new Map(), errors: [] };
 
@@ -124,43 +177,105 @@ export function unify(constraints: Constraint[]): UnifyResult {
   const l = first!.left;
   const r = first!.right;
 
-  if (typeEquals(l, r)) {
-    return unify(rest);
+  switch (l.kind) {
+    case "concrete":
+      switch (r.kind) {
+        case "concrete": {
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+        case "var": {
+          return bindVar(r.name, l, first!, rest);
+        }
+        case "constructor": {
+          const result = unify(rest);
+          result.errors.push({ constraint: first!, left: l, right: r });
+          return result;
+        }
+        case "union": {
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+      }
+    case "var":
+      switch (r.kind) {
+        case "concrete": {
+          return bindVar(l.name, r, first!, rest);
+        }
+        case "var": {
+          if (l.name === r.name) return unify(rest);
+          return bindVar(l.name, r, first!, rest);
+        }
+        case "constructor": {
+          return bindVar(l.name, r, first!, rest);
+        }
+        case "union": {
+          return bindVar(l.name, r, first!, rest);
+        }
+      }
+    case "constructor":
+      switch (r.kind) {
+        case "concrete": {
+          const result = unify(rest);
+          result.errors.push({ constraint: first!, left: l, right: r });
+          return result;
+        }
+        case "var": {
+          return bindVar(r.name, l, first!, rest);
+        }
+        case "constructor": {
+          if (l.name !== r.name) {
+            const result = unify(rest);
+            result.errors.push({ constraint: first!, left: l, right: r });
+            return result;
+          }
+          // covariant: l.inner <= r.inner
+          return unify([{ left: l.inner, right: r.inner, origin: first!.origin }, ...rest]);
+        }
+        case "union": {
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+      }
+    case "union":
+      switch (r.kind) {
+        case "concrete": {
+          // every member of the union must be <= concrete
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+        case "var": {
+          return bindVar(r.name, l, first!, rest);
+        }
+        case "constructor": {
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+        case "union": {
+          // every member of l must be <= some member of r
+          const result = unify(rest);
+          if (!isSubtype(l, r)) {
+            result.errors.push({ constraint: first!, left: l, right: r });
+          }
+          return result;
+        }
+      }
   }
-
-  if (l.kind === "concrete" && r.kind === "concrete") {
-    const result = unify(rest);
-    result.errors.push({ constraint: first!, left: l, right: r });
-    return result;
-  }
-
-  if (l.kind === "var") {
-    if (occursIn(l.name, r)) {
-      const result = unify(rest);
-      result.errors.push({ constraint: first!, left: l, right: r });
-      return result;
-    }
-    const s: Subst = new Map([[l.name, r]]);
-    const result = unify(applySubstToConstraints(s, rest));
-    result.subst = composeSubst(s, result.subst);
-    return result;
-  }
-
-  if (r.kind === "var") {
-    if (occursIn(r.name, l)) {
-      const result = unify(rest);
-      result.errors.push({ constraint: first!, left: l, right: r });
-      return result;
-    }
-    const s: Subst = new Map([[r.name, l]]);
-    const result = unify(applySubstToConstraints(s, rest));
-    result.subst = composeSubst(s, result.subst);
-    return result;
-  }
-
-  const result = unify(rest);
-  result.errors.push({ constraint: first!, left: l, right: r });
-  return result;
 }
 
 export interface CheckResult {
@@ -169,7 +284,15 @@ export interface CheckResult {
 }
 
 export function typeToString(t: Type): string {
-  return t.name;
+  switch (t.kind) {
+    case "concrete":
+    case "var":
+      return t.name;
+    case "constructor":
+      return `${t.name}[${typeToString(t.inner)}]`;
+    case "union":
+      return t.types.map(typeToString).join(" | ");
+  }
 }
 
 export function checkTypes(
