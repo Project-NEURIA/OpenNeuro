@@ -35,7 +35,7 @@ import {
   closeProject as apiCloseProject,
   saveGraph,
 } from "@/lib/api";
-import type { ComponentInfo, Graph, GraphEdge } from "@/lib/types";
+import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
 import { checkTypes, typeToString } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
@@ -76,11 +76,15 @@ function AppInner({
   nodesRef.current = nodes;
 
   const componentTypeInfo = useMemo(() => {
-    const inputs: Record<string, Record<string, string>> = {};
-    const outputs: Record<string, Record<string, string>> = {};
+    const inputs: Record<string, Record<string, SlotType>> = {};
+    const outputs: Record<string, Record<string, SlotType>> = {};
     for (const c of components) {
-      inputs[c.name] = c.inputs;
-      outputs[c.name] = c.outputs;
+      inputs[c.name] = Object.fromEntries(
+        Object.entries(c.inputs).map(([k, v]) => [k, parseSlotType(v)]),
+      );
+      outputs[c.name] = Object.fromEntries(
+        Object.entries(c.outputs).map(([k, v]) => [k, parseSlotType(v)]),
+      );
     }
     return { inputs, outputs };
   }, [components]);
@@ -173,8 +177,8 @@ function AppInner({
                 category: info?.category ?? "conduit",
                 inputs: info ? Object.keys(info.inputs) : [],
                 outputs: info ? Object.keys(info.outputs) : [],
-                inputTypes: info?.inputs ?? {},
-                outputTypes: info?.outputs ?? {},
+                inputTypes: componentTypeInfo.inputs[n.type] ?? {},
+                outputTypes: componentTypeInfo.outputs[n.type] ?? {},
                 status: n.status,
                 nodeMetrics: null,
               } satisfies GraphNodeData,
@@ -342,8 +346,8 @@ function AppInner({
               category: item.category,
               inputs: Object.keys(item.inputs),
               outputs: Object.keys(item.outputs),
-              inputTypes: item.inputs,
-              outputTypes: item.outputs,
+              inputTypes: componentTypeInfo.inputs[item.name] ?? {},
+              outputTypes: componentTypeInfo.outputs[item.name] ?? {},
               status: "startup",
               nodeMetrics: null,
             },

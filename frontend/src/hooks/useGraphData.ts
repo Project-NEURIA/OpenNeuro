@@ -1,14 +1,14 @@
 import { useMemo } from "react";
 import { useSSE } from "./useSSE";
-import type { ComponentInfo, MetricsSnapshot, NodeMetrics } from "@/lib/types";
+import type { ComponentInfo, MetricsSnapshot, NodeMetrics, SlotType } from "@/lib/types";
 
 export interface GraphNodeData extends Record<string, unknown> {
   label: string;
   category: "source" | "conduit" | "sink";
   inputs: string[];
   outputs: string[];
-  inputTypes: Record<string, string>;
-  outputTypes: Record<string, string>;
+  inputTypes: Record<string, SlotType>;
+  outputTypes: Record<string, SlotType>;
   status: string;
   nodeMetrics: NodeMetrics | null;
 }
