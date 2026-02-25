@@ -4,15 +4,14 @@ import base64
 import json
 import os
 import threading
-from typing import TypedDict
+from typing import NamedTuple
 
-from websockets.sync.client import connect, Connection
+from websockets.sync.client import Connection, connect
 
+from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.channel import Channel
+from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame
 from pydantic import BaseModel
-
-from src.core.frames import AudioFrame, AudioDataFormat, InterruptFrame
 
 
 class STSConfig(BaseModel):
@@ -20,16 +19,20 @@ class STSConfig(BaseModel):
     voice: str = "alloy"
 
 
-class STSOutputs(TypedDict):
-    audio: Channel[AudioFrame]
+class STSInputs(NamedTuple):
+    audio: Receiver[AudioFrame]
+    interrupt: Receiver[InterruptFrame] | None = None
 
 
-class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs]):
+class STSOutputs(NamedTuple):
+    audio: Sender[AudioFrame]
+
+
+class STS(Component[STSInputs, STSOutputs]):
     def __init__(self, config: STSConfig) -> None:
         super().__init__()
         self.config: STSConfig = config
         self._ws: Connection | None = None
-        self._output_audio: Channel[AudioFrame] = Channel(name="audio")
 
     def stop(self) -> None:
         if self._ws:
@@ -39,14 +42,7 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                 pass
         super().stop()
 
-    def get_output_channels(self) -> STSOutputs:
-        return {"audio": self._output_audio}
-
-    def run(
-        self,
-        audio: Channel[AudioFrame],
-        interrupt: Channel[InterruptFrame] | None = None,
-    ) -> None:
+    def run(self, inputs: STSInputs, outputs: STSOutputs) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
         headers = {
             "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
@@ -71,18 +67,17 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
             )
 
             threading.Thread(
-                target=self._send_loop, args=(ws, audio), daemon=True
+                target=self._send_loop, args=(ws, inputs.audio), daemon=True
             ).start()
 
-            if interrupt:
+            if inputs.interrupt is not None:
+                interrupt_recv = inputs.interrupt
 
-                def listen_interrupts():
-                    for frame in interrupt.stream(self):
+                def listen_interrupts() -> None:
+                    for frame in interrupt_recv(self):
                         if frame is None:
                             break
-                        # Use .get() instead of .reason
-                        print(f"[STS] Interrupt received: {frame.get()}")
-                        # Clear the audio buffer on the server
+                        print(f"[STS] Interrupt received: {frame.reason}")
                         ws.send(json.dumps({"type": "input_audio_buffer.clear"}))
 
                 threading.Thread(target=listen_interrupts, daemon=True).start()
@@ -94,24 +89,17 @@ class STS(Component[[Channel[AudioFrame], Channel[InterruptFrame]], STSOutputs])
                 event = json.loads(msg)
                 if event["type"] == "response.audio.delta":
                     pcm = base64.b64decode(event["delta"])
-                    # Use AudioFrame with data getter logic
-                    frame = AudioFrame(
-                        display_name="sts_audio",
+                    frame = AudioFrame.new(
                         data=pcm,
                         sample_rate=24000,
                         channels=1,
                     )
-                    self._output_audio.send(frame)
+                    outputs.audio.send(frame)
 
-    def _send_loop(
-        self, ws: Connection, audio: Channel[AudioFrame] | None = None
-    ) -> None:
+    def _send_loop(self, ws: Connection, audio: Receiver[AudioFrame]) -> None:
         from websockets.exceptions import ConnectionClosed
 
-        if not audio:
-            return
-
-        for frame in audio.stream(self):
+        for frame in audio(self):
             if frame is None:
                 break
 

@@ -1,10 +1,10 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { formatCount, formatBytes, formatUptime } from "@/lib/format";
+import { formatCount, formatBytes } from "@/lib/format";
 import { useVideoStream } from "@/hooks/useVideoStream";
-import type { PipelineNodeData } from "@/hooks/usePipelineData";
-import type { ChannelMetrics } from "@/lib/types";
+import type { GraphNodeData } from "@/hooks/useGraphData";
+import type { SenderMetrics, ReceiverMetrics, SlotType } from "@/lib/types";
 
 const categoryColors: Record<string, { border: string; bg: string; badge: string; badgeText: string }> = {
   source: {
@@ -33,37 +33,40 @@ const statusDot: Record<string, string> = {
   stopped: "bg-status-stopped",
 };
 
-/** Renders `name: Type[T]` with syntax highlighting */
-function TypeLabel({ name, type }: { name: string; type: string }) {
-  const match = type.match(/^(\w+)\[(.+)]$/);
-
+function TypeLabel({ name, slot, side }: { name: string; slot: SlotType; side: "in" | "out" }) {
+  const asterisk = !slot.optional && <span style={{ color: "#ef4444" }}>* </span>;
   return (
     <span className="text-[12px] font-mono">
+      {side === "in" && asterisk}
       <span style={{ color: "var(--syn-param)" }}>{name}</span>
       <span style={{ color: "var(--syn-punct)" }}>: </span>
-      {match ? (
-        <>
-          <span style={{ color: "var(--syn-type)" }}>{match[1]}</span>
-          <span style={{ color: "var(--syn-punct)" }}>[</span>
-          <span style={{ color: "var(--syn-primitive)" }}>{match[2]}</span>
-          <span style={{ color: "var(--syn-punct)" }}>]</span>
-        </>
-      ) : (
-        <span style={{ color: "var(--syn-type)" }}>{type}</span>
-      )}
+      <span style={{ color: "var(--syn-type)" }}>{slot.name}</span>
+      {side === "out" && !slot.optional && <span style={{ color: "#ef4444" }}> *</span>}
     </span>
   );
 }
 
-function ChannelRow({ ch }: { ch: ChannelMetrics }) {
+function SenderRow({ sender }: { sender: SenderMetrics }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-foreground/60 font-medium">{ch.name}</span>
+      <span className="text-foreground/60 font-medium">{sender.name}</span>
       <div className="flex items-center gap-3">
-        <Stat label="msgs" value={formatCount(ch.msg_count_delta)} />
-        <Stat label="bytes" value={formatBytes(ch.byte_count_delta)} />
-        <Stat label="buf" value={String(ch.buffer_depth)} />
-        <Stat label="subs" value={String(Object.keys(ch.subscribers).length)} />
+        <Stat label="msgs" value={formatCount(sender.msg_count_delta)} />
+        <Stat label="bytes" value={formatBytes(sender.byte_count_delta)} />
+        <Stat label="buf" value={String(sender.buffer_depth)} />
+      </div>
+    </div>
+  );
+}
+
+function ReceiverRow({ receiver }: { receiver: ReceiverMetrics }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-foreground/60 font-medium">{receiver.name}</span>
+      <div className="flex items-center gap-3">
+        <Stat label="msgs" value={formatCount(receiver.msg_count_delta)} />
+        <Stat label="bytes" value={formatBytes(receiver.byte_count_delta)} />
+        <Stat label="lag" value={String(receiver.lag)} />
       </div>
     </div>
   );
@@ -78,8 +81,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PipelineNodeComponent({ id, data }: NodeProps) {
-  const d = data as PipelineNodeData;
+function GraphNodeComponent({ id, data }: NodeProps) {
+  const d = data as GraphNodeData;
   const colors = categoryColors[d.category]!;
   const isVideoStream = d.label === "VideoStream";
   const frameUrl = useVideoStream(isVideoStream ? id : null);
@@ -88,9 +91,11 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
 
   const maxSlots = Math.max(d.inputs.length, d.outputs.length, 1);
 
-  const channels = d.nodeMetrics?.channels;
-  const channelEntries = channels ? Object.values(channels) : [];
-  const uptime = formatUptime(d.nodeMetrics?.started_at ?? null);
+  const senders = d.nodeMetrics?.senders;
+  const receivers = d.nodeMetrics?.receivers;
+  const senderEntries = senders ? Object.values(senders) : [];
+  const receiverEntries = receivers ? Object.values(receivers) : [];
+  const hasMetrics = senderEntries.length > 0 || receiverEntries.length > 0;
 
   return (
     <div
@@ -170,10 +175,10 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
                     className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-ml-[32px]"
                   />
                 )}
-                {inName && <TypeLabel name={inName} type={d.inputTypes[inName] ?? inName} />}
+                {inName && d.inputTypes[inName] && <TypeLabel name={inName} slot={d.inputTypes[inName]} side="in" />}
               </div>
               <div className="flex items-center gap-2">
-                {outName && <TypeLabel name={outName} type={d.outputTypes[outName] ?? outName} />}
+                {outName && d.outputTypes[outName] && <TypeLabel name={outName} slot={d.outputTypes[outName]} side="out" />}
                 {outName && (
                   <Handle
                     id={`out-${outName}`}
@@ -190,15 +195,11 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
 
       {/* Metrics */}
       <div className="pt-5 border-t border-white/[0.06] text-[10px] font-mono space-y-2">
-        {/* Uptime bar */}
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground/60 uppercase tracking-wider">uptime</span>
-          <span className="text-foreground/70 tabular-nums">{uptime}</span>
-        </div>
-
-        {/* Channel metrics */}
-        {channelEntries.length > 0 ? (
-          channelEntries.map((ch) => <ChannelRow key={ch.name} ch={ch} />)
+        {hasMetrics ? (
+          <>
+            {senderEntries.map((s) => <SenderRow key={s.name} sender={s} />)}
+            {receiverEntries.map((r) => <ReceiverRow key={r.name} receiver={r} />)}
+          </>
         ) : (
           <div className="text-muted-foreground/40 text-center py-1">awaiting data</div>
         )}
@@ -207,4 +208,4 @@ function PipelineNodeComponent({ id, data }: NodeProps) {
   );
 }
 
-export const PipelineNode = memo(PipelineNodeComponent);
+export const GraphNode = memo(GraphNodeComponent);

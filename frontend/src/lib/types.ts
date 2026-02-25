@@ -8,29 +8,62 @@ export interface ComponentInfo {
   outputs: Record<string, string>;
 }
 
-export interface SubscriberSnapshot {
-  lag: number;
-  msg_count_delta: number;
-  byte_count_delta: number;
+export interface GraphNode {
+  type: string;
+  init_args: Record<string, unknown>;
+  x: number;
+  y: number;
 }
 
-export interface ChannelMetrics {
+export interface GraphEdge {
+  source_node: string;
+  source_slot: string;
+  target_node: string;
+  target_slot: string;
+}
+
+export interface Graph {
+  nodes: Record<string, GraphNode>;
+  edges: GraphEdge[];
+}
+
+export interface SenderMetrics {
   name: string;
   msg_count_delta: number;
   byte_count_delta: number;
   last_send_time: number;
   buffer_depth: number;
-  subscribers: Record<string, SubscriberSnapshot>;
+}
+
+export interface ReceiverMetrics {
+  name: string;
+  msg_count_delta: number;
+  byte_count_delta: number;
+  lag: number;
 }
 
 export interface NodeMetrics {
   name: string;
   status: string;
-  started_at: number | null;
-  channels: Record<string, ChannelMetrics>;
+  senders: Record<string, SenderMetrics>;
+  receivers: Record<string, ReceiverMetrics>;
 }
 
 export interface MetricsSnapshot {
   nodes: Record<string, NodeMetrics>;
   timestamp: number;
+}
+
+export interface SlotType {
+  name: string;
+  optional: boolean;
+}
+
+export function parseSlotType(raw: string): SlotType {
+  const optional = /Union\[.*,\s*NoneType\]/.test(raw) || raw.endsWith("| None");
+  const name = raw
+    .replace(/Union\[(.+),\s*NoneType\]/, "$1")
+    .replace(/\s*\|\s*None$/, "")
+    .replace(/^(?:Sender|Receiver)\[(.+)\]$/, "$1");
+  return { name, optional };
 }

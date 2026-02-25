@@ -5,7 +5,7 @@ interface PositionedNode {
 }
 
 /**
- * Topological sort of pipeline nodes, then assign left-to-right positions.
+ * Topological sort of graph nodes, then assign left-to-right positions.
  */
 export function layoutNodes(
   nodes: { id: string }[],

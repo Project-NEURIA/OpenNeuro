@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import io
 import time
-from typing import TypedDict
+from typing import NamedTuple
 
 import numpy as np
 from PIL import Image
 
+from src.core.channel import Sender
 from src.core.component import Component
-from src.core.channel import Channel
 
 
-class VRChatVideoOutputs(TypedDict):
-    video: Channel[bytes]
+class VRChatVideoOutputs(NamedTuple):
+    video: Sender[bytes]
 
 
-class VRChatVideo(Component[[], VRChatVideoOutputs]):
+class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
     """Captures video frames from VRChat via the OpenVR virtual driver."""
 
     def __init__(
@@ -31,12 +31,8 @@ class VRChatVideo(Component[[], VRChatVideoOutputs]):
         self._port = port
         self._frame_interval = 1.0 / fps
         self._quality = quality
-        self._output_video: Channel[bytes] = Channel(name="video")
 
-    def get_output_channels(self) -> VRChatVideoOutputs:
-        return {"video": self._output_video}
-
-    def run(self) -> None:
+    def run(self, inputs: tuple[()], outputs: VRChatVideoOutputs) -> None:
         from ovd_client import Client
 
         with Client() as client:
@@ -59,4 +55,4 @@ class VRChatVideo(Component[[], VRChatVideoOutputs]):
 
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG", quality=self._quality)
-                self._output_video.send(buf.getvalue())
+                outputs.video.send(buf.getvalue())

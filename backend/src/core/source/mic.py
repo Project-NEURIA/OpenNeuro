@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import NamedTuple
 
 import sounddevice as sd
-
-from src.core.component import Component
-from src.core.channel import Channel
-
-
 from pydantic import BaseModel
 
+from src.core.channel import Sender
+from src.core.component import Component
 from src.core.frames import AudioFrame
 
 
@@ -19,23 +16,19 @@ class MicConfig(BaseModel):
     frame_ms: int = 20
 
 
-class MicOutputs(TypedDict):
-    audio: Channel[AudioFrame]
+class MicOutputs(NamedTuple):
+    audio: Sender[AudioFrame]
 
 
-class Mic(Component[[], MicOutputs]):
+class Mic(Component[tuple[()], MicOutputs]):
     def __init__(self, config: MicConfig) -> None:
         super().__init__()
         self.config: MicConfig = config
         self._sample_rate = self.config.sample_rate
         self._channels = self.config.channels
         self._frame_samples = int(self._sample_rate * self.config.frame_ms / 1000)
-        self._output_audio: Channel[AudioFrame] = Channel(name="audio")
 
-    def get_output_channels(self) -> MicOutputs:
-        return {"audio": self._output_audio}
-
-    def run(self) -> None:
+    def run(self, inputs: tuple[()], outputs: MicOutputs) -> None:
         with sd.InputStream(
             samplerate=self._sample_rate,
             channels=self._channels,
@@ -44,9 +37,9 @@ class Mic(Component[[], MicOutputs]):
         ) as stream:
             while not self.stop_event.is_set():
                 data, _ = stream.read(self._frame_samples)
-                frame = AudioFrame(
+                frame = AudioFrame.new(
                     data=data,
                     sample_rate=self._sample_rate,
                     channels=self._channels,
                 )
-                self._output_audio.send(frame)
+                outputs.audio.send(frame)

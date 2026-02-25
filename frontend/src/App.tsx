@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlowProvider,
   useNodesState,
@@ -13,12 +13,12 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import { Home } from "lucide-react";
-import { PipelineCanvas } from "@/components/pipeline/PipelineCanvas";
-import { NodeSidebar } from "@/components/pipeline/NodeSidebar";
-import { MetricsOverlay } from "@/components/pipeline/MetricsOverlay";
+import { GraphCanvas } from "@/components/graph/GraphCanvas";
+import { NodeSidebar } from "@/components/graph/NodeSidebar";
+import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
 import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { ProjectChooser } from "@/components/project/ProjectChooser";
-import { usePipelineData, type PipelineNodeData } from "@/hooks/usePipelineData";
+import { useGraphData, type GraphNodeData } from "@/hooks/useGraphData";
 import { useComponents } from "@/hooks/useComponents";
 import { useMetricsHistory } from "@/hooks/useMetricsHistory";
 import { layoutNodes } from "@/lib/layout";
@@ -35,7 +35,8 @@ import {
   closeProject as apiCloseProject,
   saveGraph,
 } from "@/lib/api";
-import type { ComponentInfo } from "@/lib/types";
+import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
+import { checkTypes, typeToString } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
   if (!handleId) return "";
@@ -57,7 +58,7 @@ function AppInner({
   onGoHome: () => void;
 }) {
   const components = useComponents();
-  const { connected, metrics, componentMap } = usePipelineData(components);
+  const { connected, metrics, componentMap } = useGraphData(components);
 
   const [metricsOpen, setMetricsOpen] = useState(false);
   const history = useMetricsHistory(metrics);
@@ -70,6 +71,70 @@ function AppInner({
   const triggerSave = useCallback(() => {
     saveGraph().catch(console.error);
   }, []);
+
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+  const componentTypeInfo = useMemo(() => {
+    const inputs: Record<string, Record<string, SlotType>> = {};
+    const outputs: Record<string, Record<string, SlotType>> = {};
+    for (const c of components) {
+      inputs[c.name] = Object.fromEntries(
+        Object.entries(c.inputs).map(([k, v]) => [k, parseSlotType(v)]),
+      );
+      outputs[c.name] = Object.fromEntries(
+        Object.entries(c.outputs).map(([k, v]) => [k, parseSlotType(v)]),
+      );
+    }
+    return { inputs, outputs };
+  }, [components]);
+
+  const runTypeCheck = useCallback(() => {
+    const currentNodes = nodesRef.current;
+
+    setEdges((currentEdges) => {
+      const graph: Graph = {
+        nodes: Object.fromEntries(
+          currentNodes
+            .filter((n) => n.type === "graph")
+            .map((n) => {
+              const data = n.data as GraphNodeData;
+              return [n.id, { type: data.label, init_args: {}, x: n.position.x, y: n.position.y }];
+            }),
+        ),
+        edges: currentEdges.map((e): GraphEdge => ({
+          source_node: e.source,
+          source_slot: parseSlot(e.sourceHandle),
+          target_node: e.target,
+          target_slot: parseSlot(e.targetHandle),
+        })),
+      };
+
+      const { errors } = checkTypes(graph, componentTypeInfo.inputs, componentTypeInfo.outputs);
+
+      const errorMap = new Map<string, string>();
+      for (const err of errors) {
+        if (err.constraint.origin.kind === "edge") {
+          const { sourceNode, sourceSlot, targetNode, targetSlot } = err.constraint.origin;
+          const edgeId = `${sourceNode}:${sourceSlot}->${targetNode}:${targetSlot}`;
+          errorMap.set(edgeId, `${typeToString(err.left)} ≠ ${typeToString(err.right)}`);
+        }
+      }
+
+      return currentEdges.map((e) => {
+        const srcSlot = parseSlot(e.sourceHandle);
+        const tgtSlot = parseSlot(e.targetHandle);
+        const key = `${e.source}:${srcSlot}->${e.target}:${tgtSlot}`;
+        return {
+          ...e,
+          data: {
+            ...(e.data as Record<string, unknown>),
+            typeError: errorMap.get(key) || undefined,
+          },
+        };
+      });
+    });
+  }, [setEdges, componentTypeInfo]);
 
   // Initialize: fetch existing graph from backend
   useEffect(() => {
@@ -105,18 +170,18 @@ function AppInner({
 
             return {
               id: n.id,
-              type: "pipeline",
+              type: "graph",
               position: { x: pos.x, y: pos.y },
               data: {
                 label: n.type,
                 category: info?.category ?? "conduit",
                 inputs: info ? Object.keys(info.inputs) : [],
                 outputs: info ? Object.keys(info.outputs) : [],
-                inputTypes: info?.inputs ?? {},
-                outputTypes: info?.outputs ?? {},
+                inputTypes: componentTypeInfo.inputs[n.type] ?? {},
+                outputTypes: componentTypeInfo.outputs[n.type] ?? {},
                 status: n.status,
                 nodeMetrics: null,
-              } satisfies PipelineNodeData,
+              } satisfies GraphNodeData,
             };
           }),
         );
@@ -128,15 +193,17 @@ function AppInner({
             sourceHandle: `out-${e.source_slot}`,
             target: e.target_node,
             targetHandle: `in-${e.target_slot}`,
-            type: "pipeline",
+            type: "graph",
             data: {},
           })),
         );
+
+        runTypeCheck();
       } catch (err) {
-        console.error("[pipeline] Init failed:", err);
+        console.error("[graph] Init failed:", err);
       }
     })();
-  }, [components, componentMap, setNodes, setEdges]);
+  }, [components, componentMap, setNodes, setEdges, runTypeCheck]);
 
   // Update node and edge data with metrics
   useEffect(() => {
@@ -144,12 +211,12 @@ function AppInner({
     setNodes((prev) =>
       prev.map((n) => {
         const nodeMetrics = metrics.nodes[n.id] ?? null;
-        const status = nodeMetrics?.status ?? (n.data as PipelineNodeData).status;
+        const status = nodeMetrics?.status ?? (n.data as GraphNodeData).status;
 
         return {
           ...n,
           data: {
-            ...(n.data as PipelineNodeData),
+            ...(n.data as GraphNodeData),
             status,
             nodeMetrics,
           },
@@ -158,12 +225,11 @@ function AppInner({
     );
     setEdges((prev) =>
       prev.map((e) => {
-        const slot = parseSlot(e.sourceHandle);
-        const ch = metrics.nodes[e.source]?.channels?.[slot];
-        const sub = ch?.subscribers?.[e.target];
+        const targetSlot = parseSlot(e.targetHandle);
+        const recv = metrics.nodes[e.target]?.receivers?.[targetSlot];
         return {
           ...e,
-          data: { byteDelta: sub?.byte_count_delta ?? 0 },
+          data: { ...(e.data as Record<string, unknown>), byteDelta: recv?.byte_count_delta ?? 0 },
         };
       }),
     );
@@ -190,12 +256,15 @@ function AppInner({
             );
           });
           apiDeleteNode(r.id)
-            .then(() => triggerSave())
+            .then(() => {
+              runTypeCheck();
+              triggerSave();
+            })
             .catch(console.error);
         }
       }
     },
-    [onNodesChangeRaw, setEdges, triggerSave],
+    [onNodesChangeRaw, setEdges, triggerSave, runTypeCheck],
   );
 
   // Wrap edge changes — detect removals and call backend
@@ -214,17 +283,21 @@ function AppInner({
         return currentEdges;
       });
       onEdgesChangeRaw(changes);
-      if (hasRemovals) triggerSave();
+      if (hasRemovals) {
+        runTypeCheck();
+        triggerSave();
+      }
     },
-    [onEdgesChangeRaw, setEdges, triggerSave],
+    [onEdgesChangeRaw, setEdges, triggerSave, runTypeCheck],
   );
 
   // Handle new edge connections
   const onConnect: OnConnect = useCallback(
     (connection) => {
       setEdges((eds) =>
-        addEdge({ ...connection, type: "pipeline", data: {} }, eds),
+        addEdge({ ...connection, type: "graph", data: {} }, eds),
       );
+      runTypeCheck();
       if (connection.source && connection.target) {
         const sourceSlot = parseSlot(connection.sourceHandle);
         const targetSlot = parseSlot(connection.targetHandle);
@@ -238,7 +311,7 @@ function AppInner({
           .catch(console.error);
       }
     },
-    [setEdges, triggerSave],
+    [setEdges, triggerSave, runTypeCheck],
   );
 
   const onNodeDragStop: OnNodeDrag = useCallback(
@@ -256,7 +329,7 @@ function AppInner({
     e.dataTransfer.dropEffect = "move";
   }, []);
 
-  const createPipelineNode = useCallback(
+  const createGraphNode = useCallback(
     (
       item: ComponentInfo,
       position: { x: number; y: number },
@@ -264,33 +337,34 @@ function AppInner({
     ) => {
       apiCreateNode(item.name, initArgs)
         .then((res) => {
-          const newNode: Node<PipelineNodeData> = {
+          const newNode: Node<GraphNodeData> = {
             id: res.id,
-            type: "pipeline",
+            type: "graph",
             position,
             data: {
               label: item.name,
               category: item.category,
               inputs: Object.keys(item.inputs),
               outputs: Object.keys(item.outputs),
-              inputTypes: item.inputs,
-              outputTypes: item.outputs,
+              inputTypes: componentTypeInfo.inputs[item.name] ?? {},
+              outputTypes: componentTypeInfo.outputs[item.name] ?? {},
               status: "startup",
               nodeMetrics: null,
             },
           };
           setNodes((nds) => [...nds, newNode]);
+          runTypeCheck();
           triggerSave();
         })
         .catch(console.error);
     },
-    [setNodes, triggerSave],
+    [setNodes, triggerSave, runTypeCheck],
   );
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const raw = e.dataTransfer.getData("application/pipeline-node");
+      const raw = e.dataTransfer.getData("application/graph-node");
       if (!raw) return;
 
       const item = JSON.parse(raw) as ComponentInfo;
@@ -310,7 +384,7 @@ function AppInner({
       });
 
       if (!hasConfig) {
-        createPipelineNode(item, position);
+        createGraphNode(item, position);
         return;
       }
 
@@ -323,7 +397,7 @@ function AppInner({
           componentInfo: item,
           onConfirm: (initArgs: Record<string, unknown>) => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
-            createPipelineNode(item, position, initArgs);
+            createGraphNode(item, position, initArgs);
           },
           onCancel: () => {
             setNodes((nds) => nds.filter((n) => n.id !== tempId));
@@ -332,7 +406,7 @@ function AppInner({
       };
       setNodes((nds) => [...nds, configuringNode]);
     },
-    [screenToFlowPosition, setNodes, createPipelineNode],
+    [screenToFlowPosition, setNodes, createGraphNode],
   );
 
   const handleGoHome = useCallback(async () => {
@@ -342,7 +416,7 @@ function AppInner({
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <PipelineCanvas
+      <GraphCanvas
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}

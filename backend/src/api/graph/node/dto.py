@@ -11,8 +11,8 @@ class NodeCreateRequest(BaseModel):
 
 
 class NodeUpdateRequest(BaseModel):
-    x: float | None = None
-    y: float | None = None
+    x: float
+    y: float
 
 
 class NodeResponse(BaseModel):

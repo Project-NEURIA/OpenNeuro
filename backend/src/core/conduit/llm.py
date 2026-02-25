@@ -4,14 +4,14 @@ import json
 import os
 import threading
 from queue import Empty, Queue
-from typing import TypedDict
+from typing import NamedTuple
 
 import requests
 from pydantic import BaseModel
 
+from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.channel import Channel
-from src.core.frames import MessagesFrame, InterruptFrame, TextFrame, MessagesDataFormat
+from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
@@ -24,19 +24,22 @@ class LLMConfig(BaseModel):
     max_tokens: int = 350
 
 
-class LLMOutputs(TypedDict):
-    text: Channel[TextFrame]
-    interrupt: Channel[InterruptFrame]
+class LLMInputs(NamedTuple):
+    messages: Receiver[MessagesFrame]
+    interrupt: Receiver[InterruptFrame] | None = None
 
 
-class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutputs]):
+class LLMOutputs(NamedTuple):
+    text: Sender[TextFrame]
+    interrupt: Sender[InterruptFrame]
+
+
+class LLM(Component[LLMInputs, LLMOutputs]):
     """LLM text generation component using Groq API."""
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__()
         self.config: LLMConfig = config
-        self._output_text = Channel[TextFrame](name="text")
-        self._output_interrupt = Channel[InterruptFrame](name="interrupt")
 
         # Generation tracking
         self._generation = 0
@@ -45,10 +48,7 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
         # Task queue for worker thread
         self._task_queue: Queue[tuple[int, MessagesFrame]] = Queue()
 
-    def get_output_channels(self) -> LLMOutputs:
-        return {"text": self._output_text, "interrupt": self._output_interrupt}
-
-    def _worker(self) -> None:
+    def _worker(self, outputs: LLMOutputs) -> None:
         print("[LLM] Worker thread started")
         while not self.stop_event.is_set():
             try:
@@ -58,47 +58,46 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
                     if gen != self._generation:
                         continue
 
-                self._process_generation(gen, frame)
+                self._process_generation(gen, frame, outputs)
             except Empty:
                 continue
             except Exception as e:
                 print(f"[LLM] Worker error: {e}")
 
-    def run(
-        self,
-        messages: Channel[MessagesFrame],
-        interrupt: Channel[InterruptFrame] | None = None,
-    ) -> None:
+    def run(self, inputs: LLMInputs, outputs: LLMOutputs) -> None:
         print("[LLM] Starting LLM generation")
 
-        worker_thread = threading.Thread(target=self._worker, daemon=True)
+        worker_thread = threading.Thread(
+            target=self._worker, args=(outputs,), daemon=True
+        )
         worker_thread.start()
 
-        def handle_interrupts():
-            if not interrupt:
-                return
-            for frame in interrupt.stream(self):
-                if frame is None:
-                    break
-                print(f"[LLM] Interrupt received: {frame.get()}")
+        if inputs.interrupt is not None:
+            interrupt_recv = inputs.interrupt
 
-                # Signal interruption to generation loop
-                with self._gen_lock:
-                    self._generation += 1
-
-                # Forward the interrupt
-                self._output_interrupt.send(frame)
-
-                # Clear queue
-                while not self._task_queue.empty():
-                    try:
-                        self._task_queue.get_nowait()
-                    except Empty:
+            def handle_interrupts() -> None:
+                for frame in interrupt_recv(self):
+                    if frame is None:
                         break
+                    print(f"[LLM] Interrupt received: {frame.reason}")
 
-        threading.Thread(target=handle_interrupts, daemon=True).start()
+                    # Signal interruption to generation loop
+                    with self._gen_lock:
+                        self._generation += 1
 
-        for frame in messages.stream(self):
+                    # Forward the interrupt
+                    outputs.interrupt.send(frame)
+
+                    # Clear queue
+                    while not self._task_queue.empty():
+                        try:
+                            self._task_queue.get_nowait()
+                        except Empty:
+                            break
+
+            threading.Thread(target=handle_interrupts, daemon=True).start()
+
+        for frame in inputs.messages(self):
             if frame is None:
                 break
 
@@ -109,7 +108,9 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
         worker_thread.join(timeout=1)
         print("[LLM] LLM generation stopped")
 
-    def _process_generation(self, gen: int, frame: MessagesFrame) -> None:
+    def _process_generation(
+        self, gen: int, frame: MessagesFrame, outputs: LLMOutputs
+    ) -> None:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             print("[LLM] GROQ_API_KEY not set")
@@ -122,7 +123,7 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
 
         payload = {
             "model": self.config.model_id,
-            "messages": frame.get(MessagesDataFormat.MESSAGES),
+            "messages": frame.messages,
             "stream": True,
             "top_p": self.config.top_p,
             "temperature": self.config.temperature,
@@ -139,9 +140,7 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
             for line in r.iter_lines():
                 with self._gen_lock:
                     if gen != self._generation:
-                        self._output_text.send(
-                            TextFrame(display_name="llm_chunk", text=GENERATE_END_FLAG)
-                        )
+                        outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
                         break
 
                 if not line:
@@ -165,17 +164,13 @@ class LLM(Component[[Channel[MessagesFrame], Channel[InterruptFrame]], LLMOutput
 
                 choice = choices[0]
                 if choice.get("finish_reason"):
-                    self._output_text.send(
-                        TextFrame(display_name="llm_chunk", text=GENERATE_END_FLAG)
-                    )
+                    outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
                     break
 
                 delta = choice.get("delta") or {}
                 text = delta.get("content") or ""
                 if text:
-                    self._output_text.send(
-                        TextFrame(display_name="llm_chunk", text=text)
-                    )
+                    outputs.text.send(TextFrame.new(text=text))
 
         except Exception as e:
             print(f"[LLM] Generation error: {e}")

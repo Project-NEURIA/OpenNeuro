@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import time
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Literal, overload
 
 import numpy as np
 
@@ -17,49 +16,33 @@ class AudioDataFormat(Enum):
     FLOAT32 = "float32"
 
 
-class MessagesDataFormat(Enum):
-    MESSAGES = "messages"
-    TEXT = "text"
-
-
-@dataclass(frozen=True)
-class Frame(ABC):
+@dataclass(frozen=True, slots=True)
+class Frame:
     """Base frame class for all frames in the pipeline."""
 
-    display_name: str
-    pts: int = field(default_factory=time.time_ns)
-    id: int = field(default_factory=obj_id)
+    pts: int
+    id: int
 
-    @abstractmethod
-    def get(self, *args, **kwargs) -> Any:
-        """Get the data from the frame in a specific format."""
-        pass
-
-    def __str__(self):
-        return f"{type(self).__name__}(id={self.id}, type={self.display_name}, pts={self.pts})"
+    def __str__(self) -> str:
+        return f"{type(self).__name__}(id={self.id}, pts={self.pts})"
 
 
+@dataclass(frozen=True, slots=True)
 class AudioFrame(Frame):
     """Audio frame with immutable data and on-the-fly reformatting/resampling."""
 
-    _data: np.ndarray
-    _sample_rate: int
-    _channels: int
+    data: np.ndarray
+    sample_rate: int
+    channels: int
 
-    def __init__(
-        self,
-        display_name: str = "audio",
+    @classmethod
+    def new(
+        cls,
         *,
         data: bytes | np.ndarray,
         sample_rate: int,
         channels: int = 1,
-        pts: int | None = None,
-        id: int | None = None,
-    ):
-        object.__setattr__(self, "display_name", display_name)
-        object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
-        object.__setattr__(self, "id", id if id is not None else obj_id())
-
+    ) -> AudioFrame:
         # Normalize data to np.ndarray shape (channels, samples) float32
         # PCM bytes and 1D arrays are assumed INTERLEAVED: [L0,R0,L1,R1,...]
         if isinstance(data, bytes):
@@ -87,25 +70,44 @@ class AudioFrame(Frame):
         else:
             raise ValueError(f"Unsupported data type: {type(data)}")
 
-        object.__setattr__(self, "_data", arr)
-        object.__setattr__(self, "_sample_rate", sample_rate)
-        object.__setattr__(self, "_channels", channels)
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            data=arr,
+            sample_rate=sample_rate,
+            channels=channels,
+        )
+
+    @overload
+    def get(
+        self,
+        data_format: Literal[AudioDataFormat.FLOAT32],
+        sample_rate: int | None = None,
+        num_channels: int | None = None,
+    ) -> np.ndarray: ...
+
+    @overload
+    def get(
+        self,
+        data_format: Literal[AudioDataFormat.PCM16, AudioDataFormat.PCM8],
+        sample_rate: int | None = None,
+        num_channels: int | None = None,
+    ) -> bytes: ...
 
     def get(
         self,
+        data_format: AudioDataFormat,
         sample_rate: int | None = None,
         num_channels: int | None = None,
-        data_format: AudioDataFormat = AudioDataFormat.PCM16,
-    ) -> Any:
+    ) -> np.ndarray | bytes:
         """Get the audio data in the requested format, sample rate, and channels."""
-        arr = self._data
-        current_sr = self._sample_rate
-        current_ch = self._channels
+        arr = self.data
+        current_sr = self.sample_rate
+        current_ch = self.channels
 
         # 1. Resample if needed
         if sample_rate and sample_rate != current_sr:
             num_samples = int(arr.shape[1] * sample_rate / current_sr)
-            # Linear interpolation for resampling
             arr = np.stack(
                 [
                     np.interp(
@@ -149,92 +151,58 @@ class AudioFrame(Frame):
 
         raise ValueError(f"Unsupported data format: {data_format}")
 
-    def __str__(self):
-        duration_ms = self._data.shape[1] / self._sample_rate * 1000
-        return f"AudioFrame(id={self.id}, pts={self.pts}, duration={duration_ms:.1f}ms, sr={self._sample_rate}Hz, channels={self._channels})"
 
-
+@dataclass(frozen=True, slots=True)
 class TextFrame(Frame):
     """Frame containing text data."""
 
-    _text: str
+    text: str
+    language: str | None = None
 
-    def __init__(
-        self,
-        display_name: str = "text",
-        *,
-        text: str,
-        language: str | None = None,
-        pts: int | None = None,
-        id: int | None = None,
-    ):
-        object.__setattr__(self, "display_name", display_name)
-        object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
-        object.__setattr__(self, "id", id if id is not None else obj_id())
-        object.__setattr__(self, "_text", text)
-        object.__setattr__(self, "_language", language)
-
-    def get(self) -> str:
-        return self._text
-
-    def __str__(self):
-        return f"TextFrame(id={self.id}, text='{self._text[:50]}...', pts={self.pts})"
+    @classmethod
+    def new(cls, *, text: str, language: str | None = None) -> TextFrame:
+        return cls(pts=time.time_ns(), id=obj_id(), text=text, language=language)
 
 
+@dataclass(frozen=True, slots=True)
 class InterruptFrame(Frame):
     """Frame representing an interrupt event."""
 
-    _reason: str
+    reason: str
 
-    def __init__(
-        self,
-        display_name: str = "interrupt",
+    @classmethod
+    def new(
+        cls,
         *,
-        reason: str = "speech_detected",
-        pts: int | None = None,
-        id: int | None = None,
-    ):
-        object.__setattr__(self, "display_name", display_name)
-        object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
-        object.__setattr__(self, "id", id if id is not None else obj_id())
-        object.__setattr__(self, "_reason", reason)
-
-    def get(self) -> str:
-        return self._reason
-
-    def __str__(self):
-        return f"InterruptFrame(id={self.id}, reason={self._reason}, pts={self.pts})"
+        reason: str,
+    ) -> InterruptFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            reason=reason,
+        )
 
 
+@dataclass(frozen=True, slots=True)
 class MessagesFrame(Frame):
     """Frame containing conversation history (messages) for LLM consumption."""
 
-    _text: str
-    _messages: list[dict[str, str]]
+    text: str
+    messages: list[dict[str, str]]
+    language: str | None = None
 
-    def __init__(
-        self,
-        display_name: str = "messages",
+    @classmethod
+    def new(
+        cls,
         *,
         text: str,
         messages: list[dict[str, str]],
         language: str | None = None,
-        pts: int | None = None,
-        id: int | None = None,
-    ):
-        object.__setattr__(self, "display_name", display_name)
-        object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
-        object.__setattr__(self, "id", id if id is not None else obj_id())
-        object.__setattr__(self, "_text", text)
-        object.__setattr__(self, "_messages", messages)
-        object.__setattr__(self, "_language", language)
-
-    def get(self, format: MessagesDataFormat = MessagesDataFormat.MESSAGES) -> Any:
-        if format == MessagesDataFormat.MESSAGES:
-            return self._messages
-        if format == MessagesDataFormat.TEXT:
-            return self._text
-        raise ValueError(f"Unsupported format: {format}")
-
-    def __str__(self):
-        return f"MessagesFrame(id={self.id}, msg_count={len(self._messages)}, pts={self.pts})"
+    ) -> MessagesFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            text=text,
+            messages=messages,
+            language=language,
+        )

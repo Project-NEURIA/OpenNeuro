@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { MetricsSnapshot } from "@/lib/types";
 
-export interface SubscriberHistory {
-  msgThroughput: number[];
-  byteThroughput: number[];
-}
-
-export interface ChannelHistory {
+export interface SenderHistory {
   msgThroughput: number[];
   byteThroughput: number[];
   bufferDepths: number[];
-  subscriberHistory: Record<string, SubscriberHistory>;
+}
+
+export interface ReceiverHistory {
+  msgThroughput: number[];
+  byteThroughput: number[];
 }
 
 export interface NodeHistoryEntry {
   msgThroughput: number[];
   byteThroughput: number[];
-  channelHistory: Record<string, ChannelHistory>;
+  senderHistory: Record<string, SenderHistory>;
+  receiverHistory: Record<string, ReceiverHistory>;
 }
 
 export interface MetricsHistory {
@@ -74,35 +74,26 @@ export function useMetricsHistory(snapshot: MetricsSnapshot | null): MetricsHist
     for (const nodeId of nodeIds) {
       const msgThroughput: number[] = [];
       const byteThroughput: number[] = [];
-      const channelIds = new Set<string>();
 
+      // Collect all sender/receiver slot names across snapshots
+      const senderSlots = new Set<string>();
+      const receiverSlots = new Set<string>();
       for (const s of snapshots) {
         const n = s.nodes[nodeId];
         if (n) {
-          for (const chId of Object.keys(n.channels)) channelIds.add(chId);
+          for (const slot of Object.keys(n.senders)) senderSlots.add(slot);
+          for (const slot of Object.keys(n.receivers)) receiverSlots.add(slot);
         }
       }
 
-      // Collect all subscriber IDs per channel across all snapshots
-      const channelSubIds: Record<string, Set<string>> = {};
-      for (const chId of channelIds) {
-        const subIds = new Set<string>();
-        for (const s of snapshots) {
-          const ch = s.nodes[nodeId]?.channels[chId];
-          if (ch) {
-            for (const subId of Object.keys(ch.subscribers)) subIds.add(subId);
-          }
-        }
-        channelSubIds[chId] = subIds;
+      const senderHistory: Record<string, SenderHistory> = {};
+      for (const slot of senderSlots) {
+        senderHistory[slot] = { msgThroughput: [], byteThroughput: [], bufferDepths: [] };
       }
 
-      const channelHistory: Record<string, ChannelHistory> = {};
-      for (const chId of channelIds) {
-        const subHist: Record<string, SubscriberHistory> = {};
-        for (const subId of channelSubIds[chId]!) {
-          subHist[subId] = { msgThroughput: [], byteThroughput: [] };
-        }
-        channelHistory[chId] = { msgThroughput: [], byteThroughput: [], bufferDepths: [], subscriberHistory: subHist };
+      const receiverHistory: Record<string, ReceiverHistory> = {};
+      for (const slot of receiverSlots) {
+        receiverHistory[slot] = { msgThroughput: [], byteThroughput: [] };
       }
 
       for (let i = 0; i < snapshots.length; i++) {
@@ -114,42 +105,45 @@ export function useMetricsHistory(snapshot: MetricsSnapshot | null): MetricsHist
         if (!n) {
           msgThroughput.push(0);
           byteThroughput.push(0);
-          for (const chId of channelIds) {
-            channelHistory[chId]!.msgThroughput.push(0);
-            channelHistory[chId]!.byteThroughput.push(0);
-            channelHistory[chId]!.bufferDepths.push(0);
-            for (const subId of channelSubIds[chId]!) {
-              channelHistory[chId]!.subscriberHistory[subId]!.msgThroughput.push(0);
-              channelHistory[chId]!.subscriberHistory[subId]!.byteThroughput.push(0);
-            }
+          for (const slot of senderSlots) {
+            senderHistory[slot]!.msgThroughput.push(0);
+            senderHistory[slot]!.byteThroughput.push(0);
+            senderHistory[slot]!.bufferDepths.push(0);
+          }
+          for (const slot of receiverSlots) {
+            receiverHistory[slot]!.msgThroughput.push(0);
+            receiverHistory[slot]!.byteThroughput.push(0);
           }
           continue;
         }
 
+        // Aggregate across all senders for node-level throughput
         let totalMsg = 0;
         let totalBytes = 0;
-        for (const ch of Object.values(n.channels)) {
-          totalMsg += ch.msg_count_delta;
-          totalBytes += ch.byte_count_delta;
+        for (const sender of Object.values(n.senders)) {
+          totalMsg += sender.msg_count_delta;
+          totalBytes += sender.byte_count_delta;
         }
         msgThroughput.push(totalMsg * rate);
         byteThroughput.push(totalBytes * rate);
 
-        for (const chId of channelIds) {
-          const ch = n.channels[chId];
-          channelHistory[chId]!.msgThroughput.push((ch?.msg_count_delta ?? 0) * rate);
-          channelHistory[chId]!.byteThroughput.push((ch?.byte_count_delta ?? 0) * rate);
-          channelHistory[chId]!.bufferDepths.push(ch?.buffer_depth ?? 0);
+        // Per-sender history
+        for (const slot of senderSlots) {
+          const sender = n.senders[slot];
+          senderHistory[slot]!.msgThroughput.push((sender?.msg_count_delta ?? 0) * rate);
+          senderHistory[slot]!.byteThroughput.push((sender?.byte_count_delta ?? 0) * rate);
+          senderHistory[slot]!.bufferDepths.push(sender?.buffer_depth ?? 0);
+        }
 
-          for (const subId of channelSubIds[chId]!) {
-            const sub = ch?.subscribers[subId];
-            channelHistory[chId]!.subscriberHistory[subId]!.msgThroughput.push((sub?.msg_count_delta ?? 0) * rate);
-            channelHistory[chId]!.subscriberHistory[subId]!.byteThroughput.push((sub?.byte_count_delta ?? 0) * rate);
-          }
+        // Per-receiver history
+        for (const slot of receiverSlots) {
+          const recv = n.receivers[slot];
+          receiverHistory[slot]!.msgThroughput.push((recv?.msg_count_delta ?? 0) * rate);
+          receiverHistory[slot]!.byteThroughput.push((recv?.byte_count_delta ?? 0) * rate);
         }
       }
 
-      nodeHistory[nodeId] = { msgThroughput, byteThroughput, channelHistory };
+      nodeHistory[nodeId] = { msgThroughput, byteThroughput, senderHistory, receiverHistory };
     }
 
     setHistory({ current: snapshot, snapshots, snapshotRate, dt, nodeHistory });

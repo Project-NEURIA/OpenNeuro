@@ -27,7 +27,7 @@ interface NodeSidebarProps {
 
 export function NodeSidebar({ components }: NodeSidebarProps) {
   function onDragStart(e: React.DragEvent, item: ComponentInfo) {
-    e.dataTransfer.setData("application/pipeline-node", JSON.stringify(item));
+    e.dataTransfer.setData("application/graph-node", JSON.stringify(item));
     e.dataTransfer.effectAllowed = "move";
   }
 
