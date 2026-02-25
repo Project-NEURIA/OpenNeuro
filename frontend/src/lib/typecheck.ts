@@ -4,6 +4,20 @@
 // https://doi.org/10.1145/3409006
 
 import type { Graph, SlotType } from "./types";
+import { fetchIsSubtype } from "./api";
+
+// Module-level subtype cache: "sub:sup" → true for known subtype pairs.
+// Populated by warmSubtypeCache() before solving.
+const subtypeSet = new Set<string>();
+
+export async function warmSubtypeCache(concreteNames: Iterable<string>): Promise<void> {
+  const names = [...concreteNames];
+  const pairs = names.flatMap((a) => names.filter((b) => a !== b).map((b) => [a, b] as const));
+  const results = await Promise.all(pairs.map(async ([a, b]) => [a, b, await fetchIsSubtype(a, b)] as const));
+  for (const [a, b, ok] of results) {
+    if (ok) subtypeSet.add(`${a}:${b}`);
+  }
+}
 
 export type Type =
   | { kind: "concrete"; name: string }
@@ -12,7 +26,6 @@ export type Type =
   | { kind: "constructor"; name: string; inner: Type };
 
 export type Origin =
-  | { kind: "node_slot"; nodeId: string; direction: "in" | "out"; slot: string }
   | { kind: "edge"; sourceNode: string; sourceSlot: string; targetNode: string; targetSlot: string };
 
 export interface Constraint {
@@ -62,6 +75,9 @@ function dedup(types: Type[]): Type[] {
 // a <= b?
 function isSubtype(a: Type, b: Type): boolean {
   if (typesEqual(a, b)) return true;
+  if (a.kind === "concrete" && b.kind === "concrete") {
+    return subtypeSet.has(`${a.name}:${b.name}`);
+  }
   if (a.kind === "constructor" && b.kind === "constructor") {
     return a.name === b.name && isSubtype(a.inner, b.inner);
   }
@@ -132,53 +148,40 @@ function parseType(s: string, concreteTypes: Set<string>, scope?: string): Type 
   return { kind: "var", name: scope ? `${scope}.${s}` : s };
 }
 
+function slotType(
+  graph: Graph,
+  nodeId: string,
+  direction: "in" | "out",
+  slot: string,
+  componentInputs: Record<string, Record<string, SlotType>>,
+  componentOutputs: Record<string, Record<string, SlotType>>,
+  concreteTypes: Set<string>,
+): Type {
+  const nodeType = graph.nodes[nodeId]?.type;
+  if (!nodeType) return { kind: "concrete", name: "?" };
+  const slots = direction === "in" ? componentInputs[nodeType] : componentOutputs[nodeType];
+  const st = slots?.[slot];
+  if (!st) return { kind: "concrete", name: "?" };
+  return parseType(st.name, concreteTypes, nodeId);
+}
+
 export function getConstraints(
   graph: Graph,
   componentInputs: Record<string, Record<string, SlotType>>,
   componentOutputs: Record<string, Record<string, SlotType>>,
   concreteTypes: Set<string>,
 ): Constraint[] {
-  const constraints: Constraint[] = [];
-
-  function slotVar(nodeId: string, direction: "in" | "out", slot: string): Type {
-    return { kind: "var", name: `${nodeId}.${direction}.${slot}` };
-  }
-
-  for (const [nodeId, node] of Object.entries(graph.nodes)) {
-    const inputs = componentInputs[node.type] ?? {};
-    for (const [slot, slotType] of Object.entries(inputs)) {
-      constraints.push({
-        left: slotVar(nodeId, "in", slot),
-        right: parseType(slotType.name, concreteTypes, nodeId),
-        origin: { kind: "node_slot", nodeId, direction: "in", slot },
-      });
-    }
-
-    const outputs = componentOutputs[node.type] ?? {};
-    for (const [slot, slotType] of Object.entries(outputs)) {
-      constraints.push({
-        left: parseType(slotType.name, concreteTypes, nodeId),
-        right: slotVar(nodeId, "out", slot),
-        origin: { kind: "node_slot", nodeId, direction: "out", slot },
-      });
-    }
-  }
-
-  for (const edge of graph.edges) {
-    constraints.push({
-      left: slotVar(edge.source_node, "out", edge.source_slot),
-      right: slotVar(edge.target_node, "in", edge.target_slot),
-      origin: {
-        kind: "edge",
-        sourceNode: edge.source_node,
-        sourceSlot: edge.source_slot,
-        targetNode: edge.target_node,
-        targetSlot: edge.target_slot,
-      },
-    });
-  }
-
-  return constraints;
+  return graph.edges.map((edge) => ({
+    left: slotType(graph, edge.source_node, "out", edge.source_slot, componentInputs, componentOutputs, concreteTypes),
+    right: slotType(graph, edge.target_node, "in", edge.target_slot, componentInputs, componentOutputs, concreteTypes),
+    origin: {
+      kind: "edge" as const,
+      sourceNode: edge.source_node,
+      sourceSlot: edge.source_slot,
+      targetNode: edge.target_node,
+      targetSlot: edge.target_slot,
+    },
+  }));
 }
 
 // --- Simple-sub style constraint solving ---
@@ -348,14 +351,14 @@ export function checkTypes(
   const types = new Map<string, Type>();
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
     const inputs = componentInputs[node.type] ?? {};
-    for (const slot of Object.keys(inputs)) {
-      const varName = `${nodeId}.in.${slot}`;
-      types.set(varName, applySubst(subst, { kind: "var", name: varName }));
+    for (const [slot, st] of Object.entries(inputs)) {
+      const parsed = parseType(st.name, concreteTypes, nodeId);
+      types.set(`${nodeId}.in.${slot}`, applySubst(subst, parsed));
     }
     const outputs = componentOutputs[node.type] ?? {};
-    for (const slot of Object.keys(outputs)) {
-      const varName = `${nodeId}.out.${slot}`;
-      types.set(varName, applySubst(subst, { kind: "var", name: varName }));
+    for (const [slot, st] of Object.entries(outputs)) {
+      const parsed = parseType(st.name, concreteTypes, nodeId);
+      types.set(`${nodeId}.out.${slot}`, applySubst(subst, parsed));
     }
   }
 

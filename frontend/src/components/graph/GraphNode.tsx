@@ -33,14 +33,35 @@ const statusDot: Record<string, string> = {
   stopped: "bg-status-stopped",
 };
 
-function TypeLabel({ name, slot, side }: { name: string; slot: SlotType; side: "in" | "out" }) {
+function TypeLabel({ name, slot, side, resolved }: { name: string; slot: SlotType; side: "in" | "out"; resolved?: string }) {
   const asterisk = !slot.optional && <span style={{ color: "#ef4444" }}>* </span>;
+  const isInferred = resolved && resolved !== slot.name;
   return (
     <span className="text-[12px] font-mono">
       {side === "in" && asterisk}
       <span style={{ color: "var(--syn-param)" }}>{name}</span>
       <span style={{ color: "var(--syn-punct)" }}>: </span>
-      <span style={{ color: "var(--syn-type)" }}>{slot.name}</span>
+      {isInferred ? (
+        <span className="group/tip relative inline-block">
+          <span
+            style={{
+              color: "var(--syn-type)",
+              textDecorationLine: "underline",
+              textDecorationStyle: "dashed",
+              textUnderlineOffset: "3px",
+              textDecorationColor: "var(--muted-foreground)",
+              cursor: "help",
+            }}
+          >
+            {slot.name}
+          </span>
+          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded bg-[var(--glass)] border border-[var(--glass-border)] text-[11px] whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity">
+            <span style={{ color: "var(--syn-type)" }}>{resolved}</span> <span style={{ color: "var(--muted-foreground)" }}>(derived)</span>
+          </span>
+        </span>
+      ) : (
+        <span style={{ color: "var(--syn-type)" }}>{slot.name}</span>
+      )}
       {side === "out" && !slot.optional && <span style={{ color: "#ef4444" }}> *</span>}
     </span>
   );
@@ -175,10 +196,10 @@ function GraphNodeComponent({ id, data }: NodeProps) {
                     className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-ml-[32px]"
                   />
                 )}
-                {inName && d.inputTypes[inName] && <TypeLabel name={inName} slot={d.inputTypes[inName]} side="in" />}
+                {inName && d.inputTypes[inName] && <TypeLabel name={inName} slot={d.inputTypes[inName]} side="in" resolved={d.resolvedTypes?.[`in.${inName}`]} />}
               </div>
               <div className="flex items-center gap-2">
-                {outName && d.outputTypes[outName] && <TypeLabel name={outName} slot={d.outputTypes[outName]} side="out" />}
+                {outName && d.outputTypes[outName] && <TypeLabel name={outName} slot={d.outputTypes[outName]} side="out" resolved={d.resolvedTypes?.[`out.${outName}`]} />}
                 {outName && (
                   <Handle
                     id={`out-${outName}`}
