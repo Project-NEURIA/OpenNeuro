@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 class NodeCreateRequest(BaseModel):
     type: str
-    init_args: dict[str, Any]
+    init_args: dict[str, Any] = {}
 
 
 class NodeUpdateRequest(BaseModel):

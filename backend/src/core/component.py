@@ -81,6 +81,23 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]]
     def _resolve_tuple_types(cls, tp: type | None) -> dict[str, type]:
         if tp is None:
             return {}
+        origin = get_origin(tp)
+        # Parameterized generic NamedTuple, e.g. PassthroughInputs[T]
+        if origin is not None and hasattr(origin, "_fields"):
+            hints = get_type_hints(origin)
+            # Build substitution map: TypeVar -> actual arg
+            params = getattr(origin, "__type_params__", ())
+            args = get_args(tp)
+            sub = dict(zip(params, args))
+            def _subst(t: type) -> type:
+                if t in sub:
+                    return sub[t]
+                t_origin = get_origin(t)
+                t_args = get_args(t)
+                if t_origin and t_args:
+                    return t_origin[tuple(_subst(a) for a in t_args)]
+                return t
+            return {name: _subst(hints[name]) for name in origin._fields}
         if hasattr(tp, "_fields"):
             hints = get_type_hints(tp)
             return {name: hints[name] for name in tp._fields}

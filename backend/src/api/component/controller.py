@@ -1,22 +1,31 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import TypeAdapter
 
 from src.api.component.dto import ComponentInfo
 from src.api.component import service
+from src.core.frames import *  # noqa: F403, F401
 
 router = APIRouter(prefix="/component")
 
 
+def _resolve_type(name: str) -> type:
+    t = globals().get(name)
+    if isinstance(t, type):
+        return t
+    raise ValueError(name)
+
+
 def _type_name(t: type) -> str:
+    import types
+    if isinstance(t, types.UnionType):
+        return "Union[" + ", ".join(_type_name(a) for a in t.__args__) + "]"
     origin = getattr(t, "__origin__", None)
     args = getattr(t, "__args__", None)
     if origin and args:
         name = origin.__name__
-        inner = ", ".join(
-            a.__name__ if hasattr(a, "__name__") else str(a) for a in args
-        )
+        inner = ", ".join(_type_name(a) for a in args)
         return f"{name}[{inner}]"
     return getattr(t, "__name__", str(t))
 
@@ -48,3 +57,22 @@ def list_components() -> list[ComponentInfo]:
         )
 
     return result
+
+
+@router.get("/is-type")
+def is_type(name: str = Query()) -> bool:
+    """Check if `name` resolves to a known type."""
+    try:
+        _resolve_type(name)
+        return True
+    except ValueError:
+        return False
+
+
+@router.get("/is-subtype")
+def is_subtype(sub: str = Query(), sup: str = Query()) -> bool:
+    """Check if `sub` is a subtype of `sup` using Python's issubclass()."""
+    try:
+        return issubclass(_resolve_type(sub), _resolve_type(sup))
+    except ValueError:
+        return False
