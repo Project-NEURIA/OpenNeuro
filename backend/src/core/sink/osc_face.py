@@ -6,12 +6,11 @@ import threading
 import time
 from typing import Any, TypedDict
 
-import numpy as np
 from pydantic import BaseModel
 
 from src.core.component import Component
 from src.core.channel import Channel
-from src.core.frames import AudioFrame, AudioDataFormat, TextFrame, InterruptFrame
+from src.core.frames import TextFrame, InterruptFrame
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
@@ -317,14 +316,6 @@ class OSCFaceConfig(BaseModel):
     param_root: str = "/avatar/parameters/"
     param_prefix: str = "FT"
 
-    jaw_param: str = "v2/JawOpen"
-    jaw_gain: float = 1.15
-    jaw_min: float = 0.0
-    jaw_max: float = 0.45
-    jaw_smoothing: float = 0.38
-    jaw_fps: int = 45
-    jaw_curve: float = 0.65
-
     expression_strength: float = 1.0
     param_epsilon: float = 0.01
     reset_on_interrupt: bool = True
@@ -341,7 +332,7 @@ class OSCFaceOutputs(TypedDict):
 
 class OSCFace(
     Component[
-        [Channel[TextFrame], Channel[AudioFrame], Channel[InterruptFrame]],
+        [Channel[TextFrame], Channel[InterruptFrame]],
         OSCFaceOutputs,
     ]
 ):
@@ -350,8 +341,6 @@ class OSCFace(
         self.config = config
         self._client = _OscClient(self.config.host, self.config.port)
         self._last_params: dict[str, float] = {}
-        self._jaw_value: float | None = None
-        self._jaw_last_send = 0.0
         self._text_lock = threading.Lock()
         self._text_buffer = ""
         self._last_text_time = 0.0
@@ -387,9 +376,6 @@ class OSCFace(
         values.update(preset())
 
         for param, raw_value in values.items():
-            if param == self.config.jaw_param:
-                continue
-
             value = float(raw_value) * self.config.expression_strength
             value = max(-1.0, min(1.0, value))
 
@@ -454,36 +440,6 @@ class OSCFace(
             if text:
                 self._handle_text(text)
 
-    def _audio_loop(self, audio: Channel[AudioFrame]) -> None:
-        for frame in audio.stream(self):
-            if frame is None:
-                break
-            pcm = frame.get(data_format=AudioDataFormat.FLOAT32)
-            if pcm is None:
-                continue
-
-            level = float(np.sqrt(np.mean(np.square(pcm))))
-
-            raw = max(0.0, level * self.config.jaw_gain)
-            curve = max(0.05, float(self.config.jaw_curve))
-            shaped = raw**curve
-
-            target = min(
-                max(shaped, self.config.jaw_min),
-                self.config.jaw_max,
-            )
-
-            if self._jaw_value is None:
-                self._jaw_value = target
-            else:
-                s = self.config.jaw_smoothing
-                self._jaw_value = (1.0 - s) * self._jaw_value + s * target
-
-            now = time.monotonic()
-            if now - self._jaw_last_send >= 1.0 / max(self.config.jaw_fps, 1):
-                self._send_param(self.config.jaw_param, self._jaw_value)
-                self._jaw_last_send = now
-
     def _interrupt_loop(self, interrupt: Channel[InterruptFrame]) -> None:
         for frame in interrupt.stream(self):
             if frame is None:
@@ -496,7 +452,6 @@ class OSCFace(
     def run(
             self,
             text: Channel[TextFrame] | None = None,
-            audio: Channel[AudioFrame] | None = None,
             interrupt: Channel[InterruptFrame] | None = None,
     ) -> None:
         threads: list[threading.Thread] = []
@@ -504,8 +459,6 @@ class OSCFace(
         if text is not None:
             threads.append(threading.Thread(target=self._text_loop, args=(text,)))
             threads.append(threading.Thread(target=self._text_flush_monitor))
-        if audio is not None:
-            threads.append(threading.Thread(target=self._audio_loop, args=(audio,)))
         if interrupt is not None:
             threads.append(threading.Thread(target=self._interrupt_loop, args=(interrupt,)))
 
