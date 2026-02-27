@@ -61,9 +61,14 @@ export interface SlotType {
 
 export function parseSlotType(raw: string): SlotType {
   const optional = /Union\[.*,\s*NoneType\]/.test(raw) || raw.endsWith("| None");
-  const name = raw
+  let name = raw
     .replace(/Union\[(.+),\s*NoneType\]/, "$1")
     .replace(/\s*\|\s*None$/, "")
     .replace(/^(?:Sender|Receiver)\[(.+)\]$/, "$1");
+  // Convert Union[A, B, ...] → A | B | ...
+  const unionMatch = name.match(/^Union\[(.+)\]$/);
+  if (unionMatch) {
+    name = unionMatch[1]!.split(/,\s*/).join(" | ");
+  }
   return { name, optional };
 }

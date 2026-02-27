@@ -13,6 +13,18 @@ export async function fetchComponents(): Promise<ComponentInfo[]> {
   return res.json();
 }
 
+export async function fetchIsType(name: string): Promise<boolean> {
+  const res = await fetch(`/component/is-type?name=${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(`is-type failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchIsSubtype(sub: string, sup: string): Promise<boolean> {
+  const res = await fetch(`/component/is-subtype?sub=${encodeURIComponent(sub)}&sup=${encodeURIComponent(sup)}`);
+  if (!res.ok) throw new Error(`is-subtype failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchNodes(): Promise<
   { id: string; type: string; status: string; x: number; y: number }[]
 > {
