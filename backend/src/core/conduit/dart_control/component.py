@@ -1,0 +1,484 @@
+"""
+DartControl conduit component.
+
+Takes text instructions (e.g. "walk", "sit", "wave") as input and outputs
+BodyPoseFrames with position + quaternion for 13 tracked body parts.
+"""
+
+from __future__ import annotations
+
+import math
+import pickle
+import queue
+import threading
+from typing import NamedTuple
+
+import torch
+from . import rotation_conversions as transforms
+from pydantic import BaseModel
+
+from src.core.component import Component
+from src.core.channel import Sender
+from src.core.frames import BodyPoseFrame, BonePose
+
+from .inference import DartControlInference
+from .smpl_utils import PrimitiveUtility
+
+
+# ── SMPL feature layout (276 dims) ─────────────────────────────────────────
+# transl:                  0:3     (3)
+# poses_6d:                3:135   (22 joints × 6)
+# transl_delta:            135:138 (3)
+# global_orient_delta_6d:  138:144 (6)
+# joints:                  144:210 (22 joints × 3)
+# joints_delta:            210:276 (66)
+
+_JOINTS_OFFSET = 144
+_POSES_6D_OFFSET = 3
+_N_JOINTS = 22
+
+# SMPL joint index → OpenVR body part name
+_SMPL_TO_OPENVR: dict[int, str] = {
+    15: "head",
+    20: "left_hand",
+    21: "right_hand",
+    0: "waist",
+    9: "chest",
+    10: "left_foot",
+    11: "right_foot",
+    4: "left_knee",
+    5: "right_knee",
+    18: "left_elbow",
+    19: "right_elbow",
+    16: "left_shoulder",
+    17: "right_shoulder",
+}
+
+
+def _rot6d_to_quaternion(rot6d: torch.Tensor) -> tuple[float, float, float, float]:
+    """Convert a 6D continuous rotation to quaternion (w, x, y, z).
+
+    The 6D representation is the first two columns of the rotation matrix.
+    Uses Gram-Schmidt to reconstruct the full rotation matrix, then converts.
+    """
+    a1 = rot6d[:3]
+    a2 = rot6d[3:6]
+
+    # Gram-Schmidt: orthonormalize
+    e1 = a1 / (a1.norm() + 1e-8)
+    e2 = a2 - (a2 @ e1) * e1
+    e2 = e2 / (e2.norm() + 1e-8)
+    e3 = torch.linalg.cross(e1, e2)
+
+    # Rotation matrix columns → rows of 3×3
+    m00, m01, m02 = e1[0].item(), e2[0].item(), e3[0].item()
+    m10, m11, m12 = e1[1].item(), e2[1].item(), e3[1].item()
+    m20, m21, m22 = e1[2].item(), e2[2].item(), e3[2].item()
+
+    # Rotation matrix to quaternion (Shepperd's method)
+    tr = m00 + m11 + m22
+    if tr > 0:
+        s = 0.5 / math.sqrt(tr + 1.0)
+        w = 0.25 / s
+        x = (m21 - m12) * s
+        y = (m02 - m20) * s
+        z = (m10 - m01) * s
+    elif m00 > m11 and m00 > m22:
+        s = 2.0 * math.sqrt(1.0 + m00 - m11 - m22)
+        w = (m21 - m12) / s
+        x = 0.25 * s
+        y = (m01 + m10) / s
+        z = (m02 + m20) / s
+    elif m11 > m22:
+        s = 2.0 * math.sqrt(1.0 + m11 - m00 - m22)
+        w = (m02 - m20) / s
+        x = (m01 + m10) / s
+        y = 0.25 * s
+        z = (m12 + m21) / s
+    else:
+        s = 2.0 * math.sqrt(1.0 + m22 - m00 - m11)
+        w = (m10 - m01) / s
+        x = (m02 + m20) / s
+        y = (m12 + m21) / s
+        z = 0.25 * s
+
+    return (w, x, y, z)
+
+
+def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]:
+    """Convert a single frame of 276 SMPL features to a dict of BonePoses.
+
+    Args:
+        features: [276] tensor — one frame of denormalized motion features.
+
+    Returns:
+        Dict mapping OpenVR body part names to BonePose.
+    """
+    joints = features[_JOINTS_OFFSET : _JOINTS_OFFSET + _N_JOINTS * 3].reshape(
+        _N_JOINTS, 3
+    )
+    poses_6d = features[_POSES_6D_OFFSET : _POSES_6D_OFFSET + _N_JOINTS * 6].reshape(
+        _N_JOINTS, 6
+    )
+
+    poses: dict[str, BonePose | None] = {}
+    for joint_idx, part_name in _SMPL_TO_OPENVR.items():
+        pos = joints[joint_idx]
+        qw, qx, qy, qz = _rot6d_to_quaternion(poses_6d[joint_idx])
+        poses[part_name] = BonePose(
+            pos_x=pos[0].item(),
+            pos_y=pos[1].item(),
+            pos_z=pos[2].item(),
+            rot_w=qw,
+            rot_x=qx,
+            rot_y=qy,
+            rot_z=qz,
+        )
+    return poses
+
+
+class DartControlConfig(BaseModel):
+    denoiser_checkpoint: str = "assets/dart_control/mld/checkpoint_300000.pt"
+    """Path to the denoiser .pt checkpoint file."""
+
+    vae_checkpoint: str = "assets/dart_control/mvae/checkpoint_200000.pt"
+    """Path to the VAE .pt checkpoint file."""
+
+    mean_std_path: str = "assets/dart_control/mean_std_h2_f8.pkl"
+    """Path to the normalization statistics pickle file."""
+
+    stand_path: str = "assets/dart_control/stand.pkl"
+    """Path to the standing pose pickle file for history initialization."""
+
+    device: str = "cuda"
+    """Device for inference (cuda or cpu)."""
+
+    respacing: str = ""
+    """DDIM respacing (e.g. 'ddim10'). Empty string for full diffusion sampling."""
+
+    clip_version: str = "ViT-B/32"
+    """OpenAI CLIP model version for text encoding."""
+
+    guidance_scale: float = 5.0
+    """Classifier-free guidance strength."""
+
+    future_length: int = 8
+    """Number of motion frames generated per primitive step."""
+
+    batch_size: int = 1
+    """Batch size for motion generation."""
+
+    gender: str = "male"
+    """SMPL body gender."""
+
+    fps: float = 30.0
+    """Framerate for emitting body pose frames."""
+
+
+class DartControlOutputs(NamedTuple):
+    motion: Sender[BodyPoseFrame]
+
+
+class DartControl(Component[tuple[()], DartControlOutputs]):
+    """
+    DartControl motion generation conduit.
+
+    Generates body poses from text instructions and emits BodyPoseFrames
+    on the output channel. Uses DART's canonicalization pipeline for
+    smooth, continuous motion generation.
+    """
+
+    def __init__(self, config: DartControlConfig) -> None:
+        super().__init__()
+        self.config = config
+        self._engine: DartControlInference | None = None
+        self._primitive_util: PrimitiveUtility | None = None
+
+        # Autoregressive state (set by _init_from_stand before use)
+        self._history: torch.Tensor = torch.empty(0)
+        self._transf_rotmat: torch.Tensor = torch.empty(0)
+        self._transf_transl: torch.Tensor = torch.empty(0)
+        self._pelvis_delta: torch.Tensor = torch.empty(0)
+        self._betas: torch.Tensor = torch.empty(0)
+
+    def _ensure_engine(self) -> DartControlInference:
+        """Lazy-load the inference engine on first use."""
+        if self._engine is None:
+            self._engine = DartControlInference(
+                denoiser_checkpoint=self.config.denoiser_checkpoint,
+                vae_checkpoint=self.config.vae_checkpoint,
+                mean_std_path=self.config.mean_std_path,
+                device=self.config.device,
+                respacing=self.config.respacing,
+                clip_version=self.config.clip_version,
+            )
+        return self._engine
+
+    def _ensure_primitive_util(self) -> PrimitiveUtility:
+        """Lazy-load the PrimitiveUtility (SMPL body model)."""
+        if self._primitive_util is None:
+            self._primitive_util = PrimitiveUtility(device=self.config.device)
+        return self._primitive_util
+
+    def _init_from_stand(
+        self, engine: DartControlInference, putil: PrimitiveUtility
+    ) -> None:
+        """Initialize history from stand.pkl using DART's canonicalization pipeline."""
+        device = self.config.device
+        B = self.config.batch_size
+        h_len = engine.history_shape[0]  # typically 2
+        gender = self.config.gender
+
+        # Load stand.pkl
+        with open(self.config.stand_path, "rb") as f:
+            stand_data = pickle.load(f)
+
+        # Build primitive dict from stand.pkl (matching DART's get_primitive)
+        seq_len = h_len + 1  # need h_len+1 frames to compute h_len delta features
+        transl = torch.tensor(
+            stand_data["transl"][:seq_len], dtype=torch.float32
+        )  # [T, 3]
+        global_orient = torch.tensor(
+            stand_data["global_orient"][:seq_len], dtype=torch.float32
+        )  # [T, 3]
+        body_pose = torch.tensor(
+            stand_data["body_pose"][:seq_len], dtype=torch.float32
+        )  # [T, 63]
+
+        # Pad if stand.pkl has fewer frames than needed
+        if transl.shape[0] < seq_len:
+            pad = seq_len - transl.shape[0]
+            transl = torch.cat([transl, transl[-1:].expand(pad, -1)], dim=0)
+            global_orient = torch.cat(
+                [global_orient, global_orient[-1:].expand(pad, -1)], dim=0
+            )
+            body_pose = torch.cat([body_pose, body_pose[-1:].expand(pad, -1)], dim=0)
+
+        # Convert axis-angle to rotation matrices
+        global_orient_mat = transforms.axis_angle_to_matrix(global_orient)  # [T, 3, 3]
+        body_pose_mat = transforms.axis_angle_to_matrix(
+            body_pose.reshape(-1, 3)
+        ).reshape(seq_len, 21, 3, 3)  # [T, 21, 3, 3]
+
+        betas = torch.zeros(10, dtype=torch.float32)  # enforce zero betas like DART
+
+        primitive_dict = {
+            "gender": gender,
+            "betas": betas.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(B, seq_len, 10)
+            .to(device),  # [B, T, 10]
+            "transl": transl.unsqueeze(0).expand(B, -1, -1).to(device),  # [B, T, 3]
+            "global_orient": global_orient_mat.unsqueeze(0)
+            .expand(B, -1, -1, -1)
+            .to(device),  # [B, T, 3, 3]
+            "body_pose": body_pose_mat.unsqueeze(0)
+            .expand(B, -1, -1, -1, -1)
+            .to(device),  # [B, T, 21, 3, 3]
+            "transf_rotmat": torch.eye(3, device=device)
+            .unsqueeze(0)
+            .expand(B, -1, -1)
+            .clone(),  # [B, 3, 3]
+            "transf_transl": torch.zeros(B, 1, 3, device=device),  # [B, 1, 3]
+        }
+
+        # Compute pelvis offset (cached for all future steps)
+        self._pelvis_delta = putil.calc_calibrate_offset(
+            {
+                "gender": gender,
+                "betas": betas.unsqueeze(0).expand(B, -1).to(device),
+            }
+        )  # [B, 3]
+        primitive_dict["pelvis_delta"] = self._pelvis_delta
+
+        # Canonicalize
+        _, _, primitive_dict = putil.canonicalize(primitive_dict)
+
+        # Compute features via SMPL forward kinematics
+        feature_dict = putil.calc_features(primitive_dict)
+
+        # Convert to tensor [B, T, 276] — note: calc_features produces T-1 frames for delta fields
+        # We need to pad delta features to match T frames
+        # The last frame's delta is just repeated from the second-to-last
+        feature_dict["transl_delta"] = torch.cat(
+            [
+                feature_dict["transl_delta"],
+                feature_dict["transl_delta"][:, -1:, :],
+            ],
+            dim=1,
+        )
+        feature_dict["joints_delta"] = torch.cat(
+            [
+                feature_dict["joints_delta"],
+                feature_dict["joints_delta"][:, -1:, :],
+            ],
+            dim=1,
+        )
+        feature_dict["global_orient_delta_6d"] = torch.cat(
+            [
+                feature_dict["global_orient_delta_6d"],
+                feature_dict["global_orient_delta_6d"][:, -1:, :],
+            ],
+            dim=1,
+        )
+
+        history_tensor = putil.dict_to_tensor(feature_dict)  # [B, T, 276]
+        # Take last h_len frames
+        history_tensor = history_tensor[:, -h_len:, :]  # [B, H, 276]
+
+        # Normalize
+        self._history = engine.normalize(history_tensor)
+        self._transf_rotmat = primitive_dict["transf_rotmat"]
+        self._transf_transl = primitive_dict["transf_transl"]
+        self._betas = betas.unsqueeze(0).expand(B, -1).to(device)
+
+        print(
+            f"[DartControl] History initialized from stand.pkl (shape={self._history.shape})"
+        )
+
+    def _update_history(
+        self,
+        engine: DartControlInference,
+        putil: PrimitiveUtility,
+        history_normalized: torch.Tensor,
+        future_normalized: torch.Tensor,
+    ) -> None:
+        """Update history using DART's canonicalization pipeline.
+
+        1. Denormalize [history + future]
+        2. Take last history_len frames
+        3. Convert to feature dict, attach metadata
+        4. get_blended_feature (canonicalize + SMPL FK + recompute deltas)
+        5. dict_to_tensor → normalize → store as new history
+        6. Update transf_rotmat/transf_transl accumulators
+        """
+        h_len = engine.history_shape[0]
+        combined = torch.cat(
+            [history_normalized, future_normalized], dim=1
+        )  # [B, H+F, 276]
+        combined_denorm = engine.denormalize(combined)  # [B, H+F, 276]
+        raw_history = combined_denorm[:, -h_len:, :]  # [B, H, 276]
+
+        # Convert to feature dict
+        feature_dict = putil.tensor_to_dict(raw_history)
+
+        # Attach metadata needed by get_blended_feature
+        feature_dict["gender"] = self.config.gender
+        feature_dict["betas"] = self._betas.unsqueeze(1).expand(
+            -1, h_len, -1
+        )  # [B, H, 10]
+        feature_dict["transf_rotmat"] = self._transf_rotmat  # [B, 3, 3]
+        feature_dict["transf_transl"] = self._transf_transl  # [B, 1, 3]
+        feature_dict["pelvis_delta"] = self._pelvis_delta  # [B, 3]
+
+        # Canonicalize + recompute features
+        _, new_feature_dict = putil.get_blended_feature(
+            feature_dict, use_predicted_joints=False
+        )
+
+        # Update accumulators
+        self._transf_rotmat = new_feature_dict["transf_rotmat"]
+        self._transf_transl = new_feature_dict["transf_transl"]
+
+        # Convert back to tensor and normalize
+        new_history = putil.dict_to_tensor(new_feature_dict)  # [B, H, 276]
+        self._history = engine.normalize(new_history)
+
+    def _get_world_features(
+        self,
+        engine: DartControlInference,
+        putil: PrimitiveUtility,
+        future_normalized: torch.Tensor,
+    ) -> torch.Tensor:
+        """Transform future features to world space for visualization.
+
+        Returns: [B, F, 276] denormalized features in world coordinates.
+        """
+        future_denorm = engine.denormalize(future_normalized)  # [B, F, 276]
+        F = future_denorm.shape[1]
+
+        feature_dict = putil.tensor_to_dict(future_denorm)
+        feature_dict["gender"] = self.config.gender
+        feature_dict["betas"] = self._betas.unsqueeze(1).expand(-1, F, -1)
+        feature_dict["transf_rotmat"] = self._transf_rotmat
+        feature_dict["transf_transl"] = self._transf_transl
+        feature_dict["pelvis_delta"] = self._pelvis_delta
+
+        world_dict = putil.transform_feature_to_world(
+            feature_dict, use_predicted_joints=True
+        )
+        world_tensor = putil.dict_to_tensor(world_dict)  # [B, F, 276]
+        return world_tensor.cpu()
+
+    def _generation_loop(
+        self,
+        engine: DartControlInference,
+        putil: PrimitiveUtility,
+        frame_queue: queue.Queue[dict[str, BonePose | None]],
+    ) -> None:
+        """Background thread: generates motion primitives and fills the queue."""
+        instruction = "walk"
+        print(f"[DartControl] Instruction: '{instruction}'")
+
+        text_embedding = engine.encode_text([instruction])  # [1, 512]
+        text_embedding = text_embedding.expand(self.config.batch_size, -1)
+
+        while not self.stop_event.is_set():
+            try:
+                # Generate future frames (normalized)
+                future_normalized = engine.generate_step(
+                    text_embedding=text_embedding,
+                    history_motion=self._history,
+                    guidance_scale=self.config.guidance_scale,
+                    future_length=self.config.future_length,
+                )  # [B, F, 276] normalized
+
+                # Transform to world space for output
+                world_features = self._get_world_features(
+                    engine, putil, future_normalized
+                )  # [B, F, 276]
+
+                # Update history with canonicalization pipeline (before emitting, uses old transf)
+                self._update_history(engine, putil, self._history, future_normalized)
+
+                # Emit world-space frames
+                batch = world_features[0]  # [F, 276]
+                for f in range(batch.shape[0]):
+                    if self.stop_event.is_set():
+                        break
+                    frame_queue.put(_features_to_body_pose(batch[f]))
+
+            except Exception as e:
+                print(f"[DartControl] Generation error: {e}")
+                import traceback
+
+                traceback.print_exc()
+                continue
+
+    def run(self, _inputs: tuple[()], outputs: DartControlOutputs) -> None:
+        print("[DartControl] Starting DartControl component, loading models...")
+        engine = self._ensure_engine()
+        putil = self._ensure_primitive_util()
+        print("[DartControl] Models loaded, initializing from stand pose...")
+
+        # Initialize history from stand.pkl
+        self._init_from_stand(engine, putil)
+        print("[DartControl] Streaming motion")
+
+        frame_queue: queue.Queue[dict[str, BonePose | None]] = queue.Queue(maxsize=64)
+
+        gen_thread = threading.Thread(
+            target=self._generation_loop, args=(engine, putil, frame_queue), daemon=True
+        )
+        gen_thread.start()
+
+        frame_interval = 1.0 / self.config.fps
+        while not self.stop_event.is_set():
+            try:
+                body_poses = frame_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            outputs.motion.send(BodyPoseFrame(poses=body_poses))
+            self.stop_event.wait(frame_interval)
+
+        print("[DartControl] Component stopped")

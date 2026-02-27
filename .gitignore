@@ -1,5 +1,7 @@
 .env
 .idea/
+.claude/
+.DS_Store
 __pycache__/
 *.egg-info/
 saves/
