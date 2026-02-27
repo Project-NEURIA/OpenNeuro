@@ -12,6 +12,7 @@ from src.core.frames import AudioFrame, Frame, TextFrame
 # --- 1. Accepts base Frame, outputs AudioFrame ---
 # Tests: concrete subtyping (AudioFrame ≤ Frame should be valid)
 
+
 class FrameFilterInputs(NamedTuple):
     frames: Receiver[Frame]
 
@@ -32,6 +33,7 @@ class FrameFilter(Component[FrameFilterInputs, FrameFilterOutputs]):
 # --- 2. list[T] constructor types ---
 # Tests: constructor decomposition (list[AudioFrame] ≤ list[Frame])
 
+
 class BatchInputs(NamedTuple):
     items: Receiver[list[AudioFrame]]
 
@@ -50,6 +52,7 @@ class Batcher(Component[BatchInputs, BatchOutputs]):
 
 # --- 3. Union input type (non-optional) ---
 # Tests: union types in slot declarations
+
 
 class MergeInputs(NamedTuple):
     stream: Receiver[AudioFrame | TextFrame]
@@ -74,6 +77,7 @@ class Demux(Component[MergeInputs, MergeOutputs]):
 # --- 4. Outputs a union ---
 # Tests: union on output side
 
+
 class MuxInputs(NamedTuple):
     audio: Receiver[AudioFrame]
     text: Receiver[TextFrame]
@@ -94,6 +98,7 @@ class Mux(Component[MuxInputs, MuxOutputs]):
 # --- 5. Type variable passthrough ---
 # Tests: T stays as a type var, gets unified through edges
 
+
 class PassthroughInputs[T](NamedTuple):
     data: Receiver[T]
 
@@ -112,6 +117,7 @@ class Passthrough[T](Component[PassthroughInputs[T], PassthroughOutputs[T]]):
 
 # --- 6. Type variable in constructor ---
 # Tests: list[T] where T is a type var
+
 
 class BufferInputs[T](NamedTuple):
     data: Receiver[T]

@@ -19,6 +19,7 @@ def _resolve_type(name: str) -> type:
 
 def _type_name(t: type) -> str:
     import types
+
     if isinstance(t, types.UnionType):
         return "Union[" + ", ".join(_type_name(a) for a in t.__args__) + "]"
     origin = getattr(t, "__origin__", None)

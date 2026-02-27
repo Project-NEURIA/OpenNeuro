@@ -89,6 +89,7 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]]
             params = getattr(origin, "__type_params__", ())
             args = get_args(tp)
             sub = dict(zip(params, args))
+
             def _subst(t: type) -> type:
                 if t in sub:
                     return sub[t]
@@ -97,6 +98,7 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]]
                 if t_origin and t_args:
                     return t_origin[tuple(_subst(a) for a in t_args)]
                 return t
+
             return {name: _subst(hints[name]) for name in origin._fields}
         if hasattr(tp, "_fields"):
             hints = get_type_hints(tp)
