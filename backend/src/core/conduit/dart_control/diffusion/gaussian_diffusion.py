@@ -7,12 +7,9 @@ import enum
 import math
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torch as th
 from copy import deepcopy
 
-from .nn import mean_flat, sum_flat
-from .losses import normal_kl, discretized_gaussian_log_likelihood
 
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.0):

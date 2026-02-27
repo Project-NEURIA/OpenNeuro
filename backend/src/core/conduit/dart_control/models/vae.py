@@ -3,12 +3,11 @@ Motion VAE model for DartControl.
 Compresses motion sequences into latent space.
 """
 
-from typing import Any, Union
+from typing import Any
 
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.distributions.distribution import Distribution
 
 from .operators import (
     TransformerEncoderLayer,
@@ -118,9 +117,7 @@ class AutoMldVae(nn.Module):
             latent: [latent_size, B, latent_dim] - Sampled latent
             dist: Normal distribution for KL loss
         """
-        device = future_motion.device
         bs, nfuture, nfeats = future_motion.shape
-        nhistory = history_motion.shape[1]
 
         x = torch.cat((history_motion, future_motion), dim=1)  # [B, H+F, nfeats]
         x = self.skel_embedding(x)

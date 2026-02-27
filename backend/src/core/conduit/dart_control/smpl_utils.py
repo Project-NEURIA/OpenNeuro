@@ -9,8 +9,6 @@ from . import rotation_conversions as transforms
 from copy import deepcopy
 import torch
 import smplx
-from typing import Tuple
-from typing import Union
 from pathlib import Path
 
 # Patched: use local path instead of DART's config_files.data_paths

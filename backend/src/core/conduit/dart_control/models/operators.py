@@ -50,7 +50,7 @@ class PositionEmbeddingSine1D(nn.Module):
 
     def forward(self, x):
         if self.batch_first:
-            pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]
+            _pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]  # noqa: F841
         else:
             pos = self.pe[: x.shape[0], :]
         return pos
@@ -68,7 +68,7 @@ class PositionEmbeddingLearned1D(nn.Module):
 
     def forward(self, x):
         if self.batch_first:
-            pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]
+            _pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]  # noqa: F841
         else:
             x = x + self.pe[: x.shape[0], :]
         return x
