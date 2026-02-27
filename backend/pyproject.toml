@@ -33,7 +33,7 @@ dependencies = [
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*"]
 ignore_missing_imports = true
 
 

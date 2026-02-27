@@ -3,7 +3,7 @@ Motion VAE model for DartControl.
 Compresses motion sequences into latent space.
 """
 
-from typing import Union
+from typing import Any, Union
 
 import torch
 import torch.nn as nn
@@ -40,7 +40,7 @@ class AutoMldVae(nn.Module):
         normalize_before: bool = False,
         activation: str = "gelu",
         position_embedding: str = "learned",
-        **kwargs
+        **kwargs,
     ) -> None:
         super().__init__()
 
@@ -54,8 +54,12 @@ class AutoMldVae(nn.Module):
         self.pe_type = "mld"
 
         # Position encodings
-        self.query_pos_encoder = build_position_encoding(self.h_dim, position_embedding=position_embedding)
-        self.query_pos_decoder = build_position_encoding(self.h_dim, position_embedding=position_embedding)
+        self.query_pos_encoder = build_position_encoding(
+            self.h_dim, position_embedding=position_embedding
+        )
+        self.query_pos_decoder = build_position_encoding(
+            self.h_dim, position_embedding=position_embedding
+        )
 
         # Encoder
         encoder_layer = TransformerEncoderLayer(
@@ -66,35 +70,42 @@ class AutoMldVae(nn.Module):
         self.encoder_latent_proj = nn.Linear(self.h_dim, self.latent_dim)
 
         # Decoder
+        self.decoder: SkipTransformerEncoder | SkipTransformerDecoder
         if self.arch == "all_encoder":
             decoder_norm = nn.LayerNorm(self.h_dim)
-            self.decoder = SkipTransformerEncoder(encoder_layer, num_layers, decoder_norm)
+            self.decoder = SkipTransformerEncoder(
+                encoder_layer, num_layers, decoder_norm
+            )
         elif self.arch == "encoder_decoder":
             decoder_layer = TransformerDecoderLayer(
                 self.h_dim, num_heads, ff_size, dropout, activation, normalize_before
             )
             decoder_norm = nn.LayerNorm(self.h_dim)
-            self.decoder = SkipTransformerDecoder(decoder_layer, num_layers, decoder_norm)
+            self.decoder = SkipTransformerDecoder(
+                decoder_layer, num_layers, decoder_norm
+            )
         else:
             raise ValueError("Not support architecture!")
 
         self.decoder_latent_proj = nn.Linear(self.latent_dim, self.h_dim)
 
         # Embeddings
-        self.global_motion_token = nn.Parameter(torch.randn(self.latent_size * 2, self.h_dim))
+        self.global_motion_token = nn.Parameter(
+            torch.randn(self.latent_size * 2, self.h_dim)
+        )
         self.skel_embedding = nn.Linear(input_feats, self.h_dim)
         self.final_layer = nn.Linear(self.h_dim, output_feats)
 
         # Normalization buffers
-        self.register_buffer('latent_mean', torch.tensor(0))
-        self.register_buffer('latent_std', torch.tensor(1))
+        self.register_buffer("latent_mean", torch.tensor(0))
+        self.register_buffer("latent_std", torch.tensor(1))
 
     def encode(
         self,
         future_motion: Tensor,
         history_motion: Tensor,
         scale_latent: bool = False,
-    ) -> Union[Tensor, Distribution]:
+    ) -> tuple[Tensor, Any]:
         """
         Encode motion into latent space.
 
@@ -120,23 +131,23 @@ class AutoMldVae(nn.Module):
         xseq = torch.cat((dist, x), 0)
 
         xseq = self.query_pos_encoder(xseq)
-        dist = self.encoder(xseq)[:dist.shape[0]]  # [2*latent_size, B, h_dim]
+        dist = self.encoder(xseq)[: dist.shape[0]]  # [2*latent_size, B, h_dim]
         dist = self.encoder_latent_proj(dist)  # [2*latent_size, B, latent_dim]
 
         # Split into mean and logvar
-        mu = dist[0:self.latent_size, ...]
-        logvar = dist[self.latent_size:, ...]
+        mu = dist[0 : self.latent_size, ...]
+        logvar = dist[self.latent_size :, ...]
         logvar = torch.clamp(logvar, min=-10, max=10)
 
         # Reparameterization
         std = logvar.exp().pow(0.5)
-        dist = torch.distributions.Normal(mu, std)
-        latent = dist.rsample()
+        normal = torch.distributions.Normal(mu, std)
+        latent = normal.rsample()
 
         if scale_latent:
-            latent = latent / self.latent_std
+            latent = latent / self.latent_std  # type: ignore[operator]
 
-        return latent, dist
+        return latent, normal
 
     def decode(
         self,
@@ -160,11 +171,13 @@ class AutoMldVae(nn.Module):
         bs = history_motion.shape[0]
 
         if scale_latent:
-            z = z * self.latent_std
+            z = z * self.latent_std  # type: ignore[operator]
 
         z = self.decoder_latent_proj(z)  # [latent_size, B, h_dim]
         queries = torch.zeros(nfuture, bs, self.h_dim, device=z.device)
-        history_embedding = self.skel_embedding(history_motion).permute(1, 0, 2)  # [H, B, h_dim]
+        history_embedding = self.skel_embedding(history_motion).permute(
+            1, 0, 2
+        )  # [H, B, h_dim]
 
         if self.arch == "all_encoder":
             xseq = torch.cat((z, history_embedding, queries), dim=0)

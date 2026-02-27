@@ -12,6 +12,7 @@ from src.core.utils import obj_id
 
 class BonePose(NamedTuple):
     """Position (meters) + quaternion rotation (w,x,y,z) for a single bone."""
+
     pos_x: float = 0.0
     pos_y: float = 0.0
     pos_z: float = 0.0
@@ -221,9 +222,19 @@ class MessagesFrame(Frame):
 
 # Body tracking point names matching OpenVR full-body tracking
 BODY_PARTS = (
-    "head", "left_hand", "right_hand", "waist", "chest",
-    "left_foot", "right_foot", "left_knee", "right_knee",
-    "left_elbow", "right_elbow", "left_shoulder", "right_shoulder",
+    "head",
+    "left_hand",
+    "right_hand",
+    "waist",
+    "chest",
+    "left_foot",
+    "right_foot",
+    "left_knee",
+    "right_knee",
+    "left_elbow",
+    "right_elbow",
+    "left_shoulder",
+    "right_shoulder",
 )
 
 

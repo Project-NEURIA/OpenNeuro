@@ -39,18 +39,20 @@ class PositionEmbeddingSine1D(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model)
+        )
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
 
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
         if self.batch_first:
-            pos = self.pe.permute(1, 0, 2)[:, :x.shape[1], :]
+            pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]
         else:
-            pos = self.pe[:x.shape[0], :]
+            pos = self.pe[: x.shape[0], :]
         return pos
 
 
@@ -66,17 +68,17 @@ class PositionEmbeddingLearned1D(nn.Module):
 
     def forward(self, x):
         if self.batch_first:
-            pos = self.pe.permute(1, 0, 2)[:, :x.shape[1], :]
+            pos = self.pe.permute(1, 0, 2)[:, : x.shape[1], :]
         else:
-            x = x + self.pe[:x.shape[0], :]
+            x = x + self.pe[: x.shape[0], :]
         return x
 
 
 def build_position_encoding(N_steps, position_embedding="sine", embedding_dim="1D"):
     if embedding_dim == "1D":
-        if position_embedding in ('v2', 'sine'):
+        if position_embedding in ("v2", "sine"):
             return PositionEmbeddingSine1D(N_steps)
-        elif position_embedding in ('v3', 'learned'):
+        elif position_embedding in ("v3", "learned"):
             return PositionEmbeddingLearned1D(N_steps)
         else:
             raise ValueError(f"not supported {position_embedding}")
@@ -92,22 +94,31 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model)
+        )
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
 
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
-        x = x + self.pe[:x.shape[0], :]
+        x = x + self.pe[: x.shape[0], :]
         return self.dropout(x)
 
 
 # Transformer Encoder Layer
 class TransformerEncoderLayer(nn.Module):
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        dim_feedforward=2048,
+        dropout=0.1,
+        activation="relu",
+        normalize_before=False,
+    ):
         super().__init__()
         self.d_model = d_model
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -128,8 +139,9 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward_post(self, src, src_mask=None, src_key_padding_mask=None, pos=None):
         q = k = self.with_pos_embed(src, pos)
-        src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
+        src2 = self.self_attn(
+            q, k, value=src, attn_mask=src_mask, key_padding_mask=src_key_padding_mask
+        )[0]
         src = src + self.dropout1(src2)
         src = self.norm1(src)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
@@ -140,8 +152,9 @@ class TransformerEncoderLayer(nn.Module):
     def forward_pre(self, src, src_mask=None, src_key_padding_mask=None, pos=None):
         src2 = self.norm1(src)
         q = k = self.with_pos_embed(src2, pos)
-        src2 = self.self_attn(q, k, value=src2, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
+        src2 = self.self_attn(
+            q, k, value=src2, attn_mask=src_mask, key_padding_mask=src_key_padding_mask
+        )[0]
         src = src + self.dropout1(src2)
         src2 = self.norm2(src)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src2))))
@@ -156,8 +169,15 @@ class TransformerEncoderLayer(nn.Module):
 
 # Transformer Decoder Layer
 class TransformerDecoderLayer(nn.Module):
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", normalize_before=False):
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        dim_feedforward=2048,
+        dropout=0.1,
+        activation="relu",
+        normalize_before=False,
+    ):
         super().__init__()
         self.d_model = d_model
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -179,18 +199,30 @@ class TransformerDecoderLayer(nn.Module):
     def with_pos_embed(self, tensor, pos: Optional[Tensor]):
         return tensor if pos is None else tensor + pos
 
-    def forward_post(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                     tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                     pos=None, query_pos=None):
+    def forward_post(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        tgt_key_padding_mask=None,
+        memory_key_padding_mask=None,
+        pos=None,
+        query_pos=None,
+    ):
         q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
-                              key_padding_mask=tgt_key_padding_mask)[0]
+        tgt2 = self.self_attn(
+            q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
+        )[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
-        tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt, query_pos),
-                                   key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
-                                   key_padding_mask=memory_key_padding_mask)[0]
+        tgt2 = self.multihead_attn(
+            query=self.with_pos_embed(tgt, query_pos),
+            key=self.with_pos_embed(memory, pos),
+            value=memory,
+            attn_mask=memory_mask,
+            key_padding_mask=memory_key_padding_mask,
+        )[0]
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt))))
@@ -198,33 +230,69 @@ class TransformerDecoderLayer(nn.Module):
         tgt = self.norm3(tgt)
         return tgt
 
-    def forward_pre(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                    tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                    pos=None, query_pos=None):
+    def forward_pre(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        tgt_key_padding_mask=None,
+        memory_key_padding_mask=None,
+        pos=None,
+        query_pos=None,
+    ):
         tgt2 = self.norm1(tgt)
         q = k = self.with_pos_embed(tgt2, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask,
-                              key_padding_mask=tgt_key_padding_mask)[0]
+        tgt2 = self.self_attn(
+            q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
+        )[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.norm2(tgt)
-        tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
-                                   key=self.with_pos_embed(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
-                                   key_padding_mask=memory_key_padding_mask)[0]
+        tgt2 = self.multihead_attn(
+            query=self.with_pos_embed(tgt2, query_pos),
+            key=self.with_pos_embed(memory, pos),
+            value=memory,
+            attn_mask=memory_mask,
+            key_padding_mask=memory_key_padding_mask,
+        )[0]
         tgt = tgt + self.dropout2(tgt2)
         tgt2 = self.norm3(tgt)
         tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
         tgt = tgt + self.dropout3(tgt2)
         return tgt
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                pos=None, query_pos=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        tgt_key_padding_mask=None,
+        memory_key_padding_mask=None,
+        pos=None,
+        query_pos=None,
+    ):
         if self.normalize_before:
-            return self.forward_pre(tgt, memory, tgt_mask, memory_mask,
-                                    tgt_key_padding_mask, memory_key_padding_mask, pos, query_pos)
-        return self.forward_post(tgt, memory, tgt_mask, memory_mask,
-                                 tgt_key_padding_mask, memory_key_padding_mask, pos, query_pos)
+            return self.forward_pre(
+                tgt,
+                memory,
+                tgt_mask,
+                memory_mask,
+                tgt_key_padding_mask,
+                memory_key_padding_mask,
+                pos,
+                query_pos,
+            )
+        return self.forward_post(
+            tgt,
+            memory,
+            tgt_mask,
+            memory_mask,
+            tgt_key_padding_mask,
+            memory_key_padding_mask,
+            pos,
+            query_pos,
+        )
 
 
 # Skip Transformer Encoder (U-Net style)
@@ -241,7 +309,9 @@ class SkipTransformerEncoder(nn.Module):
         self.input_blocks = _get_clones(encoder_layer, num_block)
         self.middle_block = _get_clone(encoder_layer)
         self.output_blocks = _get_clones(encoder_layer, num_block)
-        self.linear_blocks = _get_clones(nn.Linear(2 * self.d_model, self.d_model), num_block)
+        self.linear_blocks = _get_clones(
+            nn.Linear(2 * self.d_model, self.d_model), num_block
+        )
 
         self._reset_parameters()
 
@@ -255,15 +325,21 @@ class SkipTransformerEncoder(nn.Module):
         xs = []
 
         for module in self.input_blocks:
-            x = module(x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos)
+            x = module(
+                x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos
+            )
             xs.append(x)
 
-        x = self.middle_block(x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos)
+        x = self.middle_block(
+            x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos
+        )
 
         for module, linear in zip(self.output_blocks, self.linear_blocks):
             x = torch.cat([x, xs.pop()], dim=-1)
             x = linear(x)
-            x = module(x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos)
+            x = module(
+                x, src_mask=mask, src_key_padding_mask=src_key_padding_mask, pos=pos
+            )
 
         if self.norm is not None:
             x = self.norm(x)
@@ -284,7 +360,9 @@ class SkipTransformerDecoder(nn.Module):
         self.input_blocks = _get_clones(decoder_layer, num_block)
         self.middle_block = _get_clone(decoder_layer)
         self.output_blocks = _get_clones(decoder_layer, num_block)
-        self.linear_blocks = _get_clones(nn.Linear(2 * self.d_model, self.d_model), num_block)
+        self.linear_blocks = _get_clones(
+            nn.Linear(2 * self.d_model, self.d_model), num_block
+        )
 
         self._reset_parameters()
 
@@ -293,31 +371,57 @@ class SkipTransformerDecoder(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                pos=None, query_pos=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        tgt_key_padding_mask=None,
+        memory_key_padding_mask=None,
+        pos=None,
+        query_pos=None,
+    ):
         x = tgt
         xs = []
 
         for module in self.input_blocks:
-            x = module(x, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
-                       tgt_key_padding_mask=tgt_key_padding_mask,
-                       memory_key_padding_mask=memory_key_padding_mask,
-                       pos=pos, query_pos=query_pos)
+            x = module(
+                x,
+                memory,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                memory_key_padding_mask=memory_key_padding_mask,
+                pos=pos,
+                query_pos=query_pos,
+            )
             xs.append(x)
 
-        x = self.middle_block(x, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
-                              tgt_key_padding_mask=tgt_key_padding_mask,
-                              memory_key_padding_mask=memory_key_padding_mask,
-                              pos=pos, query_pos=query_pos)
+        x = self.middle_block(
+            x,
+            memory,
+            tgt_mask=tgt_mask,
+            memory_mask=memory_mask,
+            tgt_key_padding_mask=tgt_key_padding_mask,
+            memory_key_padding_mask=memory_key_padding_mask,
+            pos=pos,
+            query_pos=query_pos,
+        )
 
         for module, linear in zip(self.output_blocks, self.linear_blocks):
             x = torch.cat([x, xs.pop()], dim=-1)
             x = linear(x)
-            x = module(x, memory, tgt_mask=tgt_mask, memory_mask=memory_mask,
-                       tgt_key_padding_mask=tgt_key_padding_mask,
-                       memory_key_padding_mask=memory_key_padding_mask,
-                       pos=pos, query_pos=query_pos)
+            x = module(
+                x,
+                memory,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                memory_key_padding_mask=memory_key_padding_mask,
+                pos=pos,
+                query_pos=query_pos,
+            )
 
         if self.norm is not None:
             x = self.norm(x)
@@ -325,8 +429,14 @@ class SkipTransformerDecoder(nn.Module):
 
 
 # Timestep embeddings
-def get_timestep_embedding(timesteps, embedding_dim, flip_sin_to_cos=False,
-                           downscale_freq_shift=1, scale=1, max_period=10000):
+def get_timestep_embedding(
+    timesteps,
+    embedding_dim,
+    flip_sin_to_cos=False,
+    downscale_freq_shift=1,
+    scale=1,
+    max_period=10000,
+):
     """Create sinusoidal timestep embeddings."""
     assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
 
@@ -373,7 +483,8 @@ class Timesteps(nn.Module):
 
     def forward(self, timesteps):
         return get_timestep_embedding(
-            timesteps, self.num_channels,
+            timesteps,
+            self.num_channels,
             flip_sin_to_cos=self.flip_sin_to_cos,
             downscale_freq_shift=self.downscale_freq_shift,
         )

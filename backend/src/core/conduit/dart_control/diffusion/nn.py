@@ -125,22 +125,24 @@ class CheckpointFunction(th.autograd.Function):
                 if i < ctx.input_length:
                     args[i] = args[i].detach().requires_grad_()
                     args[i] = args[i].view_as(args[i])
-            output_tensors = ctx.run_function(*args[:ctx.input_length])
+            output_tensors = ctx.run_function(*args[: ctx.input_length])
 
         if isinstance(output_tensors, th.Tensor):
             output_tensors = [output_tensors]
 
-        out_and_grads = [(o, g) for (o, g) in zip(output_tensors, output_grads) if o.requires_grad]
+        out_and_grads = [
+            (o, g) for (o, g) in zip(output_tensors, output_grads) if o.requires_grad
+        ]
         if not out_and_grads:
             return (None, None) + tuple(None for _ in args)
 
         computed_grads = th.autograd.grad(
             [o for (o, g) in out_and_grads],
             [args[i] for i in input_indices],
-            [g for (o, g) in out_and_grads]
+            [g for (o, g) in out_and_grads],
         )
 
         input_grads = [None for _ in args]
-        for (i, g) in zip(input_indices, computed_grads):
+        for i, g in zip(input_indices, computed_grads):
             input_grads[i] = g
         return (None, None) + tuple(input_grads)
