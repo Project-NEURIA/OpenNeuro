@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "clip @ git+https://github.com/openai/CLIP.git",
     "fastapi>=0.115.0",
     "litellm>=1.81.8",
     "mypy>=1.19.1",
@@ -14,7 +15,8 @@ dependencies = [
     "opencv-python-headless>=4.13.0.92",
     "openvr-virtual-driver-client>=0.0.8",
     "pillow>=12.1.1",
-"python-dotenv>=1.2.1",
+    "python-dotenv>=1.2.1",
+    "smplx",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
     "torch>=2.6.0",
@@ -31,7 +33,7 @@ dependencies = [
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx"]
 ignore_missing_imports = true
 
 

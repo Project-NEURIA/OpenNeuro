@@ -11,10 +11,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+import clip
 import torch
 import yaml
 import tyro
-from transformers import CLIPTokenizer, CLIPTextModel
 
 from .models.denoiser import DenoiserMLP, DenoiserTransformer, ClassifierFreeWrapper
 from .models.vae import AutoMldVae
@@ -140,13 +140,6 @@ class MVAEArgs:
 # ── Inference engine ────────────────────────────────────────────────────────
 
 
-@dataclass
-class MotionPrimitive:
-    """A single generated motion primitive (8 frames by default)."""
-    features: torch.Tensor  # [B, F, nfeats]
-    history: torch.Tensor   # [B, H, nfeats] - history used for next step
-
-
 def _load_tyro_yaml(path: Path, cls: type):
     """Load a tyro-formatted YAML config file into the given dataclass type."""
     with open(path, "r") as f:
@@ -191,7 +184,7 @@ class DartControlInference:
         mean_std_path: str = "assets/dart_control/mean_std_h2_f8.pkl",
         device: str = "cuda",
         respacing: str = "",
-        clip_model_name: str = "openai/clip-vit-base-patch32",
+        clip_version: str = "ViT-B/32",
     ):
         self.device = device
         self.respacing = respacing
@@ -204,13 +197,14 @@ class DartControlInference:
         self._mean = mean.to(device)  # [1, 1, 276]
         self._std = std.to(device)    # [1, 1, 276]
 
-        # Load CLIP for text encoding
+        # Load CLIP for text encoding (OpenAI's clip package, matching DART)
         print("[DartControl] Loading CLIP text encoder...")
-        self._clip_tokenizer = CLIPTokenizer.from_pretrained(clip_model_name)
-        self._clip_model = CLIPTextModel.from_pretrained(clip_model_name).to(device)
-        self._clip_model.eval()
-        for p in self._clip_model.parameters():
+        clip_model, _ = clip.load(clip_version, device=device, jit=False)
+        clip.model.convert_weights(clip_model)
+        clip_model.eval()
+        for p in clip_model.parameters():
             p.requires_grad = False
+        self._clip_model = clip_model
 
         # Load denoiser + VAE configs and models
         print("[DartControl] Loading denoiser and VAE checkpoints...")
@@ -231,6 +225,10 @@ class DartControlInference:
         self.rescale_latent = bool(denoiser_args.rescale_latent)
 
         print(f"[DartControl] Ready. noise_shape={self.noise_shape}, history_shape={self.history_shape}")
+
+    def normalize(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Normalize features from real-world space to model space."""
+        return (tensor - self._mean) / self._std
 
     def denormalize(self, tensor: torch.Tensor) -> torch.Tensor:
         """Denormalize features from model space to real-world space."""
@@ -303,7 +301,7 @@ class DartControlInference:
 
     def encode_text(self, texts: list[str]) -> torch.Tensor:
         """
-        Encode text instructions into CLIP embeddings.
+        Encode text instructions into CLIP embeddings using OpenAI's clip package.
 
         Args:
             texts: List of instruction strings (e.g. ["walk", "sit", "wave"])
@@ -311,12 +309,9 @@ class DartControlInference:
         Returns:
             embeddings: [len(texts), 512] float32 tensor
         """
-        tokens = self._clip_tokenizer(
-            texts, padding=True, truncation=True, max_length=77, return_tensors="pt"
-        ).to(self.device)
+        tokens = clip.tokenize(texts, truncate=True).to(self.device)
         with torch.no_grad():
-            outputs = self._clip_model(**tokens)
-            embeddings = outputs.pooler_output.float()
+            embeddings = self._clip_model.encode_text(tokens).float()
         # Zero out empty strings (matches original DART behavior)
         for i, t in enumerate(texts):
             if t == "":
@@ -330,7 +325,7 @@ class DartControlInference:
         history_motion: torch.Tensor,
         guidance_scale: float = 5.0,
         future_length: int = 8,
-    ) -> MotionPrimitive:
+    ) -> torch.Tensor:
         """
         Generate one motion primitive (one autoregressive step).
 
@@ -341,7 +336,7 @@ class DartControlInference:
             future_length: Frames to generate per step
 
         Returns:
-            MotionPrimitive with generated frames and updated history
+            future_motion: [B, F, nfeats] normalized future features
         """
         batch_size = text_embedding.shape[0]
         guidance = torch.ones(batch_size, *self.noise_shape, device=self.device) * guidance_scale
@@ -371,9 +366,4 @@ class DartControlInference:
             latent, history_motion, nfuture=future_length, scale_latent=self.rescale_latent
         )  # [B, F, nfeats]
 
-        # Build next history from the tail of [history + future]
-        history_len = self.history_shape[0]
-        combined = torch.cat([history_motion, future_motion], dim=1)
-        next_history = combined[:, -history_len:, :]
-
-        return MotionPrimitive(features=future_motion, history=next_history)
+        return future_motion
