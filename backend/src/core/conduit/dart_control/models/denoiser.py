@@ -31,18 +31,18 @@ class TimestepEmbedder(nn.Module):
 class MLP(nn.Module):
     """Simple MLP with configurable activation."""
 
-    def __init__(self, in_dim, h_dims=(128, 128), activation='tanh'):
+    def __init__(self, in_dim, h_dims=(128, 128), activation="tanh"):
         super().__init__()
 
-        if activation == 'tanh':
+        if activation == "tanh":
             self.activation = torch.tanh
-        elif activation == 'relu':
+        elif activation == "relu":
             self.activation = torch.relu
-        elif activation == 'sigmoid':
+        elif activation == "sigmoid":
             self.activation = torch.sigmoid
-        elif activation == 'gelu':
+        elif activation == "gelu":
             self.activation = nn.GELU()
-        elif activation == 'lrelu':
+        elif activation == "lrelu":
             self.activation = nn.LeakyReLU()
         else:
             self.activation = torch.tanh
@@ -63,13 +63,15 @@ class MLP(nn.Module):
 class MLPBlock(nn.Module):
     """Residual MLP block."""
 
-    def __init__(self, h_dim, out_dim, n_blocks, actfun='relu', residual=True):
+    def __init__(self, h_dim, out_dim, n_blocks, actfun="relu", residual=True):
         super().__init__()
         self.residual = residual
-        self.layers = nn.ModuleList([
-            MLP(h_dim, h_dims=(h_dim, h_dim), activation=actfun)
-            for _ in range(n_blocks)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                MLP(h_dim, h_dims=(h_dim, h_dim), activation=actfun)
+                for _ in range(n_blocks)
+            ]
+        )
         self.out_fc = nn.Linear(h_dim, out_dim)
 
     def forward(self, x):
@@ -99,7 +101,7 @@ class DenoiserMLP(nn.Module):
         history_shape: tuple = (2, 276),
         noise_shape: tuple = (1, 128),
         cond_mask_prob: float = 0.0,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.h_dim = h_dim
@@ -114,26 +116,34 @@ class DenoiserMLP(nn.Module):
         self.sequence_pos_encoder = PositionalEncoding(self.h_dim, self.dropout)
         self.embed_timestep = TimestepEmbedder(self.h_dim, self.sequence_pos_encoder)
 
-        input_dim = self.h_dim + self.clip_dim + np.prod(history_shape) + np.prod(noise_shape)
+        input_dim = (
+            self.h_dim + self.clip_dim + np.prod(history_shape) + np.prod(noise_shape)
+        )
         self.input_project = nn.Linear(input_dim, self.h_dim)
 
         self.mlp = MLPBlock(
             h_dim=h_dim,
             out_dim=np.prod(noise_shape),
             n_blocks=n_blocks,
-            actfun=activation
+            actfun=activation,
         )
 
     def parameters_wo_clip(self):
-        return [p for name, p in self.named_parameters() if not name.startswith('clip_model.')]
+        return [
+            p
+            for name, p in self.named_parameters()
+            if not name.startswith("clip_model.")
+        ]
 
     def mask_cond(self, cond, force_mask=False):
         bs, d = cond.shape
         if force_mask:
             return torch.zeros_like(cond)
-        elif self.training and self.cond_mask_prob > 0.:
-            mask = torch.bernoulli(torch.ones(bs, device=cond.device) * self.cond_mask_prob).view(bs, 1)
-            return cond * (1. - mask)
+        elif self.training and self.cond_mask_prob > 0.0:
+            mask = torch.bernoulli(
+                torch.ones(bs, device=cond.device) * self.cond_mask_prob
+            ).view(bs, 1)
+            return cond * (1.0 - mask)
         else:
             return cond
 
@@ -152,9 +162,11 @@ class DenoiserMLP(nn.Module):
         batch_size = x_t.shape[0]
 
         emb_time = self.embed_timestep(timesteps).squeeze(0)  # [B, h_dim]
-        emb_history = y['history_motion_normalized'].reshape(batch_size, np.prod(self.history_shape))
-        force_mask = y.get('uncond', False)
-        emb_text = self.mask_cond(y['text_embedding'], force_mask=force_mask)
+        emb_history = y["history_motion_normalized"].reshape(
+            batch_size, np.prod(self.history_shape)
+        )
+        force_mask = y.get("uncond", False)
+        emb_text = self.mask_cond(y["text_embedding"], force_mask=force_mask)
         emb_noise = x_t.reshape(batch_size, np.prod(self.noise_shape))
 
         input_embed = torch.cat((emb_time, emb_text, emb_history, emb_noise), dim=1)
@@ -184,7 +196,7 @@ class DenoiserTransformer(nn.Module):
         history_shape: tuple = (2, 276),
         noise_shape: tuple = (1, 128),
         cond_mask_prob: float = 0.0,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.h_dim = h_dim
@@ -211,23 +223,31 @@ class DenoiserTransformer(nn.Module):
             nhead=self.num_heads,
             dim_feedforward=self.ff_size,
             dropout=self.dropout,
-            activation=self.activation
+            activation=self.activation,
         )
-        self.seqTransEncoder = nn.TransformerEncoder(encoder_layer, num_layers=self.num_layers)
+        self.seqTransEncoder = nn.TransformerEncoder(
+            encoder_layer, num_layers=self.num_layers
+        )
 
         # Output projection
         self.output_process = nn.Linear(self.h_dim, self.noise_shape[-1])
 
     def parameters_wo_clip(self):
-        return [p for name, p in self.named_parameters() if not name.startswith('clip_model.')]
+        return [
+            p
+            for name, p in self.named_parameters()
+            if not name.startswith("clip_model.")
+        ]
 
     def mask_cond(self, cond, force_mask=False):
         bs, d = cond.shape
         if force_mask:
             return torch.zeros_like(cond)
-        elif self.training and self.cond_mask_prob > 0.:
-            mask = torch.bernoulli(torch.ones(bs, device=cond.device) * self.cond_mask_prob).view(bs, 1)
-            return cond * (1. - mask)
+        elif self.training and self.cond_mask_prob > 0.0:
+            mask = torch.bernoulli(
+                torch.ones(bs, device=cond.device) * self.cond_mask_prob
+            ).view(bs, 1)
+            return cond * (1.0 - mask)
         else:
             return cond
 
@@ -244,14 +264,18 @@ class DenoiserTransformer(nn.Module):
             output: [B, T=1, D] - Predicted clean latent
         """
         emb_time = self.embed_timestep(timesteps)  # [1, B, h_dim]
-        emb_history = self.embed_history(y['history_motion_normalized']).permute(1, 0, 2)  # [H, B, h_dim]
-        force_mask = y.get('uncond', False)
-        emb_text = self.embed_text(self.mask_cond(y['text_embedding'], force_mask=force_mask)).unsqueeze(0)  # [1, B, h_dim]
+        emb_history = self.embed_history(y["history_motion_normalized"]).permute(
+            1, 0, 2
+        )  # [H, B, h_dim]
+        force_mask = y.get("uncond", False)
+        emb_text = self.embed_text(
+            self.mask_cond(y["text_embedding"], force_mask=force_mask)
+        ).unsqueeze(0)  # [1, B, h_dim]
         emb_noise = self.embed_noise(x_t).permute(1, 0, 2)  # [1, B, h_dim]
 
         xseq = torch.cat((emb_time, emb_text, emb_history, emb_noise), dim=0)
         xseq = self.sequence_pos_encoder(xseq)
-        output = self.seqTransEncoder(xseq)[-self.noise_shape[0]:]  # [1, B, h_dim]
+        output = self.seqTransEncoder(xseq)[-self.noise_shape[0] :]  # [1, B, h_dim]
         output = self.output_process(output)  # [1, B, noise_shape[-1]]
         output = output.permute(1, 0, 2)  # [B, 1, noise_shape[-1]]
 
@@ -270,8 +294,9 @@ class ClassifierFreeWrapper(nn.Module):
         super().__init__()
         self.model = model
 
-        assert self.model.cond_mask_prob > 0, \
-            'Cannot run guided diffusion on a model not trained with condition masking'
+        assert self.model.cond_mask_prob > 0, (
+            "Cannot run guided diffusion on a model not trained with condition masking"
+        )
 
     def forward(self, x, timesteps, y=None):
         """
@@ -285,10 +310,10 @@ class ClassifierFreeWrapper(nn.Module):
         Returns:
             Guided output = uncond + scale * (cond - uncond)
         """
-        y['uncond'] = False
+        y["uncond"] = False
         out = self.model(x, timesteps, y)
 
-        y['uncond'] = True
+        y["uncond"] = True
         out_uncond = self.model(x, timesteps, y)
 
-        return out_uncond + (y['scale'] * (out - out_uncond))
+        return out_uncond + (y["scale"] * (out - out_uncond))

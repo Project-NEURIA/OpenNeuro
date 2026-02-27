@@ -42,12 +42,12 @@ _SMPL_TO_OPENVR: dict[int, str] = {
     15: "head",
     20: "left_hand",
     21: "right_hand",
-    0:  "waist",
-    9:  "chest",
+    0: "waist",
+    9: "chest",
     10: "left_foot",
     11: "right_foot",
-    4:  "left_knee",
-    5:  "right_knee",
+    4: "left_knee",
+    5: "right_knee",
     18: "left_elbow",
     19: "right_elbow",
     16: "left_shoulder",
@@ -114,16 +114,25 @@ def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]
     Returns:
         Dict mapping OpenVR body part names to BonePose.
     """
-    joints = features[_JOINTS_OFFSET:_JOINTS_OFFSET + _N_JOINTS * 3].reshape(_N_JOINTS, 3)
-    poses_6d = features[_POSES_6D_OFFSET:_POSES_6D_OFFSET + _N_JOINTS * 6].reshape(_N_JOINTS, 6)
+    joints = features[_JOINTS_OFFSET : _JOINTS_OFFSET + _N_JOINTS * 3].reshape(
+        _N_JOINTS, 3
+    )
+    poses_6d = features[_POSES_6D_OFFSET : _POSES_6D_OFFSET + _N_JOINTS * 6].reshape(
+        _N_JOINTS, 6
+    )
 
     poses: dict[str, BonePose | None] = {}
     for joint_idx, part_name in _SMPL_TO_OPENVR.items():
         pos = joints[joint_idx]
         qw, qx, qy, qz = _rot6d_to_quaternion(poses_6d[joint_idx])
         poses[part_name] = BonePose(
-            pos_x=pos[0].item(), pos_y=pos[1].item(), pos_z=pos[2].item(),
-            rot_w=qw, rot_x=qx, rot_y=qy, rot_z=qz,
+            pos_x=pos[0].item(),
+            pos_y=pos[1].item(),
+            pos_z=pos[2].item(),
+            rot_w=qw,
+            rot_x=qx,
+            rot_y=qy,
+            rot_z=qz,
         )
     return poses
 
@@ -185,12 +194,12 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         self._engine: DartControlInference | None = None
         self._primitive_util: PrimitiveUtility | None = None
 
-        # Autoregressive state
-        self._history: torch.Tensor | None = None  # [B, H, 276] normalized
-        self._transf_rotmat: torch.Tensor | None = None  # [B, 3, 3]
-        self._transf_transl: torch.Tensor | None = None  # [B, 1, 3]
-        self._pelvis_delta: torch.Tensor | None = None  # [B, 3]
-        self._betas: torch.Tensor | None = None  # [B, 10]
+        # Autoregressive state (set by _init_from_stand before use)
+        self._history: torch.Tensor = torch.empty(0)
+        self._transf_rotmat: torch.Tensor = torch.empty(0)
+        self._transf_transl: torch.Tensor = torch.empty(0)
+        self._pelvis_delta: torch.Tensor = torch.empty(0)
+        self._betas: torch.Tensor = torch.empty(0)
 
     def _ensure_engine(self) -> DartControlInference:
         """Lazy-load the inference engine on first use."""
@@ -211,7 +220,9 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
             self._primitive_util = PrimitiveUtility(device=self.config.device)
         return self._primitive_util
 
-    def _init_from_stand(self, engine: DartControlInference, putil: PrimitiveUtility) -> None:
+    def _init_from_stand(
+        self, engine: DartControlInference, putil: PrimitiveUtility
+    ) -> None:
         """Initialize history from stand.pkl using DART's canonicalization pipeline."""
         device = self.config.device
         B = self.config.batch_size
@@ -224,15 +235,23 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
 
         # Build primitive dict from stand.pkl (matching DART's get_primitive)
         seq_len = h_len + 1  # need h_len+1 frames to compute h_len delta features
-        transl = torch.tensor(stand_data["transl"][:seq_len], dtype=torch.float32)  # [T, 3]
-        global_orient = torch.tensor(stand_data["global_orient"][:seq_len], dtype=torch.float32)  # [T, 3]
-        body_pose = torch.tensor(stand_data["body_pose"][:seq_len], dtype=torch.float32)  # [T, 63]
+        transl = torch.tensor(
+            stand_data["transl"][:seq_len], dtype=torch.float32
+        )  # [T, 3]
+        global_orient = torch.tensor(
+            stand_data["global_orient"][:seq_len], dtype=torch.float32
+        )  # [T, 3]
+        body_pose = torch.tensor(
+            stand_data["body_pose"][:seq_len], dtype=torch.float32
+        )  # [T, 63]
 
         # Pad if stand.pkl has fewer frames than needed
         if transl.shape[0] < seq_len:
             pad = seq_len - transl.shape[0]
             transl = torch.cat([transl, transl[-1:].expand(pad, -1)], dim=0)
-            global_orient = torch.cat([global_orient, global_orient[-1:].expand(pad, -1)], dim=0)
+            global_orient = torch.cat(
+                [global_orient, global_orient[-1:].expand(pad, -1)], dim=0
+            )
             body_pose = torch.cat([body_pose, body_pose[-1:].expand(pad, -1)], dim=0)
 
         # Convert axis-angle to rotation matrices
@@ -245,19 +264,31 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
 
         primitive_dict = {
             "gender": gender,
-            "betas": betas.unsqueeze(0).unsqueeze(0).expand(B, seq_len, 10).to(device),  # [B, T, 10]
+            "betas": betas.unsqueeze(0)
+            .unsqueeze(0)
+            .expand(B, seq_len, 10)
+            .to(device),  # [B, T, 10]
             "transl": transl.unsqueeze(0).expand(B, -1, -1).to(device),  # [B, T, 3]
-            "global_orient": global_orient_mat.unsqueeze(0).expand(B, -1, -1, -1).to(device),  # [B, T, 3, 3]
-            "body_pose": body_pose_mat.unsqueeze(0).expand(B, -1, -1, -1, -1).to(device),  # [B, T, 21, 3, 3]
-            "transf_rotmat": torch.eye(3, device=device).unsqueeze(0).expand(B, -1, -1).clone(),  # [B, 3, 3]
+            "global_orient": global_orient_mat.unsqueeze(0)
+            .expand(B, -1, -1, -1)
+            .to(device),  # [B, T, 3, 3]
+            "body_pose": body_pose_mat.unsqueeze(0)
+            .expand(B, -1, -1, -1, -1)
+            .to(device),  # [B, T, 21, 3, 3]
+            "transf_rotmat": torch.eye(3, device=device)
+            .unsqueeze(0)
+            .expand(B, -1, -1)
+            .clone(),  # [B, 3, 3]
             "transf_transl": torch.zeros(B, 1, 3, device=device),  # [B, 1, 3]
         }
 
         # Compute pelvis offset (cached for all future steps)
-        self._pelvis_delta = putil.calc_calibrate_offset({
-            "gender": gender,
-            "betas": betas.unsqueeze(0).expand(B, -1).to(device),
-        })  # [B, 3]
+        self._pelvis_delta = putil.calc_calibrate_offset(
+            {
+                "gender": gender,
+                "betas": betas.unsqueeze(0).expand(B, -1).to(device),
+            }
+        )  # [B, 3]
         primitive_dict["pelvis_delta"] = self._pelvis_delta
 
         # Canonicalize
@@ -269,18 +300,27 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         # Convert to tensor [B, T, 276] — note: calc_features produces T-1 frames for delta fields
         # We need to pad delta features to match T frames
         # The last frame's delta is just repeated from the second-to-last
-        feature_dict["transl_delta"] = torch.cat([
-            feature_dict["transl_delta"],
-            feature_dict["transl_delta"][:, -1:, :],
-        ], dim=1)
-        feature_dict["joints_delta"] = torch.cat([
-            feature_dict["joints_delta"],
-            feature_dict["joints_delta"][:, -1:, :],
-        ], dim=1)
-        feature_dict["global_orient_delta_6d"] = torch.cat([
-            feature_dict["global_orient_delta_6d"],
-            feature_dict["global_orient_delta_6d"][:, -1:, :],
-        ], dim=1)
+        feature_dict["transl_delta"] = torch.cat(
+            [
+                feature_dict["transl_delta"],
+                feature_dict["transl_delta"][:, -1:, :],
+            ],
+            dim=1,
+        )
+        feature_dict["joints_delta"] = torch.cat(
+            [
+                feature_dict["joints_delta"],
+                feature_dict["joints_delta"][:, -1:, :],
+            ],
+            dim=1,
+        )
+        feature_dict["global_orient_delta_6d"] = torch.cat(
+            [
+                feature_dict["global_orient_delta_6d"],
+                feature_dict["global_orient_delta_6d"][:, -1:, :],
+            ],
+            dim=1,
+        )
 
         history_tensor = putil.dict_to_tensor(feature_dict)  # [B, T, 276]
         # Take last h_len frames
@@ -292,7 +332,9 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         self._transf_transl = primitive_dict["transf_transl"]
         self._betas = betas.unsqueeze(0).expand(B, -1).to(device)
 
-        print(f"[DartControl] History initialized from stand.pkl (shape={self._history.shape})")
+        print(
+            f"[DartControl] History initialized from stand.pkl (shape={self._history.shape})"
+        )
 
     def _update_history(
         self,
@@ -311,7 +353,9 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         6. Update transf_rotmat/transf_transl accumulators
         """
         h_len = engine.history_shape[0]
-        combined = torch.cat([history_normalized, future_normalized], dim=1)  # [B, H+F, 276]
+        combined = torch.cat(
+            [history_normalized, future_normalized], dim=1
+        )  # [B, H+F, 276]
         combined_denorm = engine.denormalize(combined)  # [B, H+F, 276]
         raw_history = combined_denorm[:, -h_len:, :]  # [B, H, 276]
 
@@ -320,13 +364,17 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
 
         # Attach metadata needed by get_blended_feature
         feature_dict["gender"] = self.config.gender
-        feature_dict["betas"] = self._betas.unsqueeze(1).expand(-1, h_len, -1)  # [B, H, 10]
+        feature_dict["betas"] = self._betas.unsqueeze(1).expand(
+            -1, h_len, -1
+        )  # [B, H, 10]
         feature_dict["transf_rotmat"] = self._transf_rotmat  # [B, 3, 3]
         feature_dict["transf_transl"] = self._transf_transl  # [B, 1, 3]
         feature_dict["pelvis_delta"] = self._pelvis_delta  # [B, 3]
 
         # Canonicalize + recompute features
-        _, new_feature_dict = putil.get_blended_feature(feature_dict, use_predicted_joints=False)
+        _, new_feature_dict = putil.get_blended_feature(
+            feature_dict, use_predicted_joints=False
+        )
 
         # Update accumulators
         self._transf_rotmat = new_feature_dict["transf_rotmat"]
@@ -356,7 +404,9 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         feature_dict["transf_transl"] = self._transf_transl
         feature_dict["pelvis_delta"] = self._pelvis_delta
 
-        world_dict = putil.transform_feature_to_world(feature_dict, use_predicted_joints=True)
+        world_dict = putil.transform_feature_to_world(
+            feature_dict, use_predicted_joints=True
+        )
         world_tensor = putil.dict_to_tensor(world_dict)  # [B, F, 276]
         return world_tensor.cpu()
 
@@ -384,7 +434,9 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
                 )  # [B, F, 276] normalized
 
                 # Transform to world space for output
-                world_features = self._get_world_features(engine, putil, future_normalized)  # [B, F, 276]
+                world_features = self._get_world_features(
+                    engine, putil, future_normalized
+                )  # [B, F, 276]
 
                 # Update history with canonicalization pipeline (before emitting, uses old transf)
                 self._update_history(engine, putil, self._history, future_normalized)
@@ -399,6 +451,7 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
             except Exception as e:
                 print(f"[DartControl] Generation error: {e}")
                 import traceback
+
                 traceback.print_exc()
                 continue
 

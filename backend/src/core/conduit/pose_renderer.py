@@ -123,7 +123,9 @@ class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
         for parent, child in _BONES:
             if parent in pts and child in pts:
                 color = _BONE_COLORS.get((parent, child), _TORSO_COLOR)
-                cv2.line(img, pts[parent], pts[child], color, _BONE_THICKNESS, cv2.LINE_AA)
+                cv2.line(
+                    img, pts[parent], pts[child], color, _BONE_THICKNESS, cv2.LINE_AA
+                )
 
         # Draw joints
         for name, pt in pts.items():

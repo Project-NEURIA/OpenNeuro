@@ -72,7 +72,9 @@ class DenoiserArgs:
     train_rollout_type: Literal["single", "full"] = "single"
     train_rollout_history: str = "gt"
     model_type: str = "mlp"
-    model_args: DenoiserMLPArgs | DenoiserTransformerArgs = field(default_factory=DenoiserMLPArgs)
+    model_args: DenoiserMLPArgs | DenoiserTransformerArgs = field(
+        default_factory=DenoiserMLPArgs
+    )
     diffusion_args: DiffusionArgs = field(default_factory=DiffusionArgs)
 
 
@@ -110,6 +112,7 @@ class VAEArgs:
 @dataclass
 class MLDArgs:
     """Top-level config for the MLD denoiser checkpoint."""
+
     data_args: DataArgs = field(default_factory=DataArgs)
     denoiser_args: DenoiserArgs = field(default_factory=DenoiserArgs)
     exp_name: str = "mld"
@@ -125,6 +128,7 @@ class MLDArgs:
 @dataclass
 class MVAEArgs:
     """Top-level config for the VAE checkpoint."""
+
     model_args: VAEArgs = field(default_factory=VAEArgs)
     data_args: DataArgs = field(default_factory=DataArgs)
     exp_name: str = "mvae"
@@ -192,10 +196,11 @@ class DartControlInference:
         # Load normalization statistics
         print("[DartControl] Loading normalization statistics...")
         import pickle
+
         with open(mean_std_path, "rb") as f:
             mean, std = pickle.load(f)
         self._mean = mean.to(device)  # [1, 1, 276]
-        self._std = std.to(device)    # [1, 1, 276]
+        self._std = std.to(device)  # [1, 1, 276]
 
         # Load CLIP for text encoding (OpenAI's clip package, matching DART)
         print("[DartControl] Loading CLIP text encoder...")
@@ -208,8 +213,9 @@ class DartControlInference:
 
         # Load denoiser + VAE configs and models
         print("[DartControl] Loading denoiser and VAE checkpoints...")
-        self.mld_args, self.denoiser_model, self.mvae_args, self.vae_model = \
+        self.mld_args, self.denoiser_model, self.mvae_args, self.vae_model = (
             self._load_models(denoiser_checkpoint, vae_checkpoint)
+        )
 
         denoiser_args = self.mld_args.denoiser_args
 
@@ -224,7 +230,9 @@ class DartControlInference:
         self.history_shape = tuple(denoiser_args.model_args.history_shape)
         self.rescale_latent = bool(denoiser_args.rescale_latent)
 
-        print(f"[DartControl] Ready. noise_shape={self.noise_shape}, history_shape={self.history_shape}")
+        print(
+            f"[DartControl] Ready. noise_shape={self.noise_shape}, history_shape={self.history_shape}"
+        )
 
     def normalize(self, tensor: torch.Tensor) -> torch.Tensor:
         """Normalize features from real-world space to model space."""
@@ -242,33 +250,47 @@ class DartControlInference:
         model_args = denoiser_args.model_args
 
         print(f"[DartControl] Denoiser type: {denoiser_args.model_type}")
-        if isinstance(model_args, DenoiserTransformerArgs) or "transformer" in denoiser_args.model_type.lower():
-            denoiser_class = DenoiserTransformer
+        if (
+            isinstance(model_args, DenoiserTransformerArgs)
+            or "transformer" in denoiser_args.model_type.lower()
+        ):
+            denoiser_class: type[DenoiserTransformer] | type[DenoiserMLP] = (
+                DenoiserTransformer
+            )
             model_kwargs = {
-                "h_dim": model_args.h_dim, "ff_size": model_args.ff_size,
-                "num_layers": model_args.num_layers, "num_heads": model_args.num_heads,
-                "dropout": model_args.dropout, "activation": model_args.activation,
-                "cond_mask_prob": model_args.cond_mask_prob, "clip_dim": model_args.clip_dim,
+                "h_dim": model_args.h_dim,
+                "ff_size": model_args.ff_size,
+                "num_layers": model_args.num_layers,
+                "num_heads": model_args.num_heads,
+                "dropout": model_args.dropout,
+                "activation": model_args.activation,
+                "cond_mask_prob": model_args.cond_mask_prob,
+                "clip_dim": model_args.clip_dim,
                 "history_shape": tuple(model_args.history_shape),
                 "noise_shape": tuple(model_args.noise_shape),
             }
         else:
             denoiser_class = DenoiserMLP
             model_kwargs = {
-                "h_dim": model_args.h_dim, "n_blocks": model_args.n_blocks,
-                "dropout": model_args.dropout, "activation": model_args.activation,
-                "cond_mask_prob": model_args.cond_mask_prob, "clip_dim": model_args.clip_dim,
+                "h_dim": model_args.h_dim,
+                "n_blocks": model_args.n_blocks,
+                "dropout": model_args.dropout,
+                "activation": model_args.activation,
+                "cond_mask_prob": model_args.cond_mask_prob,
+                "clip_dim": model_args.clip_dim,
                 "history_shape": tuple(model_args.history_shape),
                 "noise_shape": tuple(model_args.noise_shape),
             }
 
         denoiser_model = denoiser_class(**model_kwargs).to(self.device)
-        ckpt = torch.load(denoiser_checkpoint, map_location=self.device, weights_only=False)
+        ckpt = torch.load(
+            denoiser_checkpoint, map_location=self.device, weights_only=False
+        )
         denoiser_model.load_state_dict(ckpt["model_state_dict"])
         denoiser_model.eval()
         for p in denoiser_model.parameters():
             p.requires_grad = False
-        denoiser_model = ClassifierFreeWrapper(denoiser_model)
+        wrapped_model = ClassifierFreeWrapper(denoiser_model)
 
         # Load VAE config and model
         vae_dir = Path(vae_checkpoint).parent
@@ -277,14 +299,21 @@ class DartControlInference:
 
         print(f"[DartControl] VAE arch: {vae_model_args.arch}")
         vae_model = AutoMldVae(
-            arch=vae_model_args.arch, ff_size=vae_model_args.ff_size,
-            num_layers=vae_model_args.num_layers, num_heads=vae_model_args.num_heads,
-            dropout=vae_model_args.dropout, normalize_before=vae_model_args.normalize_before,
-            activation=vae_model_args.activation, position_embedding=vae_model_args.position_embedding,
-            latent_dim=tuple(vae_model_args.latent_dim), h_dim=vae_model_args.h_dim,
+            arch=vae_model_args.arch,
+            ff_size=vae_model_args.ff_size,
+            num_layers=vae_model_args.num_layers,
+            num_heads=vae_model_args.num_heads,
+            dropout=vae_model_args.dropout,
+            normalize_before=vae_model_args.normalize_before,
+            activation=vae_model_args.activation,
+            position_embedding=vae_model_args.position_embedding,
+            latent_dim=tuple(vae_model_args.latent_dim),
+            h_dim=vae_model_args.h_dim,
             nfeats=vae_model_args.nfeats,
         ).to(self.device)
-        vae_ckpt = torch.load(vae_checkpoint, map_location=self.device, weights_only=False)
+        vae_ckpt = torch.load(
+            vae_checkpoint, map_location=self.device, weights_only=False
+        )
         vae_state = vae_ckpt["model_state_dict"]
         if "latent_mean" not in vae_state:
             vae_state["latent_mean"] = torch.tensor(0)
@@ -297,7 +326,7 @@ class DartControlInference:
         for p in vae_model.parameters():
             p.requires_grad = False
 
-        return mld_args, denoiser_model, mvae_args, vae_model
+        return mld_args, wrapped_model, mvae_args, vae_model
 
     def encode_text(self, texts: list[str]) -> torch.Tensor:
         """
@@ -339,7 +368,10 @@ class DartControlInference:
             future_motion: [B, F, nfeats] normalized future features
         """
         batch_size = text_embedding.shape[0]
-        guidance = torch.ones(batch_size, *self.noise_shape, device=self.device) * guidance_scale
+        guidance = (
+            torch.ones(batch_size, *self.noise_shape, device=self.device)
+            * guidance_scale
+        )
 
         y = {
             "text_embedding": text_embedding,
@@ -347,7 +379,11 @@ class DartControlInference:
             "scale": guidance,
         }
 
-        sample_fn = self.diffusion.ddim_sample_loop if self.respacing else self.diffusion.p_sample_loop
+        sample_fn = (
+            self.diffusion.ddim_sample_loop
+            if self.respacing
+            else self.diffusion.p_sample_loop
+        )
         x_start = sample_fn(
             self.denoiser_model,
             (batch_size, *self.noise_shape),
@@ -363,7 +399,10 @@ class DartControlInference:
 
         latent = x_start.permute(1, 0, 2)  # [T=1, B, D]
         future_motion = self.vae_model.decode(
-            latent, history_motion, nfuture=future_length, scale_latent=self.rescale_latent
+            latent,
+            history_motion,
+            nfuture=future_length,
+            scale_latent=self.rescale_latent,
         )  # [B, F, nfeats]
 
         return future_motion
