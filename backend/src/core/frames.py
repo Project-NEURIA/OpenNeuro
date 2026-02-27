@@ -3,11 +3,23 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, overload
+from typing import Literal, overload, NamedTuple
 
 import numpy as np
 
 from src.core.utils import obj_id
+
+
+class BonePose(NamedTuple):
+    """Position (meters) + quaternion rotation (w,x,y,z) for a single bone."""
+
+    pos_x: float = 0.0
+    pos_y: float = 0.0
+    pos_z: float = 0.0
+    rot_w: float = 1.0
+    rot_x: float = 0.0
+    rot_y: float = 0.0
+    rot_z: float = 0.0
 
 
 class AudioDataFormat(Enum):
@@ -206,3 +218,52 @@ class MessagesFrame(Frame):
             messages=messages,
             language=language,
         )
+
+
+# Body tracking point names matching OpenVR full-body tracking
+BODY_PARTS = (
+    "head",
+    "left_hand",
+    "right_hand",
+    "waist",
+    "chest",
+    "left_foot",
+    "right_foot",
+    "left_knee",
+    "right_knee",
+    "left_elbow",
+    "right_elbow",
+    "left_shoulder",
+    "right_shoulder",
+)
+
+
+class BodyPoseFrame(Frame):
+    """Frame containing full-body pose data (positions + quaternion rotations).
+
+    Each body part is a BonePose(pos_x, pos_y, pos_z, rot_w, rot_x, rot_y, rot_z).
+    Any body part can be None to indicate it should not be updated.
+    """
+
+    _poses: dict[str, BonePose | None]
+
+    def __init__(
+        self,
+        display_name: str = "body_pose",
+        *,
+        poses: dict[str, BonePose | None],
+        pts: int | None = None,
+        id: int | None = None,
+    ):
+        object.__setattr__(self, "display_name", display_name)
+        object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
+        object.__setattr__(self, "id", id if id is not None else obj_id())
+        object.__setattr__(self, "_poses", poses)
+
+    def get(self) -> dict[str, BonePose | None]:
+        """Returns dict mapping body part name to BonePose (or None)."""
+        return self._poses
+
+    def __str__(self):
+        active = sum(1 for v in self._poses.values() if v is not None)
+        return f"BodyPoseFrame(id={self.id}, active_parts={active}/{len(self._poses)}, pts={self.pts})"

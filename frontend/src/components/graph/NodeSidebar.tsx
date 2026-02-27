@@ -38,12 +38,13 @@ export function NodeSidebar({ components }: NodeSidebarProps) {
         "rounded-2xl border border-glass-border",
         "bg-glass backdrop-blur-xs backdrop-saturate-150",
         "shadow-2xl shadow-black/40",
-        "p-3 flex flex-col gap-1.5",
+        "p-3 flex flex-col gap-1.5 max-h-[70vh]",
       )}
     >
-      <h2 className="text-sm font-semibold text-white px-1 mb-1">
+      <h2 className="text-sm font-semibold text-white px-1 mb-1 shrink-0">
         Components
       </h2>
+      <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0">
       {components.map((item) => {
         const Icon = iconMap[item.name] ?? Puzzle;
         const accent = catAccent[item.category] ?? catAccent.conduit!;
@@ -65,6 +66,7 @@ export function NodeSidebar({ components }: NodeSidebarProps) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
