@@ -188,12 +188,21 @@ class DartControlInference:
         self,
         denoiser_checkpoint: str,
         vae_checkpoint: str,
+        mean_std_path: str = "assets/dart_control/mean_std_h2_f8.pkl",
         device: str = "cuda",
         respacing: str = "",
         clip_model_name: str = "openai/clip-vit-base-patch32",
     ):
         self.device = device
         self.respacing = respacing
+
+        # Load normalization statistics
+        print("[DartControl] Loading normalization statistics...")
+        import pickle
+        with open(mean_std_path, "rb") as f:
+            mean, std = pickle.load(f)
+        self._mean = mean.to(device)  # [1, 1, 276]
+        self._std = std.to(device)    # [1, 1, 276]
 
         # Load CLIP for text encoding
         print("[DartControl] Loading CLIP text encoder...")
@@ -222,6 +231,10 @@ class DartControlInference:
         self.rescale_latent = bool(denoiser_args.rescale_latent)
 
         print(f"[DartControl] Ready. noise_shape={self.noise_shape}, history_shape={self.history_shape}")
+
+    def denormalize(self, tensor: torch.Tensor) -> torch.Tensor:
+        """Denormalize features from model space to real-world space."""
+        return tensor * self._std + self._mean
 
     def _load_models(self, denoiser_checkpoint: str, vae_checkpoint: str):
         # Load denoiser config and model

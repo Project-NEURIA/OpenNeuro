@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import math
 import random
-import threading
 import time
-from queue import Empty, Queue
-from typing import TypedDict
+from typing import NamedTuple
 
 import torch
 from pydantic import BaseModel
 
 from src.core.component import Component
-from src.core.channel import Channel
+from src.core.channel import Sender
 from src.core.frames import BodyPoseFrame, BonePose
 
 from .inference import DartControlInference
@@ -136,6 +134,9 @@ class DartControlConfig(BaseModel):
     vae_checkpoint: str = "assets/dart_control/mvae/checkpoint_200000.pt"
     """Path to the VAE .pt checkpoint file."""
 
+    mean_std_path: str = "assets/dart_control/mean_std_h2_f8.pkl"
+    """Path to the normalization statistics pickle file."""
+
     device: str = "cuda"
     """Device for inference (cuda or cpu)."""
 
@@ -161,11 +162,11 @@ class DartControlConfig(BaseModel):
     """Framerate for emitting body pose frames."""
 
 
-class DartControlOutputs(TypedDict):
-    motion: Channel[BodyPoseFrame]
+class DartControlOutputs(NamedTuple):
+    motion: Sender[BodyPoseFrame]
 
 
-class DartControl(Component[[], DartControlOutputs]):
+class DartControl(Component[tuple[()], DartControlOutputs]):
     """
     DartControl motion generation conduit.
 
@@ -176,13 +177,8 @@ class DartControl(Component[[], DartControlOutputs]):
     def __init__(self, config: DartControlConfig) -> None:
         super().__init__()
         self.config = config
-        self._output_motion = Channel[BodyPoseFrame](name="motion")
-
         self._engine: DartControlInference | None = None
         self._history: torch.Tensor | None = None
-
-    def get_output_channels(self) -> DartControlOutputs:
-        return {"motion": self._output_motion}
 
     def _ensure_engine(self) -> DartControlInference:
         """Lazy-load the inference engine on first use."""
@@ -190,6 +186,7 @@ class DartControl(Component[[], DartControlOutputs]):
             self._engine = DartControlInference(
                 denoiser_checkpoint=self.config.denoiser_checkpoint,
                 vae_checkpoint=self.config.vae_checkpoint,
+                mean_std_path=self.config.mean_std_path,
                 device=self.config.device,
                 respacing=self.config.respacing,
                 clip_model_name=self.config.clip_model_name,
@@ -222,10 +219,10 @@ class DartControl(Component[[], DartControlOutputs]):
 
         self._history = result.history
 
-        features = result.features.cpu()  # [B, F, 276]
+        features = engine.denormalize(result.features).cpu()  # [B, F, 276]
         return [_features_to_body_pose(features[0, f]) for f in range(features.shape[1])]
 
-    def run(self) -> None:
+    def run(self, _inputs: tuple[()], outputs: DartControlOutputs) -> None:
         print("[DartControl] Starting DartControl component, loading models...")
         engine = self._ensure_engine()
         print("[DartControl] Models loaded, streaming motion")
@@ -255,7 +252,7 @@ class DartControl(Component[[], DartControlOutputs]):
                 if self.stop_event.is_set():
                     break
                 send_time = time.monotonic()
-                self._output_motion.send(BodyPoseFrame(poses=body_poses))
+                outputs.motion.send(BodyPoseFrame(poses=body_poses))
                 elapsed = time.monotonic() - send_time
                 sleep_time = frame_interval - elapsed
                 if sleep_time > 0:
