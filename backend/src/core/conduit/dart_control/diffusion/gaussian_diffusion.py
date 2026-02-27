@@ -11,7 +11,6 @@ import torch as th
 from copy import deepcopy
 
 
-
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.0):
     """Get a pre-defined beta schedule for the given name."""
     if schedule_name == "linear":
