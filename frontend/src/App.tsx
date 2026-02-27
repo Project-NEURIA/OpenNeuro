@@ -31,12 +31,13 @@ import {
   createEdge as apiCreateEdge,
   deleteEdge as apiDeleteEdge,
   fetchCurrentProject,
+  fetchIsType,
   startProject as apiStartProject,
   closeProject as apiCloseProject,
   saveGraph,
 } from "@/lib/api";
 import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
-import { checkTypes, typeToString } from "@/lib/typecheck";
+import { checkTypes, collectLeafNames, typeToString, warmSubtypeCache } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
   if (!handleId) return "";
@@ -89,6 +90,25 @@ function AppInner({
     return { inputs, outputs };
   }, [components]);
 
+  const [concreteTypes, setConcreteTypes] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const leafNames = new Set<string>();
+    for (const slots of [...Object.values(componentTypeInfo.inputs), ...Object.values(componentTypeInfo.outputs)]) {
+      for (const slot of Object.values(slots)) {
+        for (const name of collectLeafNames(slot.name)) leafNames.add(name);
+      }
+    }
+    if (leafNames.size === 0) return;
+    Promise.all(
+      [...leafNames].map(async (name) => [name, await fetchIsType(name)] as const),
+    ).then(async (results) => {
+      const concrete = new Set(results.filter(([, ok]) => ok).map(([name]) => name));
+      await warmSubtypeCache(concrete);
+      setConcreteTypes(concrete);
+    });
+  }, [componentTypeInfo]);
+
   const runTypeCheck = useCallback(() => {
     const currentNodes = nodesRef.current;
 
@@ -110,7 +130,32 @@ function AppInner({
         })),
       };
 
-      const { errors } = checkTypes(graph, componentTypeInfo.inputs, componentTypeInfo.outputs);
+      const { errors, types } = checkTypes(graph, componentTypeInfo.inputs, componentTypeInfo.outputs, concreteTypes);
+
+      // Build per-node resolved type maps (only for vars that resolved to non-var types)
+      const nodeResolved = new Map<string, Record<string, string>>();
+      for (const [key, typ] of types) {
+        if (typ.kind === "var") continue;
+        // key format: "nodeId.in.slot" or "nodeId.out.slot"
+        const firstDot = key.indexOf(".");
+        const nodeId = key.slice(0, firstDot);
+        const rest = key.slice(firstDot + 1); // "in.slot" or "out.slot"
+        let resolved = nodeResolved.get(nodeId);
+        if (!resolved) {
+          resolved = {};
+          nodeResolved.set(nodeId, resolved);
+        }
+        resolved[rest] = typeToString(typ);
+      }
+
+      // Update nodes with resolved types
+      setNodes((prev) =>
+        prev.map((n) => {
+          const r = nodeResolved.get(n.id);
+          if (!r) return n;
+          return { ...n, data: { ...(n.data as GraphNodeData), resolvedTypes: r } };
+        }),
+      );
 
       const errorMap = new Map<string, string>();
       for (const err of errors) {
@@ -134,7 +179,7 @@ function AppInner({
         };
       });
     });
-  }, [setEdges, componentTypeInfo]);
+  }, [setEdges, setNodes, componentTypeInfo, concreteTypes]);
 
   // Initialize: fetch existing graph from backend
   useEffect(() => {
