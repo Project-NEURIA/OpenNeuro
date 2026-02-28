@@ -8,3 +8,4 @@ saves/
 
 node_modules/
 bun.lock
+.DS_Store
