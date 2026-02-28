@@ -7,24 +7,23 @@ import cv2
 
 from src.core.channel import Sender
 from src.core.component import Component
+from src.core.frames import VideoFrame
 
 
 class VideoPlayerOutputs(NamedTuple):
-    video: Sender[bytes]
+    video: Sender[VideoFrame]
 
 
 class VideoPlayer(Component[tuple[()], VideoPlayerOutputs]):
-    """Plays a local video file and sends JPEG frames through the pipeline."""
+    """Plays a local video file and sends VideoFrame through the pipeline."""
 
     def __init__(
         self,
         *,
         path: str = "/Users/kevin/Downloads/1234.mov",
-        quality: int = 75,
     ) -> None:
         super().__init__()
         self._path = path
-        self._quality = quality
 
     def run(self, inputs: tuple[()], outputs: VideoPlayerOutputs) -> None:
         cap = cv2.VideoCapture(self._path)
@@ -43,10 +42,7 @@ class VideoPlayer(Component[tuple[()], VideoPlayerOutputs]):
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
 
-                _, buf = cv2.imencode(
-                    ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, self._quality]
-                )
-                outputs.video.send(buf.tobytes())
+                outputs.video.send(VideoFrame.new(data=frame))
 
                 next_time += interval
                 sleep = next_time - time.monotonic()

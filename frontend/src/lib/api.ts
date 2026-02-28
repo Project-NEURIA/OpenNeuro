@@ -168,3 +168,27 @@ export async function saveGraph() {
   const res = await fetch("/graph/save", { method: "POST" });
   if (!res.ok) throw new Error(`Save graph failed: ${res.status}`);
 }
+
+// --- Config Options API ---
+
+export interface ConfigOption {
+  value: string;
+  label: string;
+}
+
+export async function fetchConfigOptions(
+  componentName: string,
+  fieldName: string,
+  values?: Record<string, unknown>,
+): Promise<ConfigOption[]> {
+  const res = await fetch(
+    `/component/${encodeURIComponent(componentName)}/options/${encodeURIComponent(fieldName)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values ?? null),
+    },
+  );
+  if (!res.ok) throw new Error(`Fetch config options failed: ${res.status}`);
+  return res.json();
+}

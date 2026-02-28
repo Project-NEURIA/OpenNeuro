@@ -5,10 +5,11 @@ from typing import NamedTuple
 
 from src.core.channel import Receiver
 from src.core.component import Component
+from src.core.frames import VideoDataFormat, VideoFrame
 
 
 class VideoStreamInputs(NamedTuple):
-    video: Receiver[bytes]
+    video: Receiver[VideoFrame]
 
 
 class VideoStream(Component[VideoStreamInputs, tuple[()]]):
@@ -30,8 +31,15 @@ class VideoStream(Component[VideoStreamInputs, tuple[()]]):
         return self._latest_frame
 
     def run(self, inputs: VideoStreamInputs, outputs: tuple[()]) -> None:
-        for frame in inputs.video(self):
+        import cv2
+
+        for frame in inputs.video(self, newest=True):
             if frame is None:
                 break
-            self._latest_frame = frame
+            _, buf = cv2.imencode(
+                ".jpg",
+                frame.get(VideoDataFormat.BGR),
+                [cv2.IMWRITE_JPEG_QUALITY, 75],
+            )
+            self._latest_frame = buf.tobytes()
             self._frame_event.set()
