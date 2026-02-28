@@ -1,7 +1,8 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo } from "@/lib/types";
+import { fetchConfigOptions, type ConfigOption } from "@/lib/api";
 
 interface ConfiguringNodeData {
   componentInfo: ComponentInfo;
@@ -19,9 +20,10 @@ type SchemaObj = {
   anyOf?: SchemaObj[];
   description?: string;
   enum?: unknown[];
+  configOptions?: Record<string, object>;
 };
 
-type ResolvedSchema = { properties: Record<string, SchemaObj>; title?: string };
+type ResolvedSchema = { properties: Record<string, SchemaObj>; title?: string; configOptions?: Record<string, object> };
 
 function hasProps(s: SchemaObj): s is SchemaObj & { properties: Record<string, SchemaObj> } {
   return s.type === "object" && s.properties !== undefined;
@@ -57,23 +59,33 @@ function getDefaultValue(prop: SchemaObj): unknown {
 }
 
 /** Collect all fields from every init parameter's schema. */
-function collectFields(init: Record<string, unknown>): Record<string, SchemaObj> {
+function collectFields(init: Record<string, unknown>): {
+  fields: Record<string, SchemaObj>;
+  configOptionFields: Set<string>;
+} {
   const fields: Record<string, SchemaObj> = {};
+  const configOptionFields = new Set<string>();
   for (const [paramName, rawSchema] of Object.entries(init)) {
     if (!rawSchema || typeof rawSchema !== "object") continue;
     const schema = rawSchema as SchemaObj;
     const resolved = resolveSchema(schema);
     if (resolved) {
+      // Detect configOptions from the parent schema
+      const coKeys = schema.configOptions ?? resolved.configOptions;
       // Object schema — each property becomes a field
       for (const [prop, propSchema] of Object.entries(resolved.properties)) {
-        fields[`${paramName}.${prop}`] = propSchema;
+        const key = `${paramName}.${prop}`;
+        fields[key] = propSchema;
+        if (coKeys && prop in coKeys) {
+          configOptionFields.add(key);
+        }
       }
     } else {
       // Simple type — the param itself is a field
       fields[paramName] = schema;
     }
   }
-  return fields;
+  return { fields, configOptionFields };
 }
 
 /** Rebuild the nested init values dict from flat "param.prop" keys. */
@@ -102,7 +114,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
   const d = data as unknown as ConfiguringNodeData;
   const { componentInfo, onConfirm, onCancel } = d;
 
-  const fields = collectFields(componentInfo.init);
+  const { fields, configOptionFields } = collectFields(componentInfo.init);
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
@@ -111,6 +123,16 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
     }
     return initial;
   });
+
+  const [configOptions, setConfigOptions] = useState<Record<string, ConfigOption[]>>({});
+
+  useEffect(() => {
+    for (const fieldKey of configOptionFields) {
+      fetchConfigOptions(componentInfo.name, fieldKey)
+        .then((opts) => setConfigOptions((prev) => ({ ...prev, [fieldKey]: opts })))
+        .catch(() => {});
+    }
+  }, [componentInfo.name, configOptionFields]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +178,37 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
             );
           }
 
+          // Dynamic config options dropdown
+          if (configOptionFields.has(key)) {
+            const opts = configOptions[key];
+            return (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-[12px] font-mono text-white/60">{key}</span>
+                <select
+                  value={String(values[key] ?? "")}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [key]: e.target.value }))
+                  }
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[13px] font-mono",
+                    "bg-white/[0.06] border border-white/[0.08] text-white/90",
+                    "focus:outline-none focus:border-conduit/60",
+                  )}
+                >
+                  {!opts ? (
+                    <option value="">Loading...</option>
+                  ) : (
+                    opts.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+            );
+          }
+
           if (prop.enum) {
             return (
               <label key={key} className="flex flex-col gap-1">
@@ -171,7 +224,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
                     "focus:outline-none focus:border-conduit/60",
                   )}
                 >
-                  {prop.enum.map((val) => (
+                  {prop.enum.map((val: unknown) => (
                     <option key={String(val)} value={String(val)}>
                       {String(val)}
                     </option>

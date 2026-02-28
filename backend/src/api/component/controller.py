@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import TypeAdapter
 
 from src.api.component.dto import ComponentInfo
@@ -77,3 +79,22 @@ def is_subtype(sub: str = Query(), sup: str = Query()) -> bool:
         return issubclass(_resolve_type(sub), _resolve_type(sup))
     except ValueError:
         return False
+
+
+@router.post("/{component_name}/options/{field_name}")
+def get_config_options(
+    component_name: str,
+    field_name: str,
+    values: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    """Return runtime options for a dynamic config field."""
+    classes = service.list_components()
+    cls = classes.get(component_name)
+    if cls is None:
+        raise HTTPException(
+            status_code=404, detail=f"Component not found: {component_name}"
+        )
+    result = cls.get_config_options(field_name, values)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Field not dynamic: {field_name}")
+    return result

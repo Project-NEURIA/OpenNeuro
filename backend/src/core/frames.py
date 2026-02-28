@@ -270,3 +270,50 @@ class BodyPoseFrame(Frame):
     def __str__(self):
         active = sum(1 for v in self._poses.values() if v is not None)
         return f"BodyPoseFrame(id={self.id}, active_parts={active}/{len(self._poses)}, pts={self.pts})"
+
+
+class VideoDataFormat(Enum):
+    BGR = "bgr"
+    RGB = "rgb"
+
+
+@dataclass(frozen=True, slots=True)
+class VideoFrame(Frame):
+    """Video frame carrying raw pixel data (always ndarray).
+
+    Encoding (JPEG/PNG) is a boundary concern handled by sinks, not by the frame.
+    """
+
+    data: np.ndarray
+    width: int
+    height: int
+    format: VideoDataFormat
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        data: np.ndarray,
+        format: VideoDataFormat = VideoDataFormat.BGR,
+    ) -> VideoFrame:
+        h, w = data.shape[:2]
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            data=data,
+            width=w,
+            height=h,
+            format=format,
+        )
+
+    def get(self, format: VideoDataFormat) -> np.ndarray:
+        """Get pixel data in the requested color format."""
+        if self.format == format:
+            return self.data
+        import cv2
+
+        conv = {
+            (VideoDataFormat.BGR, VideoDataFormat.RGB): cv2.COLOR_BGR2RGB,
+            (VideoDataFormat.RGB, VideoDataFormat.BGR): cv2.COLOR_RGB2BGR,
+        }
+        return cv2.cvtColor(self.data, conv[(self.format, format)])

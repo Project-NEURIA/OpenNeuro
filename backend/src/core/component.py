@@ -117,6 +117,20 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]]
         return cls._resolve_tuple_types(cls._get_type_param(1))
 
     @classmethod
+    def get_config_options(
+        cls, field: str, values: dict[str, Any] | None = None
+    ) -> list[dict[str, str]] | None:
+        """Override to provide runtime options for a config field.
+
+        Args:
+            field: the config field name (e.g. "config.source")
+            values: current form values for dependent dropdowns
+
+        Returns [{\"value\": \"...\", \"label\": \"...\"}, ...] or None.
+        """
+        return None
+
+    @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
         """Construct a component instance, deserializing any BaseModel init params."""
         kwargs: dict[str, Any] = {}
