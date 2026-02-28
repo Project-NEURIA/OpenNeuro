@@ -1351,6 +1351,7 @@ dependencies = [
     { name = "pillow" },
     { name = "py-cord", extra = ["voice"] },
     { name = "python-dotenv" },
+    { name = "python-osc" },
     { name = "pyyaml" },
     { name = "smplx" },
     { name = "sounddevice" },
@@ -1384,6 +1385,7 @@ requires-dist = [
     { name = "py-cord" },
     { name = "py-cord", extras = ["voice"] },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-osc", specifier = ">=1.9.3" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "smplx" },
     { name = "sounddevice", specifier = ">=0.5.5" },
@@ -1783,6 +1785,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
+]
+
+[[package]]
+name = "python-osc"
+version = "1.9.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/6e/770a91c92e4e8db6213764fb78531dd26a4982000d9b325881f3599835e2/python_osc-1.9.3.tar.gz", hash = "sha256:bd0fa40def43ce509894709feb0e18f02192aca192c5e6c8fe2ba69e58f21794", size = 33328, upload-time = "2024-12-23T20:24:50.939Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/04/01b3de6a7565cfc20f3bf4fce959b099ad30a08157865436d48cc02f6c08/python_osc-1.9.3-py3-none-any.whl", hash = "sha256:7def2075be72f07bae5a4c1a55cc7d907b247f4a5d910f3159ed30ac2b1f17cc", size = 43808, upload-time = "2024-12-23T20:24:48.358Z" },
 ]
 
 [[package]]
