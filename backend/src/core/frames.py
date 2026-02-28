@@ -277,13 +277,13 @@ class ObjectDetectionFrame(Frame):
     """Object detection results for a single video frame."""
 
     boxes: np.ndarray
-    """(N, M, 4) float32 — XYXY bounding boxes. N = prompts, M = max per prompt."""
+    """(N, M, 4) float32 — XYXY bounding boxes. N = objects, M = max # of detection per object."""
 
     scores: np.ndarray
     """(N, M) float32 — detection confidence. 0 means empty slot."""
 
     prompts: tuple[str, ...]
-    """Prompt labels corresponding to each row in boxes/scores."""
+    """Objects to track, corresponding to each row in boxes/scores. N = len(prompts)"""
 
     @classmethod
     def new(

@@ -37,6 +37,13 @@ def obj_count(obj) -> int:
         return next(_COUNTS[obj.__class__.__name__])
 
 
+def to_numpy(t: object) -> np.ndarray:
+    """Convert a torch tensor or array-like to a numpy array."""
+    import torch
+
+    return t.detach().cpu().numpy() if torch.is_tensor(t) else np.asarray(t)
+
+
 def auto_device(device: str = "auto"):  # type: ignore[return]
     """Select best available torch device: CUDA > MPS > CPU."""
     import torch
@@ -59,15 +66,25 @@ def auto_dtype(device):  # type: ignore[return]
     return torch.float32
 
 
-def center_crop_and_resize(frame: np.ndarray, target: int) -> np.ndarray:
-    """Center-crop to largest square, resize to target x target."""
+def center_crop_and_resize(
+    frame: np.ndarray, width: int, height: int
+) -> np.ndarray:
+    """Center-crop to the largest rectangle matching the target aspect ratio, then resize."""
     import cv2
 
     h, w = frame.shape[:2]
-    side = min(h, w)
-    y0 = (h - side) // 2
-    x0 = (w - side) // 2
-    cropped = frame[y0 : y0 + side, x0 : x0 + side]
-    if side == target:
+    target_ratio = width / height
+    src_ratio = w / h
+
+    if src_ratio > target_ratio:
+        crop_w = int(h * target_ratio)
+        x0 = (w - crop_w) // 2
+        cropped = frame[:, x0 : x0 + crop_w]
+    else:
+        crop_h = int(w / target_ratio)
+        y0 = (h - crop_h) // 2
+        cropped = frame[y0 : y0 + crop_h, :]
+
+    if cropped.shape[:2] == (height, width):
         return cropped
-    return cv2.resize(cropped, (target, target), interpolation=cv2.INTER_AREA)
+    return cv2.resize(cropped, (width, height), interpolation=cv2.INTER_AREA)

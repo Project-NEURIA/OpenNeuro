@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 from pydantic import BaseModel
@@ -16,10 +16,11 @@ from src.core.frames import (
     VideoDataFormat,
     VideoFrame,
 )
-from src.core.utils import auto_device, auto_dtype, center_crop_and_resize
+from src.core.utils import auto_device, auto_dtype, center_crop_and_resize, to_numpy
 
 if TYPE_CHECKING:
-    import torch
+    from transformers import Sam3VideoModel, Sam3VideoProcessor
+    from transformers.models.sam3_video.modeling_sam3_video import Sam3VideoInferenceSession
 
 MODEL_ID = "facebook/sam3"
 
@@ -31,12 +32,11 @@ class ObjectDetectorConfig(BaseModel):
     max_tracking_per_object: int = 4
     session_ttl: int = 400
     device: str = "auto"
-    initial_prompts: str = "hand, head"
 
 
 class ObjectDetectorInputs(NamedTuple):
     video: Receiver[VideoFrame]
-    prompts: Receiver[TextFrame] | None = None
+    prompts: Receiver[TextFrame]  # e.g. "head, hand, a pink door"
 
 
 class ObjectDetectorOutputs(NamedTuple):
@@ -54,16 +54,14 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
     def __init__(self, config: ObjectDetectorConfig) -> None:
         super().__init__()
         self.config = config
-        self._model: Any = None
-        self._processor: Any = None
-        self._session: Any = None
+        self._model: Sam3VideoModel | None = None
+        self._processor: Sam3VideoProcessor | None = None
+        self._session: Sam3VideoInferenceSession | None = None
         self._session_age = 0
-        self._prompts: list[str] = [
-            p.strip() for p in config.initial_prompts.split(",") if p.strip()
-        ]
+        self._prompts: list[str] = []
         self._lock = threading.Lock()
-        self._device: torch.device | None = None
-        self._dtype: torch.dtype | None = None
+        self._device = auto_device(config.device)
+        self._dtype = auto_dtype(self._device)
 
     def _ensure_model(self) -> None:
         """Lazy-load SAM3 model and processor."""
@@ -72,8 +70,6 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
 
         from transformers import Sam3VideoConfig, Sam3VideoModel, Sam3VideoProcessor
 
-        self._device = auto_device(self.config.device)
-        self._dtype = auto_dtype(self._device)
         resolution = self.config.resolution
 
         print(f"[ObjectDetector] Loading SAM3 on {self._device} ({self._dtype})")
@@ -89,7 +85,7 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
         self._model = Sam3VideoModel.from_pretrained(
             MODEL_ID,
             config=config,
-        ).to(self._device, self._dtype)  # type: ignore[arg-type]
+        ).to(self._device, self._dtype)
         self._model.eval()
 
         self._processor = Sam3VideoProcessor.from_pretrained(
@@ -127,12 +123,9 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
         """
         import torch
 
-        def _np(t: object) -> np.ndarray:
-            return t.detach().cpu().numpy() if torch.is_tensor(t) else np.asarray(t)
-
-        obj_ids = _np(processed["object_ids"])
-        all_scores = _np(processed["scores"])
-        all_boxes = _np(processed["boxes"])
+        obj_ids = to_numpy(processed["object_ids"])
+        all_scores = to_numpy(processed["scores"])
+        all_boxes = to_numpy(processed["boxes"])
 
         prompt_to_idx = {p: i for i, p in enumerate(self._prompts)}
         oid_to_prompt_idx: dict[int, int] = {}
@@ -152,13 +145,13 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
 
         order = np.argsort(-all_scores)
         for i in order:
-            pi = oid_to_prompt_idx.get(int(obj_ids[i]))
-            if pi is None or slot[pi] >= M:
+            prompt_idx = oid_to_prompt_idx.get(int(obj_ids[i]))
+            if prompt_idx is None or slot[prompt_idx] >= M:
                 continue
-            s = slot[pi]
-            boxes[pi, s] = all_boxes[i]
-            scores[pi, s] = all_scores[i]
-            slot[pi] += 1
+            slot_idx = slot[prompt_idx]
+            boxes[prompt_idx, slot_idx] = all_boxes[i]
+            scores[prompt_idx, slot_idx] = all_scores[i]
+            slot[prompt_idx] += 1
 
         return boxes, scores
 
@@ -184,7 +177,6 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
 
     def _prompt_listener(self, inputs: ObjectDetectorInputs) -> None:
         """Daemon thread: consume prompt updates and reinitialize session."""
-        assert inputs.prompts is not None
         for frame in inputs.prompts(self):
             if frame is None:
                 break
@@ -202,13 +194,10 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
         print("[ObjectDetector] Starting, loading model...")
         self._ensure_model()
 
-        # Start prompt listener thread if prompts input is connected
-        prompt_thread: threading.Thread | None = None
-        if inputs.prompts is not None:
-            prompt_thread = threading.Thread(
-                target=self._prompt_listener, args=(inputs,), daemon=True
-            )
-            prompt_thread.start()
+        prompt_thread = threading.Thread(
+            target=self._prompt_listener, args=(inputs,), daemon=True
+        )
+        prompt_thread.start()
 
         print("[ObjectDetector] Running inference loop")
         for frame in inputs.video(self, newest=True):
@@ -216,7 +205,8 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
                 break
 
             rgb = frame.get(VideoDataFormat.RGB)
-            cropped = center_crop_and_resize(rgb, self.config.resolution)
+            res = self.config.resolution
+            cropped = center_crop_and_resize(rgb, res, res)
 
             with self._lock, torch.inference_mode():
                 inputs_processed = self._processor(images=cropped, return_tensors="pt")
@@ -260,6 +250,5 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
             )
             outputs.video.send(VideoFrame.new(data=cropped, format=VideoDataFormat.RGB))
 
-        if prompt_thread is not None:
-            prompt_thread.join(timeout=2.0)
+        prompt_thread.join(timeout=2.0)
         print("[ObjectDetector] Stopped")
