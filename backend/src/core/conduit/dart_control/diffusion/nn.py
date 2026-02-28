@@ -123,11 +123,15 @@ class CheckpointFunction(th.autograd.Function):
         # Apply AMP decorator behavior via wrapper to support both APIs
         if _AMP_DEVICE_TYPE is None:
             decorated = _custom_fwd(
-                lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a)
+                lambda c, rf, n_inputs, *a: CheckpointFunction._forward_impl(
+                    c, rf, n_inputs, *a
+                )
             )
         else:
             decorated = _custom_fwd(device_type=_AMP_DEVICE_TYPE)(
-                lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a)
+                lambda c, rf, n_inputs, *a: CheckpointFunction._forward_impl(
+                    c, rf, n_inputs, *a
+                )
             )
         return decorated(ctx, run_function, length, *args)
 
