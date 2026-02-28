@@ -128,7 +128,7 @@ class OSCChatbox(Component[OSCChatboxInputs, tuple[()]]):
                 else:
                     # Hard-split very long word
                     for i in range(0, len(word), max_chars):
-                        chunks.append(word[i: i + max_chars])
+                        chunks.append(word[i : i + max_chars])
                     current = ""
 
             if current:
@@ -234,15 +234,15 @@ class OSCChatbox(Component[OSCChatboxInputs, tuple[()]]):
         threads: list[threading.Thread] = []
 
         if inputs.text is not None:
-            threads.append(threading.Thread(target=self._text_loop, args=(inputs.text,)))
+            threads.append(
+                threading.Thread(target=self._text_loop, args=(inputs.text,))
+            )
             threads.append(threading.Thread(target=self._text_flush_monitor))
             threads.append(threading.Thread(target=self._send_worker))
 
         if inputs.interrupt is not None:
             threads.append(
-                threading.Thread(
-                    target=self._interrupt_loop, args=(inputs.interrupt,)
-                )
+                threading.Thread(target=self._interrupt_loop, args=(inputs.interrupt,))
             )
 
         if not threads:

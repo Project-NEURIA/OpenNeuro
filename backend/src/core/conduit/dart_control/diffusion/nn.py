@@ -4,17 +4,20 @@ Based on https://github.com/openai/guided-diffusion
 """
 
 import math
+from typing import Optional
+
 import torch as th
 import torch.nn as nn
 
 # --- AMP decorator compatibility (new torch.amp vs old torch.cuda.amp) ---
+_AMP_DEVICE_TYPE: Optional[str]
+
 try:
-    from torch.amp import custom_fwd as _custom_fwd  # PyTorch newer versions
+    from torch.amp import custom_fwd as _custom_fwd
     from torch.amp import custom_bwd as _custom_bwd
 
     _AMP_DEVICE_TYPE = "cuda"
 except Exception:  # pragma: no cover
-    # Fallback for older PyTorch
     from torch.cuda.amp import custom_fwd as _custom_fwd  # type: ignore
     from torch.cuda.amp import custom_bwd as _custom_bwd  # type: ignore
 
@@ -119,7 +122,9 @@ class CheckpointFunction(th.autograd.Function):
     def forward(ctx, run_function, length, *args):
         # Apply AMP decorator behavior via wrapper to support both APIs
         if _AMP_DEVICE_TYPE is None:
-            decorated = _custom_fwd(lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a))
+            decorated = _custom_fwd(
+                lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a)
+            )
         else:
             decorated = _custom_fwd(device_type=_AMP_DEVICE_TYPE)(
                 lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a)
@@ -138,7 +143,9 @@ class CheckpointFunction(th.autograd.Function):
     @staticmethod
     def backward(ctx, *output_grads):
         if _AMP_DEVICE_TYPE is None:
-            decorated = _custom_bwd(lambda c, *og: CheckpointFunction._backward_impl(c, *og))
+            decorated = _custom_bwd(
+                lambda c, *og: CheckpointFunction._backward_impl(c, *og)
+            )
         else:
             decorated = _custom_bwd(device_type=_AMP_DEVICE_TYPE)(
                 lambda c, *og: CheckpointFunction._backward_impl(c, *og)

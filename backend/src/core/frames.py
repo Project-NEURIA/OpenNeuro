@@ -49,11 +49,11 @@ class AudioFrame(Frame):
 
     @classmethod
     def new(
-            cls,
-            *,
-            data: bytes | np.ndarray,
-            sample_rate: int,
-            channels: int = 1,
+        cls,
+        *,
+        data: bytes | np.ndarray,
+        sample_rate: int,
+        channels: int = 1,
     ) -> AudioFrame:
         # Normalize data to np.ndarray shape (channels, samples) float32
         # PCM bytes and 1D arrays are assumed INTERLEAVED: [L0,R0,L1,R1,...]
@@ -92,27 +92,25 @@ class AudioFrame(Frame):
 
     @overload
     def get(
-            self,
-            data_format: Literal[AudioDataFormat.FLOAT32],
-            sample_rate: int | None = None,
-            num_channels: int | None = None,
-    ) -> np.ndarray:
-        ...
+        self,
+        data_format: Literal[AudioDataFormat.FLOAT32],
+        sample_rate: int | None = None,
+        num_channels: int | None = None,
+    ) -> np.ndarray: ...
 
     @overload
     def get(
-            self,
-            data_format: Literal[AudioDataFormat.PCM16, AudioDataFormat.PCM8],
-            sample_rate: int | None = None,
-            num_channels: int | None = None,
-    ) -> bytes:
-        ...
+        self,
+        data_format: Literal[AudioDataFormat.PCM16, AudioDataFormat.PCM8],
+        sample_rate: int | None = None,
+        num_channels: int | None = None,
+    ) -> bytes: ...
 
     def get(
-            self,
-            data_format: AudioDataFormat,
-            sample_rate: int | None = None,
-            num_channels: int | None = None,
+        self,
+        data_format: AudioDataFormat,
+        sample_rate: int | None = None,
+        num_channels: int | None = None,
     ) -> np.ndarray | bytes:
         """Get the audio data in the requested format, sample rate, and channels."""
         arr = self.data
@@ -189,9 +187,9 @@ class InterruptFrame(Frame):
 
     @classmethod
     def new(
-            cls,
-            *,
-            reason: str,
+        cls,
+        *,
+        reason: str,
     ) -> InterruptFrame:
         return cls(
             pts=time.time_ns(),
@@ -210,11 +208,11 @@ class MessagesFrame(Frame):
 
     @classmethod
     def new(
-            cls,
-            *,
-            text: str,
-            messages: list[dict[str, str]],
-            language: str | None = None,
+        cls,
+        *,
+        text: str,
+        messages: list[dict[str, str]],
+        language: str | None = None,
     ) -> MessagesFrame:
         return cls(
             pts=time.time_ns(),
@@ -253,12 +251,12 @@ class BodyPoseFrame(Frame):
     _poses: dict[str, BonePose | None]
 
     def __init__(
-            self,
-            display_name: str = "body_pose",
-            *,
-            poses: dict[str, BonePose | None],
-            pts: int | None = None,
-            id: int | None = None,
+        self,
+        display_name: str = "body_pose",
+        *,
+        poses: dict[str, BonePose | None],
+        pts: int | None = None,
+        id: int | None = None,
     ):
         object.__setattr__(self, "display_name", display_name)
         object.__setattr__(self, "pts", pts if pts is not None else time.time_ns())
