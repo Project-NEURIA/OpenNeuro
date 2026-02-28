@@ -7,6 +7,19 @@ import math
 import torch as th
 import torch.nn as nn
 
+# --- AMP decorator compatibility (new torch.amp vs old torch.cuda.amp) ---
+try:
+    from torch.amp import custom_fwd as _custom_fwd  # PyTorch newer versions
+    from torch.amp import custom_bwd as _custom_bwd
+
+    _AMP_DEVICE_TYPE = "cuda"
+except Exception:  # pragma: no cover
+    # Fallback for older PyTorch
+    from torch.cuda.amp import custom_fwd as _custom_fwd  # type: ignore
+    from torch.cuda.amp import custom_bwd as _custom_bwd  # type: ignore
+
+    _AMP_DEVICE_TYPE = None
+
 
 class SiLU(nn.Module):
     def forward(self, x):
@@ -103,8 +116,18 @@ def checkpoint(func, inputs, params, flag):
 
 class CheckpointFunction(th.autograd.Function):
     @staticmethod
-    @th.cuda.amp.custom_fwd
     def forward(ctx, run_function, length, *args):
+        # Apply AMP decorator behavior via wrapper to support both APIs
+        if _AMP_DEVICE_TYPE is None:
+            decorated = _custom_fwd(lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a))
+        else:
+            decorated = _custom_fwd(device_type=_AMP_DEVICE_TYPE)(
+                lambda c, rf, l, *a: CheckpointFunction._forward_impl(c, rf, l, *a)
+            )
+        return decorated(ctx, run_function, length, *args)
+
+    @staticmethod
+    def _forward_impl(ctx, run_function, length, *args):
         ctx.run_function = run_function
         ctx.input_length = length
         ctx.save_for_backward(*args)
@@ -113,8 +136,17 @@ class CheckpointFunction(th.autograd.Function):
         return output_tensors
 
     @staticmethod
-    @th.cuda.amp.custom_bwd
     def backward(ctx, *output_grads):
+        if _AMP_DEVICE_TYPE is None:
+            decorated = _custom_bwd(lambda c, *og: CheckpointFunction._backward_impl(c, *og))
+        else:
+            decorated = _custom_bwd(device_type=_AMP_DEVICE_TYPE)(
+                lambda c, *og: CheckpointFunction._backward_impl(c, *og)
+            )
+        return decorated(ctx, *output_grads)
+
+    @staticmethod
+    def _backward_impl(ctx, *output_grads):
         args = list(ctx.saved_tensors)
         input_indices = [i for (i, x) in enumerate(args) if x.requires_grad]
         if not input_indices:
