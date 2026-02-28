@@ -208,6 +208,9 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
             res = self.config.resolution
             cropped = center_crop_and_resize(rgb, res, res)
 
+            if not self._prompts:
+                continue
+
             with self._lock, torch.inference_mode():
                 inputs_processed = self._processor(images=cropped, return_tensors="pt")
                 pixel_frame = inputs_processed.pixel_values[0].to(
