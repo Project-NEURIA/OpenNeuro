@@ -317,4 +317,3 @@ class VideoFrame(Frame):
             (VideoDataFormat.RGB, VideoDataFormat.BGR): cv2.COLOR_RGB2BGR,
         }
         return cv2.cvtColor(self.data, conv[(self.format, format)])
-
