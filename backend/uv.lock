@@ -1353,11 +1353,8 @@ name = "openneuro"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-<<<<<<< HEAD
     { name = "clip" },
-=======
     { name = "cv2-enumerate-cameras" },
->>>>>>> 5290914 (VideoFrame, Camera source, and Dynamic config)
     { name = "fastapi" },
     { name = "litellm" },
     { name = "mypy" },
