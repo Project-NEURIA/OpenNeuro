@@ -272,6 +272,36 @@ class BodyPoseFrame(Frame):
         return f"BodyPoseFrame(id={self.id}, active_parts={active}/{len(self._poses)}, pts={self.pts})"
 
 
+@dataclass(frozen=True, slots=True)
+class ObjectDetectionFrame(Frame):
+    """Object detection results for a single video frame."""
+
+    boxes: np.ndarray
+    """(N, M, 4) float32 — XYXY bounding boxes. N = prompts, M = max per prompt."""
+
+    scores: np.ndarray
+    """(N, M) float32 — detection confidence. 0 means empty slot."""
+
+    prompts: tuple[str, ...]
+    """Prompt labels corresponding to each row in boxes/scores."""
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        boxes: np.ndarray,
+        scores: np.ndarray,
+        prompts: tuple[str, ...],
+    ) -> ObjectDetectionFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            boxes=boxes,
+            scores=scores,
+            prompts=prompts,
+        )
+
+
 class VideoDataFormat(Enum):
     BGR = "bgr"
     RGB = "rgb"
