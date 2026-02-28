@@ -110,6 +110,7 @@ class StreamFilter:
 
 
 class TTSConfig(BaseModel):
+    api_key_env_var: str = "INWORLD_API_CRED"
     url: str = "https://api.inworld.ai/tts/v1/voice:stream"
     voice_id: str = "Ashley"
     model_id: str = "inworld-tts-1.5-max"
@@ -146,10 +147,9 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                     if gen != self._generation:
                         continue
 
-                cred = os.getenv("INWORLD_API_KEY") or os.getenv("INWORLD_API_CRED")
+                cred = os.getenv("INWORLD_API_KEY") or os.getenv(self.config.api_key_env_var)
                 if not cred:
-                    print("[TTS] INWORLD_API_KEY not set")
-                    continue
+                    raise ValueError(f"Environment variable {self.config.api_key_env_var} must be set")
 
                 headers = {
                     "Authorization": f"Basic {cred}",

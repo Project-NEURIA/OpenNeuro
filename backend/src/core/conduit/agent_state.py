@@ -20,37 +20,40 @@ class AgentStateInputs(NamedTuple):
     asr: Receiver[TextFrame]
     feedback: Receiver[TextFrame]
     interrupt: Receiver[InterruptFrame] | None = None
+    memory_prefix: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
     messages: Sender[MessagesFrame]
     interrupt: Sender[InterruptFrame]
+    messages_for_memory: Sender[MessagesFrame] | None = None
 
 
 class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
-    """Agent state component that manages conversation history."""
+    """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
 
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
-        self.config: AgentStateConfig = config
-
-        # Conversation history as list of (speaker, text) tuples
+        self.config = config
         self._history: list[tuple[str, str]] = []
         self._lock = threading.Lock()
 
-    def _build_context(self) -> str:
-        """Build single prompt string."""
+    def _build_context(self, memory_prefix: str = "") -> str:
         with self._lock:
-            lines = [self.config.system_prompt, "***"]
-            for name, text in self._history:
-                lines.append(f"{name}: {text}")
+            lines = [self.config.system_prompt]
+            if memory_prefix:
+                lines += ["", memory_prefix]
+            lines.append("***")
+            lines += [f"{n}: {t}" for n, t in self._history]
             lines.append(f"{self.config.chatbot_name}:")
             return "\n".join(lines)
 
-    def _build_messages(self) -> list[dict[str, str]]:
-        """Build message list for Chat APIs."""
+    def _build_messages(self, memory_prefix: str = "") -> list[dict[str, str]]:
         with self._lock:
-            messages = [{"role": "system", "content": self.config.system_prompt}]
+            system = self.config.system_prompt
+            if memory_prefix:
+                system = f"{system}\n\n{memory_prefix}"
+            messages = [{"role": "system", "content": system}]
             for name, text in self._history:
                 role = "user" if name == self.config.user_name else "assistant"
                 messages.append({"role": role, "content": text})
@@ -58,6 +61,10 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
+
+        has_memory = inputs.memory_prefix is not None and outputs.messages_for_memory is not None
+        memory_gen = inputs.memory_prefix(self) if has_memory else None
+        print(f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}")
 
         def process_asr() -> None:
             for text_frame in inputs.asr(self):
@@ -70,14 +77,27 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 with self._lock:
                     self._history.append((self.config.user_name, text))
-
                 print(f"[AgentState] User: {text}")
 
-                # Output context as MessagesFrame
+                # Memory retrieval (optional)
+                mem_text = ""
+                if has_memory:
+                    outputs.messages_for_memory.send(
+                        MessagesFrame.new(
+                            text=self._build_context(),
+                            messages=self._build_messages(),
+                        )
+                    )
+                    # Block until Mem0 returns the memory prefix
+                    prefix_frame = next(memory_gen)
+                    if prefix_frame is not None and prefix_frame.text:
+                        mem_text = prefix_frame.text
+                        print(f"[AgentState] Memory prefix injected {mem_text}")
+
                 outputs.messages.send(
                     MessagesFrame.new(
-                        text=self._build_context(),
-                        messages=self._build_messages(),
+                        text=self._build_context(memory_prefix=mem_text),
+                        messages=self._build_messages(memory_prefix=mem_text),
                     )
                 )
 
