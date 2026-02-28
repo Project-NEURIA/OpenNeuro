@@ -110,9 +110,9 @@ class StreamFilter:
 
 
 class TTSConfig(BaseModel):
-    url: str = "https://api.inworld.ai/v1/tts/stream"
-    voice_id: str = "default"
-    model_id: str = "default"
+    url: str = "https://api.inworld.ai/tts/v1/voice:stream"
+    voice_id: str = "Ashley"
+    model_id: str = "inworld-tts-1.5-max"
 
 
 class TTSInputs(NamedTuple):
@@ -146,9 +146,9 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                     if gen != self._generation:
                         continue
 
-                cred = os.getenv("INWORLD_API_CRED")
+                cred = os.getenv("INWORLD_API_KEY") or os.getenv("INWORLD_API_CRED")
                 if not cred:
-                    print("[TTS] INWORLD_API_CRED not set")
+                    print("[TTS] INWORLD_API_KEY not set")
                     continue
 
                 headers = {
@@ -157,8 +157,8 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                 }
                 payload = {
                     "text": text,
-                    "voiceId": self.config.voice_id,
-                    "modelId": self.config.model_id,
+                    "voice_id": self.config.voice_id,
+                    "model_id": self.config.model_id,
                     "audio_config": {
                         "audio_encoding": "LINEAR16",
                         "sample_rate_hertz": 48000,

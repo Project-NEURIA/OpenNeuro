@@ -175,6 +175,9 @@ class TextFrame(Frame):
     def new(cls, *, text: str, language: str | None = None) -> TextFrame:
         return cls(pts=time.time_ns(), id=obj_id(), text=text, language=language)
 
+    def get(self) -> str:
+        return self.text
+
 
 @dataclass(frozen=True, slots=True)
 class InterruptFrame(Frame):
