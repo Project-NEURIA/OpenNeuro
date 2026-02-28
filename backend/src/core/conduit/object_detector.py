@@ -191,8 +191,7 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
     def run(self, inputs: ObjectDetectorInputs, outputs: ObjectDetectorOutputs) -> None:
         import torch
 
-        print("[ObjectDetector] Starting, loading model...")
-        self._ensure_model()
+        print("[ObjectDetector] Starting, waiting for prompts before loading model...")
 
         prompt_thread = threading.Thread(
             target=self._prompt_listener, args=(inputs,), daemon=True
@@ -210,6 +209,8 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
 
             if not self._prompts:
                 continue
+
+            self._ensure_model()
 
             with self._lock, torch.inference_mode():
                 inputs_processed = self._processor(images=cropped, return_tensors="pt")
