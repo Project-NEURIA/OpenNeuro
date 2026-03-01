@@ -40,8 +40,14 @@ def _draw_labeled_box(
     (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, _FONT_SCALE, 1)
     cv2.rectangle(img, (x1, y1 - th - 4), (x1 + tw, y1), color, -1)
     cv2.putText(
-        img, label, (x1, y1 - 2),
-        cv2.FONT_HERSHEY_SIMPLEX, _FONT_SCALE, (0, 0, 0), 1, cv2.LINE_AA,
+        img,
+        label,
+        (x1, y1 - 2),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        _FONT_SCALE,
+        (0, 0, 0),
+        1,
+        cv2.LINE_AA,
     )
 
 

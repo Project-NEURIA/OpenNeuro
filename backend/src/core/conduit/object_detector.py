@@ -20,7 +20,9 @@ from src.core.utils import auto_device, auto_dtype, center_crop_and_resize, to_n
 
 if TYPE_CHECKING:
     from transformers import Sam3VideoModel, Sam3VideoProcessor
-    from transformers.models.sam3_video.modeling_sam3_video import Sam3VideoInferenceSession
+    from transformers.models.sam3_video.modeling_sam3_video import (
+        Sam3VideoInferenceSession,
+    )
 
 MODEL_ID = "facebook/sam3"
 
