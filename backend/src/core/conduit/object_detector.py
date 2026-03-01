@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, NamedTuple, Any
+from typing import NamedTuple, Any
 
 import numpy as np
 from pydantic import BaseModel
