@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Any
 
 import numpy as np
 from pydantic import BaseModel
@@ -56,9 +56,9 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
     def __init__(self, config: ObjectDetectorConfig) -> None:
         super().__init__()
         self.config = config
-        self._model: Sam3VideoModel | None = None
-        self._processor: Sam3VideoProcessor | None = None
-        self._session: Sam3VideoInferenceSession | None = None
+        self._model: Any = None
+        self._processor: Any = None
+        self._session: Any = None
         self._session_age = 0
         self._prompts: list[str] = []
         self._lock = threading.Lock()
