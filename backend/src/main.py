@@ -13,7 +13,7 @@ from src.api.graph.save.controller import router as save_router
 from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
-from src.api.video.controller import router as video_router
+from src.api.ui.controller import router as ui_router
 from src.core.graph import Graph
 from src.core.config import PROJECTS_DIR, AppConfig
 from src.core.graph import GraphManager
@@ -47,7 +47,7 @@ app.include_router(save_router)
 app.include_router(metrics_router)
 app.include_router(component_router)
 app.include_router(project_router)
-app.include_router(video_router)
+app.include_router(ui_router)
 
 
 def main() -> None:

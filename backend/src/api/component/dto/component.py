@@ -11,3 +11,5 @@ class ComponentInfo(BaseModel):
     init: dict[str, Any]
     inputs: dict[str, str]
     outputs: dict[str, str]
+    ui_inputs: dict[str, str]
+    ui_outputs: dict[str, str]

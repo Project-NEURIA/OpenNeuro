@@ -18,6 +18,7 @@ import { NodeSidebar } from "@/components/graph/NodeSidebar";
 import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
 import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { ProjectChooser } from "@/components/project/ProjectChooser";
+import { UIChannelProvider } from "@/contexts/UIChannelContext";
 import { useGraphData, type GraphNodeData } from "@/hooks/useGraphData";
 import { useComponents } from "@/hooks/useComponents";
 import { useMetricsHistory } from "@/hooks/useMetricsHistory";
@@ -226,6 +227,8 @@ function AppInner({
                 outputTypes: componentTypeInfo.outputs[n.type] ?? {},
                 status: n.status,
                 nodeMetrics: null,
+                ui_inputs: info?.ui_inputs ?? {},
+                ui_outputs: info?.ui_outputs ?? {},
               } satisfies GraphNodeData,
             };
           }),
@@ -395,6 +398,8 @@ function AppInner({
               outputTypes: componentTypeInfo.outputs[item.name] ?? {},
               status: "startup",
               nodeMetrics: null,
+              ui_inputs: item.ui_inputs ?? {},
+              ui_outputs: item.ui_outputs ?? {},
             },
           };
           setNodes((nds) => [...nds, newNode]);
@@ -550,14 +555,16 @@ export default function App() {
   // Editor
   return (
     <ReactFlowProvider>
-      <AppInner
-        key={currentProject}
-        projectName={currentProject!}
-        onGoHome={() => {
-          setCurrentProject(null);
-          setShowChooser(true);
-        }}
-      />
+      <UIChannelProvider>
+        <AppInner
+          key={currentProject}
+          projectName={currentProject!}
+          onGoHome={() => {
+            setCurrentProject(null);
+            setShowChooser(true);
+          }}
+        />
+      </UIChannelProvider>
     </ReactFlowProvider>
   );
 }

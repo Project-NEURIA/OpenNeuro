@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections import defaultdict
-from typing import Any, get_args
+from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import Component
+from src.core.ui_channel import UIReceiver, UISender
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -40,6 +42,12 @@ class GraphManager:
         self._channel_map: dict[frozenset[SenderKey], Channel[Any]] = {}
         self._sender_handles: dict[SenderKey, Sender[Any]] = {}
         self._receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
+        # UI channels: keyed by (node_id, slot_name)
+        self._ui_channels: dict[tuple[str, str], Channel[Any]] = {}
+        self._ui_senders: dict[tuple[str, str], Sender[Any]] = {}
+        self._ui_receivers: dict[tuple[str, str], Receiver[Any]] = {}
+        self._ui_version = 0
+        self._ui_changed = asyncio.Event()
         self.reset(graph)
 
     # --- node CRUD ---
@@ -125,6 +133,14 @@ class GraphManager:
     def receiver_handles(self) -> dict[ReceiverKey, Receiver[Any]]:
         return self._receiver_handles
 
+    def ui_senders(self) -> dict[tuple[str, str], Sender[Any]]:
+        """Server-side senders that push data into component UIReceiver slots."""
+        return self._ui_senders
+
+    def ui_receivers(self) -> dict[tuple[str, str], Receiver[Any]]:
+        """Server-side receivers that read from component UISender slots."""
+        return self._ui_receivers
+
     def get_node_output(self, node_id: str) -> dict[str, type]:
         return type(self._components[node_id]).get_output_types()
 
@@ -139,6 +155,9 @@ class GraphManager:
         self._channel_map.clear()
         self._sender_handles.clear()
         self._receiver_handles.clear()
+        self._ui_channels.clear()
+        self._ui_senders.clear()
+        self._ui_receivers.clear()
 
         classes = Component.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
@@ -213,6 +232,9 @@ class GraphManager:
     def run(self) -> None:
         """Stop all running components, then start each with wired handles."""
         self.stop()
+        self._ui_channels.clear()
+        self._ui_senders.clear()
+        self._ui_receivers.clear()
 
         for node_id in self._graph.nodes:
             comp = self._components[node_id]
@@ -223,6 +245,8 @@ class GraphManager:
 
             input_slots = cls.get_input_types()
             output_slots = cls.get_output_types()
+            ui_input_slots = cls.get_ui_input_types()
+            ui_output_slots = cls.get_ui_output_types()
 
             input_handles: dict[str, Receiver[Any] | None] = {}
             for slot, slot_type in input_slots.items():
@@ -240,10 +264,35 @@ class GraphManager:
                 if skey in self._sender_handles:
                     output_handles[slot] = self._sender_handles[skey]
 
+            # Wire UI input channels (frontend -> component)
+            for slot, slot_type in ui_input_slots.items():
+                ch: Channel[Any] = Channel()
+                self._ui_channels[(node_id, slot)] = ch
+                # Component gets a UIReceiver to read from
+                origin = get_origin(slot_type) or slot_type
+                input_handles[slot] = origin(ch)
+                # Server keeps a Sender to push data in
+                self._ui_senders[(node_id, slot)] = Sender(ch)
+
+            # Wire UI output channels (component -> frontend)
+            for slot, slot_type in ui_output_slots.items():
+                ch = Channel()
+                self._ui_channels[(node_id, slot)] = ch
+                # Component gets a UISender to write to
+                origin = get_origin(slot_type) or slot_type
+                output_handles[slot] = origin(ch)
+                # Server keeps a Receiver to read from
+                self._ui_receivers[(node_id, slot)] = Receiver(ch)
+
             inputs = self._build_tuple(input_type, input_handles)
             outputs = self._build_tuple(output_type, output_handles)
 
             comp.start(inputs, outputs)
+
+        # Notify WS listeners that UI channels are ready
+        self._ui_version += 1
+        self._ui_changed.set()
+        self._ui_changed = asyncio.Event()
 
     @staticmethod
     def _build_tuple(tp: type | None, handles: dict[str, Any]) -> tuple[Any, ...]:

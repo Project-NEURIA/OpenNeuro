@@ -1,8 +1,10 @@
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
-import { useVideoStream } from "@/hooks/useVideoStream";
+import { useUIVideoOutput } from "@/hooks/useUIVideoOutput";
+import { useUITextOutput } from "@/hooks/useUITextOutput";
+import { useUIChannel } from "@/contexts/UIChannelContext";
 import type { GraphNodeData } from "@/hooks/useGraphData";
 import type { SenderMetrics, ReceiverMetrics, SlotType } from "@/lib/types";
 
@@ -102,11 +104,118 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/* --- UI widgets --- */
+
+function UIVideoWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const frameUrl = useUIVideoOutput(nodeId, channel);
+  return (
+    <div
+      className="relative w-full rounded-lg overflow-hidden bg-black/60 border border-white/[0.04]"
+      style={{ aspectRatio: "16/9" }}
+    >
+      {frameUrl ? (
+        <img
+          src={frameUrl}
+          alt="Video stream"
+          className="w-full h-full object-contain"
+          draggable={false}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-muted-foreground/40 text-[11px] font-mono uppercase tracking-wider">
+            no signal
+          </span>
+        </div>
+      )}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.1) 1px, rgba(255,255,255,0.1) 2px)",
+        }}
+      />
+    </div>
+  );
+}
+
+function UITextOutputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const text = useUITextOutput(nodeId, channel);
+  return (
+    <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 min-h-[2em]">
+      <span className="text-[12px] font-mono text-foreground/80 whitespace-pre-wrap break-words">
+        {text ?? ""}
+      </span>
+    </div>
+  );
+}
+
+function UITextInputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const { sendUIInput } = useUIChannel();
+  const [value, setValue] = useState("");
+
+  const handleSubmit = useCallback(() => {
+    if (value.trim()) {
+      sendUIInput(nodeId, channel, value);
+      setValue("");
+    }
+  }, [nodeId, channel, value, sendUIInput]);
+
+  return (
+    <div className="w-full flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit();
+        }}
+        className="flex-1 rounded-lg bg-black/40 border border-white/[0.08] px-3 py-1.5 text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20"
+        placeholder={`${channel}...`}
+      />
+      <button
+        onClick={handleSubmit}
+        className="rounded-lg bg-white/[0.06] border border-white/[0.08] px-2.5 py-1.5 text-[11px] font-mono text-foreground/60 hover:bg-white/[0.1] transition-colors"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
+function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: Record<string, string>; uiOutputs: Record<string, string> }) {
+  const outputWidgets = Object.entries(uiOutputs).map(([channel, typeName]) => {
+    if (typeName === "UIVideoSender") {
+      return <UIVideoWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }
+    if (typeName === "UITextSender") {
+      return <UITextOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }
+    return null;
+  });
+
+  const inputWidgets = Object.entries(uiInputs).map(([channel, typeName]) => {
+    if (typeName === "UITextReceiver" || typeName === "UIKeystrokeReceiver") {
+      return <UITextInputWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }
+    return null;
+  });
+
+  const widgets = [...outputWidgets, ...inputWidgets].filter(Boolean);
+  if (widgets.length === 0) return null;
+
+  return (
+    <div className="py-4 border-b border-white/[0.06] flex flex-col gap-3">
+      {widgets}
+    </div>
+  );
+}
+
 function GraphNodeComponent({ id, data }: NodeProps) {
   const d = data as GraphNodeData;
   const colors = categoryColors[d.category]!;
-  const isVideoStream = d.label === "VideoStream";
-  const frameUrl = useVideoStream(isVideoStream ? id : null);
+
+  const hasUIWidgets =
+    Object.keys(d.ui_inputs ?? {}).length > 0 ||
+    Object.keys(d.ui_outputs ?? {}).length > 0;
 
   const dot = statusDot[d.status] ?? "bg-status-stopped";
 
@@ -148,36 +257,13 @@ function GraphNodeComponent({ id, data }: NodeProps) {
         </span>
       </div>
 
-      {/* Video display for VideoStream nodes */}
-      {isVideoStream && (
-        <div className="py-4 border-b border-white/[0.06]">
-          <div
-            className="relative w-full rounded-lg overflow-hidden bg-black/60 border border-white/[0.04]"
-            style={{ aspectRatio: "16/9" }}
-          >
-            {frameUrl ? (
-              <img
-                src={frameUrl}
-                alt="Video stream"
-                className="w-full h-full object-contain"
-                draggable={false}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-muted-foreground/40 text-[11px] font-mono uppercase tracking-wider">
-                  no signal
-                </span>
-              </div>
-            )}
-            {/* Scanline overlay */}
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.03]"
-              style={{
-                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255,255,255,0.1) 1px, rgba(255,255,255,0.1) 2px)",
-              }}
-            />
-          </div>
-        </div>
+      {/* UI Widgets */}
+      {hasUIWidgets && (
+        <UIWidgets
+          nodeId={id}
+          uiInputs={d.ui_inputs ?? {}}
+          uiOutputs={d.ui_outputs ?? {}}
+        />
       )}
 
       {/* Type rows with inline handles */}
