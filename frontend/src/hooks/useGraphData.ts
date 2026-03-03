@@ -12,6 +12,8 @@ export interface GraphNodeData extends Record<string, unknown> {
   status: string;
   nodeMetrics: NodeMetrics | null;
   resolvedTypes?: Record<string, string>;
+  ui_inputs: Record<string, string>;
+  ui_outputs: Record<string, string>;
 }
 
 export function useGraphData(components: ComponentInfo[]) {

@@ -41,6 +41,8 @@ def list_components() -> list[ComponentInfo]:
         init = cls.get_init_types()
         inputs = cls.get_input_types()
         outputs = cls.get_output_types()
+        ui_inputs = cls.get_ui_input_types()
+        ui_outputs = cls.get_ui_output_types()
 
         if not inputs:
             category = "source"
@@ -56,6 +58,8 @@ def list_components() -> list[ComponentInfo]:
                 init={k: TypeAdapter(v).json_schema() for k, v in init.items()},
                 inputs={k: _type_name(v) for k, v in inputs.items()},
                 outputs={k: _type_name(v) for k, v in outputs.items()},
+                ui_inputs={k: _type_name(v) for k, v in ui_inputs.items()},
+                ui_outputs={k: _type_name(v) for k, v in ui_outputs.items()},
             )
         )
 

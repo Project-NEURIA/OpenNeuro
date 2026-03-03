@@ -8,6 +8,7 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
+from src.core.ui_channel import UIReceiver, UISender
 
 
 class Status(Enum):
@@ -108,13 +109,47 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]]
             return {}
         return {str(i + 1): arg for i, arg in enumerate(args)}
 
+    @staticmethod
+    def _is_ui_sender(t: type) -> bool:
+        origin = get_origin(t) or t
+        return isinstance(origin, type) and issubclass(origin, UISender)
+
+    @staticmethod
+    def _is_ui_receiver(t: type) -> bool:
+        origin = get_origin(t) or t
+        return isinstance(origin, type) and issubclass(origin, UIReceiver)
+
     @classmethod
     def get_input_types(cls) -> dict[str, type]:
-        return cls._resolve_tuple_types(cls._get_type_param(0))
+        return {
+            k: v
+            for k, v in cls._resolve_tuple_types(cls._get_type_param(0)).items()
+            if not cls._is_ui_receiver(v)
+        }
 
     @classmethod
     def get_output_types(cls) -> dict[str, type]:
-        return cls._resolve_tuple_types(cls._get_type_param(1))
+        return {
+            k: v
+            for k, v in cls._resolve_tuple_types(cls._get_type_param(1)).items()
+            if not cls._is_ui_sender(v)
+        }
+
+    @classmethod
+    def get_ui_input_types(cls) -> dict[str, type]:
+        return {
+            k: v
+            for k, v in cls._resolve_tuple_types(cls._get_type_param(0)).items()
+            if cls._is_ui_receiver(v)
+        }
+
+    @classmethod
+    def get_ui_output_types(cls) -> dict[str, type]:
+        return {
+            k: v
+            for k, v in cls._resolve_tuple_types(cls._get_type_param(1)).items()
+            if cls._is_ui_sender(v)
+        }
 
     @classmethod
     def get_config_options(

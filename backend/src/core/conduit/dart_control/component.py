@@ -417,7 +417,7 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         frame_queue: queue.Queue[dict[str, BonePose | None]],
     ) -> None:
         """Background thread: generates motion primitives and fills the queue."""
-        instruction = "walk"
+        instruction = "wave"
         print(f"[DartControl] Instruction: '{instruction}'")
 
         text_embedding = engine.encode_text([instruction])  # [1, 512]

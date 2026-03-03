@@ -6,6 +6,8 @@ export interface ComponentInfo {
   init: Record<string, unknown>;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
+  ui_inputs: Record<string, string>;
+  ui_outputs: Record<string, string>;
 }
 
 export interface GraphNode {
