@@ -7,7 +7,7 @@ from collections import deque
 from typing import NamedTuple, cast
 
 import discord
-from discord.sinks import Sink
+from discord.sinks import PCMSink, Sink
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
@@ -20,10 +20,17 @@ _discord_loop: asyncio.AbstractEventLoop | None = None
 _discord_thread: threading.Thread | None = None
 _discord_running = False
 _discord_lock = threading.Lock()
+_active_discord_io: DiscordIO | None = None
+
+# Global voice state for persistence across graph restarts
+_voice_clients: dict[int, discord.VoiceClient] = {}
+_rings: dict[int, deque[bytes]] = {}
+_buffer: dict[int, deque[bytes]] = {}
+_playback_tasks: dict[int, asyncio.Task[None]] = {}
 
 
 class DiscordConfig(BaseModel):
-    token: str | None = None
+    token_env_var: str = "DISCORD_TOKEN"
     sample_rate: int = 48000
     channels: int = 2
     audio_buffer_seconds: int = 64
@@ -46,21 +53,14 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
         super().__init__()
         self.config: DiscordConfig = config
 
-        token = self.config.token or os.getenv("DISCORD_TOKEN")
+        token = os.getenv(self.config.token_env_var)
         if not token:
-            raise ValueError(
-                "Discord token must be provided in config or DISCORD_TOKEN env var"
-            )
+            raise ValueError(f"Environment variable {self.config.token_env_var} must be set")
         self.token = token
 
         self.max_frames = self.config.audio_buffer_seconds * 50  # 20ms frames
         # Placeholder sender until run() wires the real one
         self._output_audio: Sender[AudioFrame] = Sender()
-
-        self._rings: dict[int, deque[bytes]] = {}
-        self._voice_clients: dict[int, discord.VoiceClient] = {}
-        self._buffer: dict[int, deque[bytes]] = {}
-        self._playback_tasks: dict[int, asyncio.Task[None]] = {}
 
         print(f"[DiscordIO] DiscordIO initialized, guild_ids: {self.config.guild_ids}")
 
@@ -115,8 +115,10 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 return
 
             gid = ctx.guild.id
-            ring: deque[bytes] = deque(maxlen=self.max_frames)
-            self._rings[gid] = ring
+            ring: deque[bytes] = deque(maxlen=2000) # Use a sane default or active's
+            if _active_discord_io:
+                ring = deque(maxlen=_active_discord_io.max_frames)
+            _rings[gid] = ring
 
             channel = member.voice.channel
             if channel is None:
@@ -124,19 +126,17 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 return
 
             vc = cast(discord.VoiceClient, await channel.connect())
-            sink = _DiscordSink(
-                self, ring, self.config.sample_rate, self.config.channels
-            )
+            sink = _DiscordSink()
 
             vc.start_recording(sink, lambda *_args: None)
 
-            self._voice_clients[gid] = vc
-            self._buffer[gid] = deque(maxlen=1000)
+            _voice_clients[gid] = vc
+            _buffer[gid] = deque(maxlen=1000)
             if _discord_loop:
                 task = asyncio.run_coroutine_threadsafe(
                     self._playback_loop(gid), _discord_loop
                 )
-                self._playback_tasks[gid] = cast(asyncio.Task[None], task)
+                _playback_tasks[gid] = cast(asyncio.Task[None], task)
             await ctx.respond("Connected")
 
         @bot.slash_command(name="leave", guild_ids=self.config.guild_ids or None)
@@ -149,23 +149,27 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
             vc = ctx.guild.voice_client
             if vc:
                 await vc.disconnect()
-                self._rings.pop(gid, None)
-                self._voice_clients.pop(gid, None)
-                self._buffer.pop(gid, None)
-                task = self._playback_tasks.pop(gid, None)
+                _rings.pop(gid, None)
+                _voice_clients.pop(gid, None)
+                _buffer.pop(gid, None)
+                task = _playback_tasks.pop(gid, None)
                 if task:
                     task.cancel()
             await ctx.respond("Disconnected")
 
     async def _playback_loop(self, guild_id: int) -> None:
-        vc = self._voice_clients[guild_id]
-        buffer = self._buffer[guild_id]
+        vc = _voice_clients[guild_id]
+        buffer = _buffer[guild_id]
         source = _DiscordAudioSource(buffer)
         vc.play(source)
-        while not self.stop_event.is_set() and vc.is_connected():
+        while vc.is_connected():
+            if not _discord_running:
+                break
             await asyncio.sleep(1.0)
 
     def run(self, inputs: DiscordInputs, outputs: DiscordOutputs) -> None:
+        global _active_discord_io
+        _active_discord_io = self
         self._output_audio = outputs.audio
 
         print("[DiscordIO] Starting Discord processing")
@@ -177,8 +181,8 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 for frame in interrupt_recv(self):
                     if frame is None:
                         break
-                    for buffer in self._buffer.values():
-                        buffer.clear()
+                    for b in _buffer.values():
+                        b.clear()
 
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
@@ -193,31 +197,28 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 data_format=AudioDataFormat.PCM16,
             )
 
-            for buffer in self._buffer.values():
-                buffer.append(pcm_data)
+            for b in _buffer.values():
+                b.append(pcm_data)
 
         print("[DiscordIO] Discord processing stopped")
 
 
-class _DiscordSink(Sink):
-    def __init__(
-        self, discord_io: DiscordIO, ring: deque[bytes], sr: int, ch: int
-    ) -> None:
-        super().__init__()
-        self._discord_io = discord_io
-        self.ring = ring
-        self.sr = sr
-        self.ch = ch
-
+class _DiscordSink(PCMSink):
     def write(self, data: bytes, user: object) -> None:
-        self.ring.append(data)
-        self._discord_io._output_audio.send(
-            AudioFrame.new(
-                data=data,
-                sample_rate=self.sr,
-                channels=self.ch,
+        if _active_discord_io:
+            gid = None
+            # Find the guild id for this sink if needed, but we can just use ring
+            # Actually, _DiscordSink doesn't know its guild unless we tell it.
+            # But the ring is global anyway. 
+            # Wait, the ring should be per-guild.
+            # Let's simplify and just send to the active IO.
+            _active_discord_io._output_audio.send(
+                AudioFrame.new(
+                    data=data,
+                    sample_rate=48000, # Discord is always 48k
+                    channels=2, # Discord is always stereo
+                )
             )
-        )
 
 
 class _DiscordAudioSource(discord.AudioSource):

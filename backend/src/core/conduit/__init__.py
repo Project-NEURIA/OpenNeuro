@@ -9,7 +9,6 @@ from src.core.conduit.dart_control import DartControl as DartControl
 from src.core.conduit.object_detection_visualizer import (
     ObjectDetectionVisualizer as ObjectDetectionVisualizer,
 )
-from src.core.conduit.object_detector import ObjectDetector as ObjectDetector
 from src.core.conduit.pose_renderer import PoseRenderer as PoseRenderer
 from src.core.conduit.test_components import Batcher as Batcher
 from src.core.conduit.test_components import Buffer as Buffer
@@ -17,3 +16,4 @@ from src.core.conduit.test_components import Demux as Demux
 from src.core.conduit.test_components import FrameFilter as FrameFilter
 from src.core.conduit.test_components import Mux as Mux
 from src.core.conduit.test_components import Passthrough as Passthrough
+from src.core.conduit.memory import Mem0 as Mem0

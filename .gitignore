@@ -5,6 +5,7 @@
 __pycache__/
 *.egg-info/
 saves/
+backend/src/core/conduit/mem0_demo.py
 
 node_modules/
 bun.lock

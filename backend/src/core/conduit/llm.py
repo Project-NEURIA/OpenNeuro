@@ -19,6 +19,7 @@ GENERATE_END_FLAG = "[END_OF_GENERATE]"
 class LLMConfig(BaseModel):
     url: str = "https://api.groq.com/openai/v1/chat/completions"
     model_id: str = "llama-3.3-70b-versatile"
+    api_key_env_var: str = "GROQ_API_KEY"
     top_p: float = 0.97
     temperature: float = 1.08
     max_tokens: int = 350
@@ -111,10 +112,9 @@ class LLM(Component[LLMInputs, LLMOutputs]):
     def _process_generation(
         self, gen: int, frame: MessagesFrame, outputs: LLMOutputs
     ) -> None:
-        api_key = os.getenv("GROQ_API_KEY")
+        api_key = os.getenv(self.config.api_key_env_var)
         if not api_key:
-            print("[LLM] GROQ_API_KEY not set")
-            return
+            raise ValueError(f"Environment variable {self.config.api_key_env_var} must be set")
 
         headers = {
             "Authorization": f"Bearer {api_key}",

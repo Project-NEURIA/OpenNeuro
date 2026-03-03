@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 
 class STSConfig(BaseModel):
+    api_key_env_var: str = "OPENAI_API_KEY"
     model: str = "gpt-4o-realtime-preview-2024-10-01"
     voice: str = "alloy"
 
@@ -44,8 +45,12 @@ class STS(Component[STSInputs, STSOutputs]):
 
     def run(self, inputs: STSInputs, outputs: STSOutputs) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
+        api_key = os.getenv(self.config.api_key_env_var)
+        if not api_key:
+            raise ValueError(f"Environment variable {self.config.api_key_env_var} must be set")
+
         headers = {
-            "Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}",
+            "Authorization": f"Bearer {api_key}",
             "OpenAI-Beta": "realtime=v1",
         }
 

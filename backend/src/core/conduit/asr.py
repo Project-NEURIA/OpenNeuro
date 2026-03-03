@@ -18,7 +18,7 @@ from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame, TextFra
 
 
 class ASRConfig(BaseModel):
-    groq_api_key: str | None = None
+    api_key_env_var: str = "GROQ_API_KEY"
     model: str = "whisper-large-v3-turbo"
     language: str = "en"
     timeout: int = 60
@@ -39,10 +39,10 @@ class ASR(Component[ASRInputs, ASROutputs]):
         super().__init__()
         self.config: ASRConfig = config
 
-        self._api_key = self.config.groq_api_key or os.getenv("GROQ_API_KEY")
+        self._api_key = os.getenv(self.config.api_key_env_var)
         if not self._api_key:
             raise ValueError(
-                "GROQ_API_KEY must be provided either as parameter or environment variable"
+                f"Environment variable {self.config.api_key_env_var} must be set"
             )
 
         self._url = "https://api.groq.com/openai/v1/audio/transcriptions"
