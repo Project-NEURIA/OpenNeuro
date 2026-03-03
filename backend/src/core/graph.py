@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import Component
-from src.core.ui_channel import UIReceiver, UISender
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)

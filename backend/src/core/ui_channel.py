@@ -13,6 +13,7 @@ from src.core.frames import TextFrame
 
 # -- marker bases --
 
+
 class UISender[T](Sender[T]):
     """Marker base: data flows from component to the frontend node UI."""
 
@@ -23,6 +24,7 @@ class UIReceiver[T](Receiver[T]):
 
 # -- concrete output types (backend -> frontend) --
 
+
 class UITextSender(UISender[TextFrame]):
     """Component sends text for display in the node UI."""
 
@@ -32,6 +34,7 @@ class UIVideoSender(UISender[bytes]):
 
 
 # -- concrete input types (frontend -> backend) --
+
 
 class UITextReceiver(UIReceiver[TextFrame]):
     """Component receives text typed by the user in the node UI."""

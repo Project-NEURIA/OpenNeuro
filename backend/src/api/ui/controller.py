@@ -127,9 +127,7 @@ async def ui_ws(ws: WebSocket) -> None:
     stop_event = asyncio.Event()
     tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
 
-    watcher = asyncio.create_task(
-        _watch_ui_channels(ws, manager, stop_event, tasks)
-    )
+    watcher = asyncio.create_task(_watch_ui_channels(ws, manager, stop_event, tasks))
 
     try:
         while True:
