@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame, TextFrame
+from src.core.frames import AudioDataFormat, AudioFrame, TextFrame
 
 
 class ASRConfig(BaseModel):
@@ -26,12 +26,10 @@ class ASRConfig(BaseModel):
 
 class ASRInputs(NamedTuple):
     audio: Receiver[AudioFrame]
-    interrupt: Receiver[InterruptFrame] | None = None
 
 
 class ASROutputs(NamedTuple):
     text: Sender[TextFrame]
-    interrupt: Sender[InterruptFrame]
 
 
 class ASR(Component[ASRInputs, ASROutputs]):
@@ -145,17 +143,6 @@ class ASR(Component[ASRInputs, ASROutputs]):
             target=self._worker_loop, args=(outputs,), daemon=True
         )
         self._worker_thread.start()
-
-        if inputs.interrupt is not None:
-            interrupt_recv = inputs.interrupt
-
-            def passthrough() -> None:
-                for frame in interrupt_recv(self):
-                    if frame is None:
-                        break
-                    outputs.interrupt.send(frame)
-
-            threading.Thread(target=passthrough, daemon=True).start()
 
         try:
             for frame in inputs.audio(self):

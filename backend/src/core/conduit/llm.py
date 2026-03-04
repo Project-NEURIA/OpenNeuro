@@ -32,7 +32,6 @@ class LLMInputs(NamedTuple):
 
 class LLMOutputs(NamedTuple):
     text: Sender[TextFrame]
-    interrupt: Sender[InterruptFrame]
 
 
 class LLM(Component[LLMInputs, LLMOutputs]):
@@ -85,9 +84,6 @@ class LLM(Component[LLMInputs, LLMOutputs]):
                     # Signal interruption to generation loop
                     with self._gen_lock:
                         self._generation += 1
-
-                    # Forward the interrupt
-                    outputs.interrupt.send(frame)
 
                     # Clear queue
                     while not self._task_queue.empty():

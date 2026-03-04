@@ -124,7 +124,6 @@ class TTSInputs(NamedTuple):
 class TTSOutputs(NamedTuple):
     audio: Sender[AudioFrame]
     text: Sender[TextFrame]
-    interrupt: Sender[InterruptFrame]
 
 
 class TTS(Component[TTSInputs, TTSOutputs]):
@@ -218,9 +217,6 @@ class TTS(Component[TTSInputs, TTSOutputs]):
 
                     with self._gen_lock:
                         self._generation += 1
-
-                    # Forward the interrupt
-                    outputs.interrupt.send(frame)
 
                     self._stream_filter = StreamFilter()
                     while not self._task_queue.empty():

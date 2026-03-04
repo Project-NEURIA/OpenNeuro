@@ -25,7 +25,6 @@ class AgentStateInputs(NamedTuple):
 
 class AgentStateOutputs(NamedTuple):
     messages: Sender[MessagesFrame]
-    interrupt: Sender[InterruptFrame]
     messages_for_memory: Sender[MessagesFrame] | None = None
 
 
@@ -128,8 +127,6 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 if frame is None:
                     break
                 print(f"[AgentState] Interrupt received: {frame.reason}")
-                # Forward the interrupt
-                outputs.interrupt.send(frame)
 
         threads = [
             threading.Thread(target=process_asr, daemon=True),
