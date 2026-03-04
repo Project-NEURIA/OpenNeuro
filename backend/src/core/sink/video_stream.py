@@ -5,7 +5,7 @@ from typing import NamedTuple
 from src.core.channel import Receiver
 from src.core.component import Component
 from src.core.frames import VideoDataFormat, VideoFrame
-from src.core.ui_channel import UIVideoSender
+from src.core.channel import UIVideoSender
 
 
 class VideoStreamInputs(NamedTuple):
