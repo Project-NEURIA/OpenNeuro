@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import AudioFrame, Frame, TextFrame
+from src.core.frames import AudioFrame, EOS, Frame, TextFrame
 
 
 # --- 1. Accepts base Frame, outputs AudioFrame ---
@@ -120,7 +120,7 @@ class Passthrough[T](Component[PassthroughInputs[T], PassthroughOutputs[T]]):
 
 
 class BufferInputs[T](NamedTuple):
-    data: Receiver[T]
+    data: Receiver[T | EOS]
 
 
 class BufferOutputs[T](NamedTuple):
@@ -133,7 +133,9 @@ class Buffer[T](Component[BufferInputs[T], BufferOutputs[T]]):
         for item in inputs.data(self):
             if item is None:
                 break
+            if item is EOS.END:
+                if buf:
+                    outputs.batch.send(buf)  # type: ignore[arg-type]
+                    buf = []
+                continue
             buf.append(item)
-            if len(buf) >= 10:
-                outputs.batch.send(buf)  # type: ignore[arg-type]
-                buf = []

@@ -3,11 +3,12 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, overload, NamedTuple
+from typing import ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
 from src.core.utils import obj_id
+
 
 
 class BonePose(NamedTuple):
@@ -177,6 +178,21 @@ class TextFrame(Frame):
 
     def get(self) -> str:
         return self.text
+
+
+@dataclass(frozen=True, slots=True)
+class EOS(TextFrame):
+    """End-of-sequence sentinel. Subclasses TextFrame so Receiver[TextFrame] accepts it."""
+
+    END: ClassVar[EOS]  # type: ignore[misc]
+
+    @classmethod
+    def new(cls, *, text: str = "", language: str | None = None) -> EOS:
+        return cls(pts=0, id=0, text=text, language=language)
+
+
+EOS.END = EOS.new()
+
 
 
 @dataclass(frozen=True, slots=True)

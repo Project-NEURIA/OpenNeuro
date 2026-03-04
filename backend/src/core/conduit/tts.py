@@ -14,9 +14,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import AudioFrame, InterruptFrame, TextFrame
-
-GENERATE_END_FLAG = "[END_OF_GENERATE]"
+from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 
 def cut_space(buf: str) -> int:
@@ -117,7 +115,7 @@ class TTSConfig(BaseModel):
 
 
 class TTSInputs(NamedTuple):
-    text: Receiver[TextFrame]
+    text: Receiver[TextFrame | EOS]
     interrupt: Receiver[InterruptFrame] | None = None
 
 
@@ -230,12 +228,10 @@ class TTS(Component[TTSInputs, TTSOutputs]):
         for frame in inputs.text(self):
             if frame is None:
                 break
-            t = frame.text
-            out = (
-                self._stream_filter.feed("", force=True)
-                if t == GENERATE_END_FLAG
-                else self._stream_filter.feed(t)
-            )
+            if frame is EOS.END:
+                out = self._stream_filter.feed("", force=True)
+            else:
+                out = self._stream_filter.feed(frame.text)
             if out and out.strip():
                 with self._gen_lock:
                     gen = self._generation

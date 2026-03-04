@@ -11,9 +11,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
-
-GENERATE_END_FLAG = "[END_OF_GENERATE]"
+from src.core.frames import EOS, InterruptFrame, MessagesFrame, TextFrame
 
 
 class LLMConfig(BaseModel):
@@ -31,7 +29,7 @@ class LLMInputs(NamedTuple):
 
 
 class LLMOutputs(NamedTuple):
-    text: Sender[TextFrame]
+    text: Sender[TextFrame | EOS]
 
 
 class LLM(Component[LLMInputs, LLMOutputs]):
@@ -136,7 +134,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
             for line in r.iter_lines():
                 with self._gen_lock:
                     if gen != self._generation:
-                        outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
+                        outputs.text.send(EOS.END)
                         break
 
                 if not line:
@@ -160,7 +158,7 @@ class LLM(Component[LLMInputs, LLMOutputs]):
 
                 choice = choices[0]
                 if choice.get("finish_reason"):
-                    outputs.text.send(TextFrame.new(text=GENERATE_END_FLAG))
+                    outputs.text.send(EOS.END)
                     break
 
                 delta = choice.get("delta") or {}
