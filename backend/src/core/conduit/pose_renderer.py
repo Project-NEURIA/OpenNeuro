@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.frames import BodyPoseFrame, BonePose
+from src.core.frames import BodyPoseFrame, BonePose, VideoFrame, VideoDataFormat
 
 # Skeleton connectivity: (parent, child) pairs
 _BONES: list[tuple[str, str]] = [
@@ -82,7 +82,7 @@ class PoseRendererInputs(NamedTuple):
 
 
 class PoseRendererOutputs(NamedTuple):
-    video: Sender[bytes]
+    video: Sender[VideoFrame]
 
 
 def _project(
@@ -104,7 +104,7 @@ class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
         super().__init__()
         self.config = config
 
-    def _render_pose(self, poses: dict[str, BonePose | None]) -> bytes:
+    def _render_pose(self, poses: dict[str, BonePose | None]) -> np.ndarray:
         w, h = self.config.width, self.config.height
         img = np.full((h, w, 3), _BG_COLOR, dtype=np.uint8)
 
@@ -132,12 +132,11 @@ class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
             color = _JOINT_COLORS.get(name, _TORSO_COLOR)
             cv2.circle(img, pt, _JOINT_RADIUS_PX, color, -1, cv2.LINE_AA)
 
-        _, buf = cv2.imencode(".jpg", img)
-        return buf.tobytes()
+        return img
 
     def run(self, inputs: PoseRendererInputs, outputs: PoseRendererOutputs) -> None:
         for frame in inputs.pose(self):
             if frame is None:
                 break
-            jpeg = self._render_pose(frame.get())
-            outputs.video.send(jpeg)
+            img = self._render_pose(frame.get())
+            outputs.video.send(VideoFrame.new(data=img, format=VideoDataFormat.BGR))

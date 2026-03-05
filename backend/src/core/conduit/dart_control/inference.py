@@ -354,6 +354,7 @@ class DartControlInference:
         history_motion: torch.Tensor,
         guidance_scale: float = 5.0,
         future_length: int = 8,
+        noise: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Generate one motion primitive (one autoregressive step).
@@ -363,6 +364,8 @@ class DartControlInference:
             history_motion: [B, H, nfeats] normalized history
             guidance_scale: Classifier-free guidance strength
             future_length: Frames to generate per step
+            noise: Optional [B, *noise_shape] noise tensor from RL policy.
+                   None means random noise (default behavior).
 
         Returns:
             future_motion: [B, F, nfeats] normalized future features
@@ -393,7 +396,7 @@ class DartControlInference:
             init_image=None,
             progress=False,
             dump_steps=None,
-            noise=None,
+            noise=noise,
             const_noise=False,
         )  # [B, T=1, D]
 

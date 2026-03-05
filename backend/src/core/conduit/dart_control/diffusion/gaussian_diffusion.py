@@ -68,7 +68,7 @@ class LossType(enum.Enum):
 
 def _extract_into_tensor(arr, timesteps, broadcast_shape):
     """Extract values from a 1-D numpy array for a batch of indices."""
-    res = th.from_numpy(arr).to(device=timesteps.device)[timesteps].float()
+    res = th.from_numpy(arr).float().to(device=timesteps.device)[timesteps]
     while len(res.shape) < len(broadcast_shape):
         res = res[..., None]
     return res.expand(broadcast_shape)

@@ -318,6 +318,19 @@ class ObjectDetectionFrame(Frame):
         )
 
 
+@dataclass(frozen=True, slots=True)
+class GoalFrame(Frame):
+    """Frame containing a 3D goal coordinate for motion control."""
+
+    x: float
+    y: float
+    z: float = 0.0
+
+    @classmethod
+    def new(cls, *, x: float, y: float, z: float = 0.0) -> GoalFrame:
+        return cls(pts=time.time_ns(), id=obj_id(), x=x, y=y, z=z)
+
+
 class VideoDataFormat(Enum):
     BGR = "bgr"
     RGB = "rgb"
