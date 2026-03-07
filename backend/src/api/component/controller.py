@@ -13,7 +13,8 @@ router = APIRouter(prefix="/component")
 
 
 def _resolve_type(name: str) -> type:
-    t = globals().get(name)
+    builtins = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
+    t = globals().get(name) or builtins.get(name)
     if isinstance(t, type):
         return t
     raise ValueError(name)
