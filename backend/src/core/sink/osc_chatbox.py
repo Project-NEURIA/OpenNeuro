@@ -11,9 +11,7 @@ from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.component import Component
 from src.core.channel import Receiver
-from src.core.frames import TextFrame, InterruptFrame
-
-GENERATE_END_FLAG = "[END_OF_GENERATE]"
+from src.core.frames import EOS, TextFrame, InterruptFrame
 
 
 class _OscClient:
@@ -55,7 +53,7 @@ class OSCChatboxConfig(BaseModel):
 
 
 class OSCChatboxInputs(NamedTuple):
-    text: Receiver[TextFrame] | None = None
+    text: Receiver[TextFrame | EOS] | None = None
     interrupt: Receiver[InterruptFrame] | None = None
 
 
@@ -165,13 +163,12 @@ class OSCChatbox(Component[OSCChatboxInputs, tuple[()]]):
             if frame is None:
                 break
 
-            token = frame.get()
-            if token == GENERATE_END_FLAG:
+            if frame is EOS.END:
                 self._flush_text_buffer()
                 continue
 
             with self._text_lock:
-                self._text_buffer += token
+                self._text_buffer += frame.get()
                 self._last_text_time = time.monotonic()
 
     def _text_flush_monitor(self) -> None:

@@ -8,7 +8,7 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
-from src.core.ui_channel import UIReceiver, UISender
+from src.core.channel import UIReceiver, UISender
 
 
 class Status(Enum):
@@ -17,7 +17,9 @@ class Status(Enum):
     STOPPED = "stopped"
 
 
-class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any], ...]](ABC):
+class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
+    ABC
+):
     def __init__(self) -> None:
         self.name: str = type(self).__name__
         self._status = Status.STARTUP

@@ -5,7 +5,7 @@ from typing import NamedTuple
 from src.core.channel import Sender
 from src.core.component import Component
 from src.core.frames import TextFrame
-from src.core.ui_channel import UITextReceiver
+from src.core.channel import UITextReceiver
 
 
 class TextInputInputs(NamedTuple):

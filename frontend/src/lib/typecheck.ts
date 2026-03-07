@@ -119,6 +119,10 @@ function splitTopLevel(s: string): string[] {
 
 export function collectLeafNames(s: string): string[] {
   s = s.trim();
+  // Handle "A | B | ..." pipe-union syntax
+  if (s.includes(" | ")) {
+    return s.split(/\s*\|\s*/).flatMap(collectLeafNames);
+  }
   const bracket = s.indexOf("[");
   if (bracket !== -1 && s.endsWith("]")) {
     const inner = s.slice(bracket + 1, -1);
@@ -129,6 +133,16 @@ export function collectLeafNames(s: string): string[] {
 
 function parseType(s: string, concreteTypes: Set<string>, scope?: string): Type {
   s = s.trim();
+
+  // Handle "A | B | ..." pipe-union syntax
+  if (s.includes(" | ")) {
+    const parts = s.split(/\s*\|\s*/);
+    if (parts.length > 1) {
+      const types = parts.map((p) => parseType(p, concreteTypes, scope));
+      return types.length === 1 ? types[0]! : { kind: "union", types };
+    }
+  }
+
   const bracket = s.indexOf("[");
   if (bracket !== -1 && s.endsWith("]")) {
     const name = s.slice(0, bracket);

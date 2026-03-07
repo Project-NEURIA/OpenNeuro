@@ -7,7 +7,7 @@ from collections import deque
 from typing import NamedTuple, cast
 
 import discord
-from discord.sinks import PCMSink, Sink
+from discord.sinks import PCMSink
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
@@ -55,7 +55,9 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
 
         token = os.getenv(self.config.token_env_var)
         if not token:
-            raise ValueError(f"Environment variable {self.config.token_env_var} must be set")
+            raise ValueError(
+                f"Environment variable {self.config.token_env_var} must be set"
+            )
         self.token = token
 
         self.max_frames = self.config.audio_buffer_seconds * 50  # 20ms frames
@@ -115,7 +117,7 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 return
 
             gid = ctx.guild.id
-            ring: deque[bytes] = deque(maxlen=2000) # Use a sane default or active's
+            ring: deque[bytes] = deque(maxlen=2000)  # Use a sane default or active's
             if _active_discord_io:
                 ring = deque(maxlen=_active_discord_io.max_frames)
             _rings[gid] = ring
@@ -206,17 +208,16 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
 class _DiscordSink(PCMSink):
     def write(self, data: bytes, user: object) -> None:
         if _active_discord_io:
-            gid = None
             # Find the guild id for this sink if needed, but we can just use ring
             # Actually, _DiscordSink doesn't know its guild unless we tell it.
-            # But the ring is global anyway. 
+            # But the ring is global anyway.
             # Wait, the ring should be per-guild.
             # Let's simplify and just send to the active IO.
             _active_discord_io._output_audio.send(
                 AudioFrame.new(
                     data=data,
-                    sample_rate=48000, # Discord is always 48k
-                    channels=2, # Discord is always stereo
+                    sample_rate=48000,  # Discord is always 48k
+                    channels=2,  # Discord is always stereo
                 )
             )
 

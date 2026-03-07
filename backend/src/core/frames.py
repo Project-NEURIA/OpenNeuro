@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal, overload, NamedTuple
+from typing import ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
@@ -180,6 +180,20 @@ class TextFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
+class EOS(TextFrame):
+    """End-of-sequence sentinel. Subclasses TextFrame so Receiver[TextFrame] accepts it."""
+
+    END: ClassVar[EOS]  # type: ignore[misc]
+
+    @classmethod
+    def new(cls, *, text: str = "", language: str | None = None) -> EOS:
+        return cls(pts=0, id=0, text=text, language=language)
+
+
+EOS.END = EOS.new()
+
+
+@dataclass(frozen=True, slots=True)
 class InterruptFrame(Frame):
     """Frame representing an interrupt event."""
 
@@ -300,6 +314,19 @@ class ObjectDetectionFrame(Frame):
             scores=scores,
             prompts=prompts,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class GoalFrame(Frame):
+    """Frame containing a 3D goal coordinate for motion control."""
+
+    x: float
+    y: float
+    z: float = 0.0
+
+    @classmethod
+    def new(cls, *, x: float, y: float, z: float = 0.0) -> GoalFrame:
+        return cls(pts=time.time_ns(), id=obj_id(), x=x, y=y, z=z)
 
 
 class VideoDataFormat(Enum):

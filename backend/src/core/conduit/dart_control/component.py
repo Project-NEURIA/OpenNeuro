@@ -1,8 +1,9 @@
 """
 DartControl conduit component.
 
-Takes text instructions (e.g. "walk", "sit", "wave") as input and outputs
-BodyPoseFrames with position + quaternion for 13 tracked body parts.
+Takes text instructions (e.g. "walk", "sit", "wave") and optional goal
+coordinates as input and outputs BodyPoseFrames with position + quaternion
+for 13 tracked body parts.
 """
 
 from __future__ import annotations
@@ -11,18 +12,21 @@ import math
 import pickle
 import queue
 import threading
+from pathlib import Path
 from typing import NamedTuple
 
+import numpy as np
 import torch
 from . import rotation_conversions as transforms
 from pydantic import BaseModel
 
 from src.core.component import Component
-from src.core.channel import Sender
-from src.core.frames import BodyPoseFrame, BonePose
+from src.core.channel import Receiver, Sender
+from src.core.frames import BodyPoseFrame, BonePose, GoalFrame, TextFrame
 
 from .inference import DartControlInference
-from .smpl_utils import PrimitiveUtility
+from .policy import PolicyConfig, PolicyReachLocationMLP
+from .smpl_utils import PrimitiveUtility, get_new_coordinate
 
 
 # ── SMPL feature layout (276 dims) ─────────────────────────────────────────
@@ -174,12 +178,26 @@ class DartControlConfig(BaseModel):
     fps: float = 30.0
     """Framerate for emitting body pose frames."""
 
+    policy_checkpoint: str = "assets/dart_control/iter_2000.pth"
+    """Path to trained RL policy checkpoint. Empty string disables policy."""
+
+    obs_goal_angle_clip: float = 60.0
+    """Maximum angle (degrees) between body forward dir and goal dir in observation."""
+
+    obs_goal_dist_clip: float = 5.0
+    """Maximum goal distance value in observation (clamped)."""
+
+
+class DartControlInputs(NamedTuple):
+    goal: Receiver[GoalFrame] | None = None
+    instruction: Receiver[TextFrame] | None = None
+
 
 class DartControlOutputs(NamedTuple):
     motion: Sender[BodyPoseFrame]
 
 
-class DartControl(Component[tuple[()], DartControlOutputs]):
+class DartControl(Component[DartControlInputs, DartControlOutputs]):
     """
     DartControl motion generation conduit.
 
@@ -410,27 +428,217 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
         world_tensor = putil.dict_to_tensor(world_dict)  # [B, F, 276]
         return world_tensor.cpu()
 
+    def _get_global_joints(self, putil: PrimitiveUtility) -> torch.Tensor:
+        """Get global joints from current history state.
+
+        Returns: [B, H, 22, 3] global joint positions.
+        """
+        engine = self._engine
+        assert engine is not None
+        history_denorm = engine.denormalize(self._history)  # [B, H, 276]
+        feature_dict = putil.tensor_to_dict(history_denorm)
+        local_joints = feature_dict["joints"]  # [B, H, 22*3]
+        B, T, _ = local_joints.shape
+        local_joints = local_joints.view(B, T, 22, 3)
+        transf_rotmat = self._transf_rotmat
+        transf_transl = self._transf_transl
+        global_joints = torch.einsum(
+            "bij,btkj->btki", transf_rotmat, local_joints
+        ) + transf_transl.unsqueeze(1)
+        return global_joints
+
+    def _compute_observation(
+        self,
+        putil: PrimitiveUtility,
+        goal: torch.Tensor,
+        text_embedding: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the RL policy observation vector.
+
+        Ported from DART's env_reach_location_mld.py get_observation().
+
+        Args:
+            putil: PrimitiveUtility instance
+            goal: [B, 3] goal location in world coordinates
+            text_embedding: [B, 512] CLIP text embedding
+
+        Returns:
+            observation: [B, obs_dim] observation vector
+        """
+        device = self.config.device
+        B = self.config.batch_size
+        engine = self._engine
+        assert engine is not None
+
+        global_joints = self._get_global_joints(putil)  # [B, H, 22, 3]
+        global_pelvis = global_joints[:, -1, 0]  # [B, 3]
+
+        # Goal direction (XY plane)
+        global_goal_dir = goal - global_pelvis  # [B, 3]
+        global_goal_dir[:, 2] = 0
+        goal_dist = torch.norm(global_goal_dir, dim=-1, keepdim=True)  # [B, 1]
+        global_goal_dir = global_goal_dir / goal_dist.clip(min=1e-12)
+
+        # Body forward direction
+        body_orient, _ = get_new_coordinate(
+            global_joints[:, -1]
+        )  # [B, 3, 3], [B, 1, 3]
+        forward_dir = body_orient[:, :, 1]  # [B, 3]
+        forward_dir[:, 2] = 0
+        moving_dir = forward_dir / torch.norm(forward_dir, dim=-1, keepdim=True).clip(
+            min=1e-12
+        )
+
+        # Clip goal angle
+        cos_theta = torch.einsum("bi,bi->b", global_goal_dir, moving_dir)  # [B]
+        cos_theta = cos_theta.clip(
+            min=np.cos(np.deg2rad(self.config.obs_goal_angle_clip)), max=1
+        )
+        sign = torch.sign(torch.cross(moving_dir, global_goal_dir, dim=1)[:, 2])  # [B]
+        theta = torch.acos(cos_theta) * sign  # [B]
+        rotation_matrix = transforms.euler_angles_to_matrix(
+            torch.cat([torch.zeros(B, 2, device=device), theta.unsqueeze(1)], dim=1),
+            "XYZ",
+        )  # [B, 3, 3]
+        global_goal_dir = torch.einsum(
+            "bij,bj->bi", rotation_matrix, moving_dir
+        )  # [B, 3]
+
+        # Transform to local coordinate frame
+        transf_rotmat = self._transf_rotmat
+        local_goal_dir = torch.einsum(
+            "bij,bj->bi", transf_rotmat.permute(0, 2, 1), global_goal_dir
+        )  # [B, 3]
+
+        # Build unnormalized motion tensor from current history
+        history_denorm = engine.denormalize(self._history)  # [B, H, 276]
+        motion_tensor = history_denorm  # [B, H, D]
+
+        # Floor height relative to first-frame pelvis
+        floor_height = -global_joints[:, 0, 0, 2]  # [B]
+
+        # Concatenate: goal_dir(3), goal_dist(1), text(512), motion(H*276), scene(1)
+        observation = torch.cat(
+            [
+                local_goal_dir,  # [B, 3]
+                goal_dist.clip(max=self.config.obs_goal_dist_clip),  # [B, 1]
+                text_embedding,  # [B, 512]
+                motion_tensor.reshape(B, -1),  # [B, H*276]
+                floor_height.unsqueeze(1),  # [B, 1]
+            ],
+            dim=-1,
+        )
+        return observation
+
+    def _load_policy(
+        self, engine: DartControlInference
+    ) -> PolicyReachLocationMLP | None:
+        """Load the RL policy if a checkpoint is configured."""
+        if not self.config.policy_checkpoint:
+            return None
+        ckpt_path = Path(self.config.policy_checkpoint)
+        if not ckpt_path.exists():
+            print(f"[DartControl] Policy checkpoint not found: {ckpt_path}, skipping")
+            return None
+
+        h_len = engine.history_shape[0]
+        noise_shape = engine.noise_shape
+        policy_config = PolicyConfig(
+            motion_dim=h_len * 276,
+            action_dim=int(np.prod(noise_shape)),
+        )
+        policy = PolicyReachLocationMLP(policy_config).to(self.config.device)
+
+        ckpt = torch.load(
+            str(ckpt_path), map_location=self.config.device, weights_only=False
+        )
+        # The checkpoint may store the full agent state; extract policy weights
+        state_dict = ckpt.get("model_state_dict", ckpt)
+        # Filter to only keys that exist in our stripped policy (no critic)
+        model_keys = set(policy.state_dict().keys())
+        filtered = {k: v for k, v in state_dict.items() if k in model_keys}
+        policy.load_state_dict(filtered, strict=False)
+        policy.eval()
+        for p in policy.parameters():
+            p.requires_grad = False
+
+        print(f"[DartControl] RL policy loaded from {ckpt_path}")
+        return policy
+
     def _generation_loop(
         self,
         engine: DartControlInference,
         putil: PrimitiveUtility,
         frame_queue: queue.Queue[dict[str, BonePose | None]],
+        policy: PolicyReachLocationMLP | None,
+        goal_receiver: Receiver[GoalFrame] | None,
+        instruction_receiver: Receiver[TextFrame] | None,
     ) -> None:
         """Background thread: generates motion primitives and fills the queue."""
-        instruction = "wave"
-        print(f"[DartControl] Instruction: '{instruction}'")
+        instruction: str | None = None
+        text_embedding: torch.Tensor | None = None
 
-        text_embedding = engine.encode_text([instruction])  # [1, 512]
-        text_embedding = text_embedding.expand(self.config.batch_size, -1)
+        # Current goal (None means no goal → random noise)
+        current_goal: torch.Tensor | None = None
+
+        # Set up non-blocking generators for input channels
+        goal_gen = (
+            goal_receiver(self, newest=True, no_block=True)
+            if goal_receiver is not None
+            else None
+        )
+        instruction_gen = (
+            instruction_receiver(self, newest=True, no_block=True)
+            if instruction_receiver is not None
+            else None
+        )
+
+        print("[DartControl] Idle, waiting for instruction...")
 
         while not self.stop_event.is_set():
             try:
+                # Poll instruction channel (non-blocking)
+                if instruction_gen is not None:
+                    instr_frame = next(instruction_gen)
+                    if instr_frame is not None and isinstance(instr_frame, TextFrame):
+                        new_instruction = instr_frame.get()
+                        if new_instruction and new_instruction != instruction:
+                            instruction = new_instruction
+                            print(f"[DartControl] Instruction updated: '{instruction}'")
+                            text_embedding = engine.encode_text([instruction])
+                            text_embedding = text_embedding.expand(
+                                self.config.batch_size, -1
+                            )
+
+                # Stay idle until an instruction is received
+                if text_embedding is None:
+                    self.stop_event.wait(0.1)
+                    continue
+
+                # Poll goal channel (non-blocking)
+                if goal_gen is not None:
+                    goal_frame = next(goal_gen)
+                    if goal_frame is not None and isinstance(goal_frame, GoalFrame):
+                        current_goal = torch.tensor(
+                            [[goal_frame.x, goal_frame.y, goal_frame.z]],
+                            device=self.config.device,
+                            dtype=torch.float32,
+                        ).expand(self.config.batch_size, -1)
+
+                # Compute noise from policy if available
+                noise: torch.Tensor | None = None
+                if policy is not None and current_goal is not None:
+                    obs = self._compute_observation(putil, current_goal, text_embedding)
+                    action = policy.get_action_mean(obs)  # [B, action_dim]
+                    noise = action.view(self.config.batch_size, *engine.noise_shape)
+
                 # Generate future frames (normalized)
                 future_normalized = engine.generate_step(
                     text_embedding=text_embedding,
                     history_motion=self._history,
                     guidance_scale=self.config.guidance_scale,
                     future_length=self.config.future_length,
+                    noise=noise,
                 )  # [B, F, 276] normalized
 
                 # Transform to world space for output
@@ -455,7 +663,7 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
                 traceback.print_exc()
                 continue
 
-    def run(self, _inputs: tuple[()], outputs: DartControlOutputs) -> None:
+    def run(self, inputs: DartControlInputs, outputs: DartControlOutputs) -> None:
         print("[DartControl] Starting DartControl component, loading models...")
         engine = self._ensure_engine()
         putil = self._ensure_primitive_util()
@@ -463,12 +671,17 @@ class DartControl(Component[tuple[()], DartControlOutputs]):
 
         # Initialize history from stand.pkl
         self._init_from_stand(engine, putil)
+
+        # Load RL policy if configured
+        policy = self._load_policy(engine)
         print("[DartControl] Streaming motion")
 
         frame_queue: queue.Queue[dict[str, BonePose | None]] = queue.Queue(maxsize=64)
 
         gen_thread = threading.Thread(
-            target=self._generation_loop, args=(engine, putil, frame_queue), daemon=True
+            target=self._generation_loop,
+            args=(engine, putil, frame_queue, policy, inputs.goal, inputs.instruction),
+            daemon=True,
         )
         gen_thread.start()
 

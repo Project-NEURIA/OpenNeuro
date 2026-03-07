@@ -21,7 +21,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from src.core.channel import Receiver
 from src.core.frames import TextFrame
 from src.core.graph import GraphManager
-from src.core.ui_channel import UIVideoSender
+from src.core.channel import UIVideoSender
 
 router = APIRouter(prefix="/ui")
 

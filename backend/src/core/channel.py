@@ -5,6 +5,8 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Generator
 
+from src.core.frames import TextFrame
+
 if TYPE_CHECKING:
     from src.core.component import Component
 
@@ -151,3 +153,30 @@ class Receiver[T]:
                 return 0
             head = ch._offset + len(ch._items)
             return head - cursor
+
+
+# -- UI channel markers --
+
+
+class UISender[T](Sender[T]):
+    """Marker base: data flows from component to the frontend node UI."""
+
+
+class UIReceiver[T](Receiver[T]):
+    """Marker base: data flows from the frontend node UI to the component."""
+
+
+class UITextSender(UISender[TextFrame]):
+    """Component sends text for display in the node UI."""
+
+
+class UIVideoSender(UISender[bytes]):
+    """Component sends JPEG bytes for display in the node UI."""
+
+
+class UITextReceiver(UIReceiver[TextFrame]):
+    """Component receives text typed by the user in the node UI."""
+
+
+class UIKeystrokeReceiver(UIReceiver[TextFrame]):
+    """Component receives individual keystrokes from the node UI."""

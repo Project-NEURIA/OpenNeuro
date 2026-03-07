@@ -11,7 +11,7 @@ from src.core.channel import Receiver, Sender
 from src.core.component import Component
 from src.core.frames import MessagesFrame, TextFrame
 
-from mem0 import Memory
+from mem0 import Memory  # type: ignore[import-untyped]
 
 
 class Mem0VectorStoreConfig(BaseModel):
@@ -72,9 +72,11 @@ def _build_mem0_config(config: Mem0Config) -> dict[str, Any]:
                 "api_key": _require_env(config.llm_api_key_env_var),
                 "temperature": config.llm_temperature,
                 "max_tokens": config.llm_max_tokens,
-                **({
-                    "openai_base_url": config.llm_base_url
-                } if config.llm_base_url else {}),
+                **(
+                    {"openai_base_url": config.llm_base_url}
+                    if config.llm_base_url
+                    else {}
+                ),
             },
         },
         "embedder": {
@@ -83,9 +85,11 @@ def _build_mem0_config(config: Mem0Config) -> dict[str, Any]:
                 "model": config.embedder_model,
                 "api_key": _require_env(config.embedder_api_key_env_var),
                 "embedding_dims": config.embedder_dims,
-                **({
-                    "openai_base_url": config.embedder_base_url
-                } if config.embedder_base_url else {}),
+                **(
+                    {"openai_base_url": config.embedder_base_url}
+                    if config.embedder_base_url
+                    else {}
+                ),
             },
         },
     }
