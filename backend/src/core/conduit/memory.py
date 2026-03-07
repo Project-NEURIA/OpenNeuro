@@ -11,7 +11,7 @@ from src.core.channel import Receiver, Sender
 from src.core.component import Component
 from src.core.frames import MessagesFrame, TextFrame
 
-from mem0 import Memory
+from mem0 import Memory  # type: ignore[import-untyped]
 
 
 class Mem0VectorStoreConfig(BaseModel):
