@@ -64,7 +64,10 @@ class MLPBlock(nn.Module):
         super().__init__()
         self.residual = residual
         self.layers = nn.ModuleList(
-            [MLP(h_dim, h_dims=[h_dim, h_dim], activation=actfun) for _ in range(n_blocks)]
+            [
+                MLP(h_dim, h_dims=[h_dim, h_dim], activation=actfun)
+                for _ in range(n_blocks)
+            ]
         )
         self.out_fc = nn.Linear(h_dim, out_dim)
 
@@ -86,12 +89,12 @@ class PolicyConfig:
     pred_std: bool = False
     use_tanh_scale: bool = True
     # Observation component dimensions
-    motion_dim: int = 552       # history_length(2) * feature_dim(276)
-    text_dim: int = 512         # CLIP embedding dim
-    goal_dim: int = 4           # goal_dir(3) + goal_dist(1)
-    scene_dim: int = 1          # floor height
+    motion_dim: int = 552  # history_length(2) * feature_dim(276)
+    text_dim: int = 512  # CLIP embedding dim
+    goal_dim: int = 4  # goal_dir(3) + goal_dist(1)
+    scene_dim: int = 1  # floor height
     # Action dimension = product of noise_shape
-    action_dim: int = 256       # 1 * 256 for transformer denoiser
+    action_dim: int = 256  # 1 * 256 for transformer denoiser
 
 
 class PolicyReachLocationMLP(nn.Module):
@@ -113,11 +116,21 @@ class PolicyReachLocationMLP(nn.Module):
         # goal_dir(3), goal_dist(1), text(512), motion(552), scene(1)
         self._obs_slices = self._build_obs_slices(config)
 
-        self.motion_encoder = MLP(in_dim=config.motion_dim, h_dims=[latent_dim], activation=activation)
-        self.text_encoder = MLP(in_dim=config.text_dim, h_dims=[latent_dim], activation=activation)
-        self.goal_encoder = MLP(in_dim=config.goal_dim, h_dims=[latent_dim], activation=activation)
-        self.scene_encoder = MLP(in_dim=config.scene_dim, h_dims=[latent_dim], activation=activation)
-        self.embedding_encoder = MLP(in_dim=latent_dim * 4, h_dims=[latent_dim], activation=activation)
+        self.motion_encoder = MLP(
+            in_dim=config.motion_dim, h_dims=[latent_dim], activation=activation
+        )
+        self.text_encoder = MLP(
+            in_dim=config.text_dim, h_dims=[latent_dim], activation=activation
+        )
+        self.goal_encoder = MLP(
+            in_dim=config.goal_dim, h_dims=[latent_dim], activation=activation
+        )
+        self.scene_encoder = MLP(
+            in_dim=config.scene_dim, h_dims=[latent_dim], activation=activation
+        )
+        self.embedding_encoder = MLP(
+            in_dim=latent_dim * 4, h_dims=[latent_dim], activation=activation
+        )
 
         out_dim = action_dim * 2 if config.pred_std else action_dim
         self.actor = MLPBlock(latent_dim, out_dim, config.n_blocks, actfun=activation)
@@ -143,12 +156,12 @@ class PolicyReachLocationMLP(nn.Module):
 
     def get_embedding(self, observation: torch.Tensor) -> torch.Tensor:
         s = self._obs_slices
-        motion = observation[:, s["motion"][0]:s["motion"][1]]
-        text = observation[:, s["text"][0]:s["text"][1]]
-        goal_dir = observation[:, s["goal_dir"][0]:s["goal_dir"][1]]
-        goal_dist = observation[:, s["goal_dist"][0]:s["goal_dist"][1]]
+        motion = observation[:, s["motion"][0] : s["motion"][1]]
+        text = observation[:, s["text"][0] : s["text"][1]]
+        goal_dir = observation[:, s["goal_dir"][0] : s["goal_dir"][1]]
+        goal_dist = observation[:, s["goal_dist"][0] : s["goal_dist"][1]]
         goal = torch.cat((goal_dir, goal_dist), dim=1)
-        scene = observation[:, s["scene"][0]:s["scene"][1]]
+        scene = observation[:, s["scene"][0] : s["scene"][1]]
 
         motion_emb = self.motion_encoder(motion)
         text_emb = self.text_encoder(text)
@@ -170,7 +183,7 @@ class PolicyReachLocationMLP(nn.Module):
         """
         embedding = self.get_embedding(observation)
         actor_output = self.actor(embedding)
-        action_mean = actor_output[:, :self.config.action_dim]
+        action_mean = actor_output[:, : self.config.action_dim]
         if self.config.use_tanh_scale:
             action_mean = torch.tanh(action_mean) * 4
         return action_mean

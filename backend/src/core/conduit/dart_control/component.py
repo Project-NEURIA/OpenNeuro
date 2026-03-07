@@ -442,10 +442,9 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
         local_joints = local_joints.view(B, T, 22, 3)
         transf_rotmat = self._transf_rotmat
         transf_transl = self._transf_transl
-        global_joints = (
-            torch.einsum("bij,btkj->btki", transf_rotmat, local_joints)
-            + transf_transl.unsqueeze(1)
-        )
+        global_joints = torch.einsum(
+            "bij,btkj->btki", transf_rotmat, local_joints
+        ) + transf_transl.unsqueeze(1)
         return global_joints
 
     def _compute_observation(
@@ -481,10 +480,14 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
         global_goal_dir = global_goal_dir / goal_dist.clip(min=1e-12)
 
         # Body forward direction
-        body_orient, _ = get_new_coordinate(global_joints[:, -1])  # [B, 3, 3], [B, 1, 3]
+        body_orient, _ = get_new_coordinate(
+            global_joints[:, -1]
+        )  # [B, 3, 3], [B, 1, 3]
         forward_dir = body_orient[:, :, 1]  # [B, 3]
         forward_dir[:, 2] = 0
-        moving_dir = forward_dir / torch.norm(forward_dir, dim=-1, keepdim=True).clip(min=1e-12)
+        moving_dir = forward_dir / torch.norm(forward_dir, dim=-1, keepdim=True).clip(
+            min=1e-12
+        )
 
         # Clip goal angle
         cos_theta = torch.einsum("bi,bi->b", global_goal_dir, moving_dir)  # [B]
@@ -494,12 +497,12 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
         sign = torch.sign(torch.cross(moving_dir, global_goal_dir, dim=1)[:, 2])  # [B]
         theta = torch.acos(cos_theta) * sign  # [B]
         rotation_matrix = transforms.euler_angles_to_matrix(
-            torch.cat(
-                [torch.zeros(B, 2, device=device), theta.unsqueeze(1)], dim=1
-            ),
+            torch.cat([torch.zeros(B, 2, device=device), theta.unsqueeze(1)], dim=1),
             "XYZ",
         )  # [B, 3, 3]
-        global_goal_dir = torch.einsum("bij,bj->bi", rotation_matrix, moving_dir)  # [B, 3]
+        global_goal_dir = torch.einsum(
+            "bij,bj->bi", rotation_matrix, moving_dir
+        )  # [B, 3]
 
         # Transform to local coordinate frame
         transf_rotmat = self._transf_rotmat
@@ -517,17 +520,19 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
         # Concatenate: goal_dir(3), goal_dist(1), text(512), motion(H*276), scene(1)
         observation = torch.cat(
             [
-                local_goal_dir,                                          # [B, 3]
-                goal_dist.clip(max=self.config.obs_goal_dist_clip),      # [B, 1]
-                text_embedding,                                          # [B, 512]
-                motion_tensor.reshape(B, -1),                            # [B, H*276]
-                floor_height.unsqueeze(1),                               # [B, 1]
+                local_goal_dir,  # [B, 3]
+                goal_dist.clip(max=self.config.obs_goal_dist_clip),  # [B, 1]
+                text_embedding,  # [B, 512]
+                motion_tensor.reshape(B, -1),  # [B, H*276]
+                floor_height.unsqueeze(1),  # [B, 1]
             ],
             dim=-1,
         )
         return observation
 
-    def _load_policy(self, engine: DartControlInference) -> PolicyReachLocationMLP | None:
+    def _load_policy(
+        self, engine: DartControlInference
+    ) -> PolicyReachLocationMLP | None:
         """Load the RL policy if a checkpoint is configured."""
         if not self.config.policy_checkpoint:
             return None
@@ -544,7 +549,9 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
         )
         policy = PolicyReachLocationMLP(policy_config).to(self.config.device)
 
-        ckpt = torch.load(str(ckpt_path), map_location=self.config.device, weights_only=False)
+        ckpt = torch.load(
+            str(ckpt_path), map_location=self.config.device, weights_only=False
+        )
         # The checkpoint may store the full agent state; extract policy weights
         state_dict = ckpt.get("model_state_dict", ckpt)
         # Filter to only keys that exist in our stripped policy (no critic)
@@ -623,9 +630,7 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
                 if policy is not None and current_goal is not None:
                     obs = self._compute_observation(putil, current_goal, text_embedding)
                     action = policy.get_action_mean(obs)  # [B, action_dim]
-                    noise = action.view(
-                        self.config.batch_size, *engine.noise_shape
-                    )
+                    noise = action.view(self.config.batch_size, *engine.noise_shape)
 
                 # Generate future frames (normalized)
                 future_normalized = engine.generate_step(

@@ -64,8 +64,12 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
         memory_prefix_receiver = inputs.memory_prefix
         memory_sender = outputs.messages_for_memory
         has_memory = memory_prefix_receiver is not None and memory_sender is not None
-        memory_gen = memory_prefix_receiver(self) if memory_prefix_receiver is not None else None
-        print(f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}")
+        memory_gen = (
+            memory_prefix_receiver(self) if memory_prefix_receiver is not None else None
+        )
+        print(
+            f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}"
+        )
 
         def process_asr() -> None:
             for text_frame in inputs.asr(self):

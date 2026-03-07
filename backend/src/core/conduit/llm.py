@@ -108,7 +108,9 @@ class LLM(Component[LLMInputs, LLMOutputs]):
     ) -> None:
         api_key = os.getenv(self.config.api_key_env_var)
         if not api_key:
-            raise ValueError(f"Environment variable {self.config.api_key_env_var} must be set")
+            raise ValueError(
+                f"Environment variable {self.config.api_key_env_var} must be set"
+            )
 
         headers = {
             "Authorization": f"Bearer {api_key}",

@@ -10,7 +10,6 @@ import numpy as np
 from src.core.utils import obj_id
 
 
-
 class BonePose(NamedTuple):
     """Position (meters) + quaternion rotation (w,x,y,z) for a single bone."""
 
@@ -192,7 +191,6 @@ class EOS(TextFrame):
 
 
 EOS.END = EOS.new()
-
 
 
 @dataclass(frozen=True, slots=True)

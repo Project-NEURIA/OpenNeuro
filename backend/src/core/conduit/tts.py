@@ -144,9 +144,13 @@ class TTS(Component[TTSInputs, TTSOutputs]):
                     if gen != self._generation:
                         continue
 
-                cred = os.getenv("INWORLD_API_KEY") or os.getenv(self.config.api_key_env_var)
+                cred = os.getenv("INWORLD_API_KEY") or os.getenv(
+                    self.config.api_key_env_var
+                )
                 if not cred:
-                    raise ValueError(f"Environment variable {self.config.api_key_env_var} must be set")
+                    raise ValueError(
+                        f"Environment variable {self.config.api_key_env_var} must be set"
+                    )
 
                 headers = {
                     "Authorization": f"Basic {cred}",
