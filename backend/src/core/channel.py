@@ -5,6 +5,8 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Generator
 
+from src.core.frames import TextFrame
+
 if TYPE_CHECKING:
     from src.core.component import Component
 
@@ -164,7 +166,7 @@ class UIReceiver[T](Receiver[T]):
     """Marker base: data flows from the frontend node UI to the component."""
 
 
-class UITextSender(UISender["TextFrame"]):
+class UITextSender(UISender[TextFrame]):
     """Component sends text for display in the node UI."""
 
 
@@ -172,9 +174,9 @@ class UIVideoSender(UISender[bytes]):
     """Component sends JPEG bytes for display in the node UI."""
 
 
-class UITextReceiver(UIReceiver["TextFrame"]):
+class UITextReceiver(UIReceiver[TextFrame]):
     """Component receives text typed by the user in the node UI."""
 
 
-class UIKeystrokeReceiver(UIReceiver["TextFrame"]):
+class UIKeystrokeReceiver(UIReceiver[TextFrame]):
     """Component receives individual keystrokes from the node UI."""

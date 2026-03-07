@@ -61,8 +61,10 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
 
-        has_memory = inputs.memory_prefix is not None and outputs.messages_for_memory is not None
-        memory_gen = inputs.memory_prefix(self) if has_memory else None
+        memory_prefix_receiver = inputs.memory_prefix
+        memory_sender = outputs.messages_for_memory
+        has_memory = memory_prefix_receiver is not None and memory_sender is not None
+        memory_gen = memory_prefix_receiver(self) if memory_prefix_receiver is not None else None
         print(f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}")
 
         def process_asr() -> None:
@@ -80,8 +82,8 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 # Memory retrieval (optional)
                 mem_text = ""
-                if has_memory:
-                    outputs.messages_for_memory.send(
+                if has_memory and memory_sender is not None and memory_gen is not None:
+                    memory_sender.send(
                         MessagesFrame.new(
                             text=self._build_context(),
                             messages=self._build_messages(),

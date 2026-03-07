@@ -7,7 +7,7 @@ from collections import deque
 from typing import NamedTuple, cast
 
 import discord
-from discord.sinks import PCMSink, Sink
+from discord.sinks import PCMSink
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
@@ -206,7 +206,6 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
 class _DiscordSink(PCMSink):
     def write(self, data: bytes, user: object) -> None:
         if _active_discord_io:
-            gid = None
             # Find the guild id for this sink if needed, but we can just use ring
             # Actually, _DiscordSink doesn't know its guild unless we tell it.
             # But the ring is global anyway. 

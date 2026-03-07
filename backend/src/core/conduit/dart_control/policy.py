@@ -11,11 +11,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing import Any
+
 import torch
 from torch import nn
 
 
 class MLP(nn.Module):
+    activation: Any
+
     def __init__(
         self,
         in_dim: int,
