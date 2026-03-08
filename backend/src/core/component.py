@@ -170,12 +170,30 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
         """Construct a component instance, deserializing any BaseModel init params."""
+        def _extract_basemodel_type(t: Any) -> type[BaseModel] | None:
+            if isinstance(t, type) and issubclass(t, BaseModel):
+                return t
+            origin = get_origin(t)
+            if origin is None:
+                return None
+            for arg in get_args(t):
+                if isinstance(arg, type) and issubclass(arg, BaseModel):
+                    return arg
+            return None
+
         kwargs: dict[str, Any] = {}
         for k, v in cls.get_init_types().items():
             if k not in init_args:
                 continue
-            if isinstance(v, type) and issubclass(v, BaseModel):
-                kwargs[k] = v(**init_args[k])
+            model_type = _extract_basemodel_type(v)
+            if model_type is not None:
+                raw = init_args[k]
+                if isinstance(raw, BaseModel):
+                    kwargs[k] = raw
+                elif isinstance(raw, dict):
+                    kwargs[k] = model_type(**raw)
+                else:
+                    kwargs[k] = model_type.model_validate(raw)
             else:
                 kwargs[k] = init_args[k]
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
