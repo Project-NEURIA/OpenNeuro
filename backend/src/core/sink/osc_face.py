@@ -300,13 +300,17 @@ Schema:
 """
 
 
-def build_full_targets(base_neutral: Dict[str, float]) -> Tuple[Dict[str, float], List[str]]:
+def build_full_targets(
+    base_neutral: Dict[str, float],
+) -> Tuple[Dict[str, float], List[str]]:
     keys = list(MANAGED_PARAMS)
     base_defaults = {k: float(base_neutral.get(k, 0.0)) for k in keys}
     return base_defaults, keys
 
 
-def preset_to_full(preset_name: str, base_defaults: Dict[str, float]) -> Dict[str, float]:
+def preset_to_full(
+    preset_name: str, base_defaults: Dict[str, float]
+) -> Dict[str, float]:
     fn = EXPRESSION_PRESETS.get(preset_name, expression_neutral)
     full = dict(base_defaults)
     full.update({k: float(v) for k, v in fn().items()})
@@ -318,51 +322,64 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
         super().__init__()
         self.config = config or OSCFaceConfig()
 
-        self.host = self.config.host or os.getenv("VRCHAT_IP", "127.0.0.1")
-        self.port = int(self.config.port or int(os.getenv("VRCHAT_PORT", "9000")))
-        self.osc_prefix = self.config.osc_prefix or os.getenv("OSC_PREFIX", "/avatar/parameters")
-        self.param_prefix = self.config.param_prefix or os.getenv("VRCHAT_PARAM_PREFIX", "FT")
+        self.host = self.config.host or os.getenv("VRCHAT_IP") or "127.0.0.1"
+        self.port = (
+            int(self.config.port)
+            if self.config.port is not None
+            else int(os.getenv("VRCHAT_PORT", "9000"))
+        )
+        self.osc_prefix = self.config.osc_prefix or os.getenv(
+            "OSC_PREFIX", "/avatar/parameters"
+        )
+        self.param_prefix = self.config.param_prefix or os.getenv(
+            "VRCHAT_PARAM_PREFIX", "FT"
+        )
 
-        self.hold_seconds = float(
+        hold_seconds_value = (
             self.config.hold_seconds
             if self.config.hold_seconds is not None
-            else os.getenv("HOLD_SECONDS", "2.0")
+            else float(os.getenv("HOLD_SECONDS", "2.0"))
         )
-        self.transition_seconds = float(
+        self.hold_seconds = float(hold_seconds_value)
+        transition_seconds_value = (
             self.config.transition_seconds
             if self.config.transition_seconds is not None
-            else os.getenv("TRANSITION_SECONDS", "0.3")
+            else float(os.getenv("TRANSITION_SECONDS", "0.3"))
         )
+        self.transition_seconds = float(transition_seconds_value)
         self.transition_steps = max(
             1,
             int(
                 self.config.transition_steps
                 if self.config.transition_steps is not None
-                else os.getenv("TRANSITION_STEPS", "20")
+                else int(os.getenv("TRANSITION_STEPS", "20"))
             ),
         )
         self.step_sleep = self.transition_seconds / self.transition_steps
-        self.send_gap_seconds = float(
+        send_gap_seconds_value = (
             self.config.send_gap_seconds
             if self.config.send_gap_seconds is not None
-            else os.getenv("SEND_GAP_SECONDS", "0.0")
+            else float(os.getenv("SEND_GAP_SECONDS", "0.0"))
         )
-        self.text_flush_ms = int(
+        self.send_gap_seconds = float(send_gap_seconds_value)
+        text_flush_ms_value = (
             self.config.text_flush_ms
             if self.config.text_flush_ms is not None
-            else os.getenv("OSC_FACE_TEXT_FLUSH_MS", "600")
+            else int(os.getenv("OSC_FACE_TEXT_FLUSH_MS", "600"))
         )
+        self.text_flush_ms = int(text_flush_ms_value)
 
         self.emotion_llm_enable = (
             self.config.emotion_llm_enable
             if self.config.emotion_llm_enable is not None
             else _env_bool("EMOTION_LLM_ENABLE", False)
         )
-        self.emotion_llm_timeout_s = float(
+        emotion_llm_timeout_value = (
             self.config.emotion_llm_timeout_s
             if self.config.emotion_llm_timeout_s is not None
-            else os.getenv("EMOTION_LLM_TIMEOUT_S", "2.0")
+            else float(os.getenv("EMOTION_LLM_TIMEOUT_S", "2.0"))
         )
+        self.emotion_llm_timeout_s = float(emotion_llm_timeout_value)
         self.emotion_llm_url = (
             self.config.emotion_llm_url
             if self.config.emotion_llm_url is not None
@@ -378,10 +395,14 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
         )
 
         self.fusion_mode = (
-            self.config.fusion_mode
-            if self.config.fusion_mode is not None
-            else os.getenv("FUSION_MODE", "rule_first")
-        ).strip().lower()
+            (
+                self.config.fusion_mode
+                if self.config.fusion_mode is not None
+                else os.getenv("FUSION_MODE", "rule_first")
+            )
+            .strip()
+            .lower()
+        )
         if self.fusion_mode not in {"rule_first", "llm_first"}:
             self.fusion_mode = "rule_first"
 
@@ -423,7 +444,9 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
             if self.send_gap_seconds > 0:
                 time.sleep(self.send_gap_seconds)
 
-    def _transition(self, current: Dict[str, float], target: Dict[str, float]) -> Dict[str, float]:
+    def _transition(
+        self, current: Dict[str, float], target: Dict[str, float]
+    ) -> Dict[str, float]:
         for i in range(1, self.transition_steps + 1):
             t = i / self.transition_steps
             frame = {
@@ -451,9 +474,24 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
                     return True
             return False
 
-        if any_hit(["scared", "terrified", "panic", "shock", "shocked", "afraid", "害怕", "恐惧", "慌", "吓"]):
+        if any_hit(
+            [
+                "scared",
+                "terrified",
+                "panic",
+                "shock",
+                "shocked",
+                "afraid",
+                "害怕",
+                "恐惧",
+                "慌",
+                "吓",
+            ]
+        ):
             return "scared", hits, True
-        if any_hit(["shy", "embarrass", "embarrassed", "blush", "害羞", "尴尬", "脸红"]):
+        if any_hit(
+            ["shy", "embarrass", "embarrassed", "blush", "害羞", "尴尬", "脸红"]
+        ):
             return "shy", hits, True
         if any_hit(["smirk", "sly", "hehe", "坏笑", "阴笑", "嘿嘿"]):
             return "smirk", hits, True
@@ -461,13 +499,43 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
             return "sleepy", hits, True
         if any_hit(["cute", "aww", "可爱", "萌", "awww"]):
             return "cute", hits, True
-        if any_hit(["happy", "great", "awesome", "love", "thanks", "开心", "高兴", "好耶", "谢谢", "爱你"]):
+        if any_hit(
+            [
+                "happy",
+                "great",
+                "awesome",
+                "love",
+                "thanks",
+                "开心",
+                "高兴",
+                "好耶",
+                "谢谢",
+                "爱你",
+            ]
+        ):
             return "happy", hits, True
-        if any_hit(["sad", "sorry", "unfortunate", "miss", "cry", "难过", "伤心", "抱歉", "想你", "哭"]):
+        if any_hit(
+            [
+                "sad",
+                "sorry",
+                "unfortunate",
+                "miss",
+                "cry",
+                "难过",
+                "伤心",
+                "抱歉",
+                "想你",
+                "哭",
+            ]
+        ):
             return "sad", hits, True
-        if any_hit(["angry", "mad", "annoy", "hate", "furious", "生气", "烦", "恼火", "讨厌"]):
+        if any_hit(
+            ["angry", "mad", "annoy", "hate", "furious", "生气", "烦", "恼火", "讨厌"]
+        ):
             return "angry", hits, True
-        if any_hit(["wow", "surprise", "omg", "amazing", "震惊", "惊讶", "天啊", "卧槽"]):
+        if any_hit(
+            ["wow", "surprise", "omg", "amazing", "震惊", "惊讶", "天啊", "卧槽"]
+        ):
             return "surprised", hits, True
 
         if "?" in text:
@@ -495,7 +563,10 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
             "temperature": 0.0,
             "max_tokens": 60,
         }
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
         try:
             response = requests.post(
@@ -544,7 +615,9 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
             return final_expr, dbg
 
         if self.force_llm or (
-            self.emotion_llm_enable and (not strong) and rule_expr in ["neutral", "thinking"]
+            self.emotion_llm_enable
+            and (not strong)
+            and rule_expr in ["neutral", "thinking"]
         ):
             call_llm()
             if llm_expr:
@@ -646,7 +719,9 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
                     print("")
 
                 target_state = preset_to_full(expr, self._base_defaults)
-                self._current_state = self._transition(self._current_state, target_state)
+                self._current_state = self._transition(
+                    self._current_state, target_state
+                )
                 if self.hold_seconds > 0:
                     time.sleep(self.hold_seconds)
 
@@ -664,7 +739,9 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
             print(f"  llm_enable    = {self.emotion_llm_enable}")
             print(f"  llm_url_set   = {bool(self.emotion_llm_url)}")
             print(f"  llm_model     = {repr(self.emotion_llm_model)}")
-            print(f"  llm_api_key   = {'(set)' if bool(os.getenv(self.emotion_llm_api_key_env_var, '')) else '(missing)'}")
+            print(
+                f"  llm_api_key   = {'(set)' if bool(os.getenv(self.emotion_llm_api_key_env_var, '')) else '(missing)'}"
+            )
             print(f"  fusion_mode   = {self.fusion_mode}")
             print(f"  force_llm     = {self.force_llm}")
             print("")
@@ -672,12 +749,16 @@ class OSCFace(Component[OSCFaceInputs, tuple[()]]):
         threads: list[threading.Thread] = []
 
         if inputs.text is not None:
-            threads.append(threading.Thread(target=self._text_loop, args=(inputs.text,)))
+            threads.append(
+                threading.Thread(target=self._text_loop, args=(inputs.text,))
+            )
             threads.append(threading.Thread(target=self._text_flush_monitor))
             threads.append(threading.Thread(target=self._expression_worker))
 
         if inputs.interrupt is not None:
-            threads.append(threading.Thread(target=self._interrupt_loop, args=(inputs.interrupt,)))
+            threads.append(
+                threading.Thread(target=self._interrupt_loop, args=(inputs.interrupt,))
+            )
 
         if not threads:
             while not self.stop_event.is_set():

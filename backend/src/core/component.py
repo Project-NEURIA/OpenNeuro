@@ -170,6 +170,7 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
         """Construct a component instance, deserializing any BaseModel init params."""
+
         def _extract_basemodel_type(t: Any) -> type[BaseModel] | None:
             if isinstance(t, type) and issubclass(t, BaseModel):
                 return t
