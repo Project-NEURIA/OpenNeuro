@@ -29,3 +29,19 @@ def update_node(
 
 def delete_node(manager: GraphManager, node_id: str) -> None:
     manager.delete_node(node_id)
+
+
+def set_agent_character_card(
+    manager: GraphManager,
+    node_id: str,
+    character_card: str,
+) -> bool:
+    return manager.set_agent_character_card(node_id, character_card)
+
+
+def update_node_init_args(
+    manager: GraphManager,
+    node_id: str,
+    init_args: dict[str, Any],
+) -> Node | None:
+    return manager.update_node_init_args(node_id, init_args)

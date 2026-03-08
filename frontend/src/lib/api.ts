@@ -26,7 +26,14 @@ export async function fetchIsSubtype(sub: string, sup: string): Promise<boolean>
 }
 
 export async function fetchNodes(): Promise<
-  { id: string; type: string; status: string; x: number; y: number }[]
+  {
+    id: string;
+    type: string;
+    status: string;
+    x: number;
+    y: number;
+    init_args: Record<string, unknown>;
+  }[]
 > {
   const res = await fetch("/graph/nodes");
   if (!res.ok) throw new Error(`Fetch nodes failed: ${res.status}`);
@@ -62,6 +69,23 @@ export async function updateNode(id: string, data: { x?: number; y?: number }) {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Update node failed: ${res.status}`);
+}
+
+export async function updateNodeInitArgs(id: string, initArgs: Record<string, unknown>) {
+  const res = await fetch(`/graph/nodes/${id}/init-args`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ init_args: initArgs }),
+  });
+  if (!res.ok) throw new Error(`Update node init args failed: ${res.status}`);
+  return res.json() as Promise<{
+    id: string;
+    type: string;
+    status: string;
+    x: number;
+    y: number;
+    init_args: Record<string, unknown>;
+  }>;
 }
 
 export async function deleteNode(id: string) {

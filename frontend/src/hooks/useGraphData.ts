@@ -3,8 +3,11 @@ import { useSSE } from "./useSSE";
 import type { ComponentInfo, MetricsSnapshot, NodeMetrics, SlotType } from "@/lib/types";
 
 export interface GraphNodeData extends Record<string, unknown> {
+  id?: string;
   label: string;
   category: "source" | "conduit" | "sink";
+  initArgs?: Record<string, unknown>;
+  onEditConfig?: () => void;
   inputs: string[];
   outputs: string[];
   inputTypes: Record<string, SlotType>;

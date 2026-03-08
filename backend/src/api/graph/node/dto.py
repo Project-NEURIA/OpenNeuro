@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class NodeCreateRequest(BaseModel):
@@ -21,3 +21,12 @@ class NodeResponse(BaseModel):
     status: str
     x: float
     y: float
+    init_args: dict[str, Any] = Field(default_factory=dict)
+
+
+class CharacterCardUpdateRequest(BaseModel):
+    character_card: str
+
+
+class NodeInitArgsUpdateRequest(BaseModel):
+    init_args: dict[str, Any]

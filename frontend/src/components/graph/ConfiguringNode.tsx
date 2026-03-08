@@ -6,6 +6,9 @@ import { fetchConfigOptions, type ConfigOption } from "@/lib/api";
 
 interface ConfiguringNodeData {
   componentInfo: ComponentInfo;
+  mode?: "create" | "edit";
+  submitLabel?: string;
+  initialValues?: Record<string, unknown>;
   onConfirm: (config: Record<string, unknown>) => void;
   onCancel: () => void;
 }
@@ -110,16 +113,31 @@ function buildInitValues(
   return result;
 }
 
+function flattenInitValues(initValues: Record<string, unknown>): Record<string, unknown> {
+  const flat: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(initValues)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      for (const [subK, subV] of Object.entries(v as Record<string, unknown>)) {
+        flat[`${k}.${subK}`] = subV;
+      }
+    } else {
+      flat[k] = v;
+    }
+  }
+  return flat;
+}
+
 function ConfiguringNodeComponent({ data }: NodeProps) {
   const d = data as unknown as ConfiguringNodeData;
-  const { componentInfo, onConfirm, onCancel } = d;
+  const { componentInfo, onConfirm, onCancel, initialValues, mode = "create" } = d;
 
   const { fields, configOptionFields } = collectFields(componentInfo.init);
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
+    const flatInitial = initialValues ? flattenInitValues(initialValues) : {};
     const initial: Record<string, unknown> = {};
     for (const [key, prop] of Object.entries(fields)) {
-      initial[key] = getDefaultValue(prop);
+      initial[key] = flatInitial[key] ?? getDefaultValue(prop);
     }
     return initial;
   });
@@ -129,7 +147,15 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
   useEffect(() => {
     for (const fieldKey of configOptionFields) {
       fetchConfigOptions(componentInfo.name, fieldKey)
-        .then((opts) => setConfigOptions((prev) => ({ ...prev, [fieldKey]: opts })))
+        .then((opts) => {
+          setConfigOptions((prev) => ({ ...prev, [fieldKey]: opts }));
+          if (opts.length > 0) {
+            setValues((prev) => {
+              if (prev[fieldKey] !== "" && prev[fieldKey] !== undefined) return prev;
+              return { ...prev, [fieldKey]: opts[0]?.value ?? "" };
+            });
+          }
+        })
         .catch(() => {});
     }
   }, [componentInfo.name, configOptionFields]);
@@ -138,6 +164,11 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
     e.preventDefault();
     onConfirm(buildInitValues(fields, values));
   };
+
+  const optionStyle = {
+    backgroundColor: "#14111e",
+    color: "#f5f3ff",
+  } as const;
 
   return (
     <div
@@ -181,6 +212,34 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
           // Dynamic config options dropdown
           if (configOptionFields.has(key)) {
             const opts = configOptions[key];
+            if (key === "config.character_card" && opts) {
+              return (
+                <label key={key} className="flex flex-col gap-1.5">
+                  <span className="text-[12px] font-mono text-white/60">{key}</span>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {opts.map((opt) => {
+                      const active = String(values[key] ?? "") === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setValues((v) => ({ ...v, [key]: opt.value }))}
+                          className={cn(
+                            "rounded-lg px-3 py-2 text-left text-[12px] font-medium transition-colors",
+                            "border",
+                            active
+                              ? "border-conduit/50 bg-conduit/20 text-conduit"
+                              : "border-white/[0.08] bg-accent text-foreground/80 hover:bg-glass-hover",
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </label>
+              );
+            }
             return (
               <label key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
@@ -191,15 +250,15 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
                   }
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[13px] font-mono",
-                    "bg-white/[0.06] border border-white/[0.08] text-white/90",
+                    "bg-accent border border-white/[0.1] text-foreground",
                     "focus:outline-none focus:border-conduit/60",
                   )}
                 >
                   {!opts ? (
-                    <option value="">Loading...</option>
+                    <option value="" style={optionStyle}>Loading...</option>
                   ) : (
                     opts.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
+                      <option key={opt.value} value={opt.value} style={optionStyle}>
                         {opt.label}
                       </option>
                     ))
@@ -220,12 +279,12 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
                   }
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[13px] font-mono",
-                    "bg-white/[0.06] border border-white/[0.08] text-white/90",
+                    "bg-accent border border-white/[0.1] text-foreground",
                     "focus:outline-none focus:border-conduit/60",
                   )}
                 >
                   {prop.enum.map((val: unknown) => (
-                    <option key={String(val)} value={String(val)}>
+                    <option key={String(val)} value={String(val)} style={optionStyle}>
                       {String(val)}
                     </option>
                   ))}
@@ -269,7 +328,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
               "transition-colors cursor-pointer",
             )}
           >
-            Create
+            {d.submitLabel ?? (mode === "edit" ? "Save" : "Create")}
           </button>
           <button
             type="button"

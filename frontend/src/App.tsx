@@ -28,6 +28,7 @@ import {
   fetchEdges as apiFetchEdges,
   createNode as apiCreateNode,
   updateNode as apiUpdateNode,
+  updateNodeInitArgs as apiUpdateNodeInitArgs,
   deleteNode as apiDeleteNode,
   createEdge as apiCreateEdge,
   deleteEdge as apiDeleteEdge,
@@ -182,6 +183,86 @@ function AppInner({
     });
   }, [setEdges, setNodes, componentTypeInfo, concreteTypes]);
 
+  const openNodeConfigEditor = useCallback(
+    (nodeId: string) => {
+      const target = nodesRef.current.find((n) => n.id === nodeId && n.type === "graph");
+      if (!target) return;
+
+      const targetData = target.data as GraphNodeData;
+      const info = componentMap[targetData.label];
+      if (!info) return;
+
+      const tempId = `configuring-edit-${nodeId}-${Date.now()}`;
+      const position = {
+        x: target.position.x + 420,
+        y: target.position.y,
+      };
+
+      const configuringNode: Node = {
+        id: tempId,
+        type: "configuring",
+        position,
+        data: {
+          componentInfo: info,
+          mode: "edit",
+          submitLabel: "Save",
+          initialValues: targetData.initArgs ?? {},
+          onConfirm: (initArgs: Record<string, unknown>) => {
+            setNodes((nds) => nds.filter((n) => n.id !== tempId));
+            apiUpdateNodeInitArgs(nodeId, initArgs)
+              .then(() => {
+                setNodes((nds) =>
+                  nds.map((n) =>
+                    n.id === nodeId
+                      ? { ...n, data: { ...(n.data as GraphNodeData), initArgs } }
+                      : n,
+                  ),
+                );
+                triggerSave();
+              })
+              .catch(console.error);
+          },
+          onCancel: () => {
+            setNodes((nds) => nds.filter((n) => n.id !== tempId));
+          },
+        },
+      };
+
+      setNodes((nds) => [
+        ...nds.filter((n) => !String(n.id).startsWith("configuring-edit-")),
+        configuringNode,
+      ]);
+    },
+    [componentMap, setNodes, triggerSave],
+  );
+
+  const buildGraphNodeData = useCallback(
+    (
+      nodeId: string,
+      componentName: string,
+      status: string,
+      initArgs: Record<string, unknown> = {},
+    ): GraphNodeData => {
+      const info = componentMap[componentName];
+      return {
+        id: nodeId,
+        label: componentName,
+        category: info?.category ?? "conduit",
+        initArgs,
+        onEditConfig: () => openNodeConfigEditor(nodeId),
+        inputs: info ? Object.keys(info.inputs) : [],
+        outputs: info ? Object.keys(info.outputs) : [],
+        inputTypes: componentTypeInfo.inputs[componentName] ?? {},
+        outputTypes: componentTypeInfo.outputs[componentName] ?? {},
+        status,
+        nodeMetrics: null,
+        ui_inputs: info?.ui_inputs ?? {},
+        ui_outputs: info?.ui_outputs ?? {},
+      };
+    },
+    [componentMap, componentTypeInfo.inputs, componentTypeInfo.outputs, openNodeConfigEditor],
+  );
+
   // Initialize: fetch existing graph from backend
   useEffect(() => {
     if (initialized.current || components.length === 0) return;
@@ -212,23 +293,13 @@ function AppInner({
         setNodes(
           backendNodes.map((n) => {
             const pos = posMap.get(n.id) ?? { x: 0, y: 0 };
-            const info = componentMap[n.type];
 
             return {
               id: n.id,
               type: "graph",
               position: { x: pos.x, y: pos.y },
               data: {
-                label: n.type,
-                category: info?.category ?? "conduit",
-                inputs: info ? Object.keys(info.inputs) : [],
-                outputs: info ? Object.keys(info.outputs) : [],
-                inputTypes: componentTypeInfo.inputs[n.type] ?? {},
-                outputTypes: componentTypeInfo.outputs[n.type] ?? {},
-                status: n.status,
-                nodeMetrics: null,
-                ui_inputs: info?.ui_inputs ?? {},
-                ui_outputs: info?.ui_outputs ?? {},
+                ...buildGraphNodeData(n.id, n.type, n.status, n.init_args ?? {}),
               } satisfies GraphNodeData,
             };
           }),
@@ -251,7 +322,7 @@ function AppInner({
         console.error("[graph] Init failed:", err);
       }
     })();
-  }, [components, componentMap, setNodes, setEdges, runTypeCheck]);
+  }, [components, componentMap, setNodes, setEdges, runTypeCheck, buildGraphNodeData]);
 
   // Update node and edge data with metrics
   useEffect(() => {
@@ -390,16 +461,7 @@ function AppInner({
             type: "graph",
             position,
             data: {
-              label: item.name,
-              category: item.category,
-              inputs: Object.keys(item.inputs),
-              outputs: Object.keys(item.outputs),
-              inputTypes: componentTypeInfo.inputs[item.name] ?? {},
-              outputTypes: componentTypeInfo.outputs[item.name] ?? {},
-              status: "startup",
-              nodeMetrics: null,
-              ui_inputs: item.ui_inputs ?? {},
-              ui_outputs: item.ui_outputs ?? {},
+              ...buildGraphNodeData(res.id, item.name, "startup", initArgs ?? {}),
             },
           };
           setNodes((nds) => [...nds, newNode]);
@@ -408,7 +470,7 @@ function AppInner({
         })
         .catch(console.error);
     },
-    [setNodes, triggerSave, runTypeCheck],
+    [setNodes, triggerSave, runTypeCheck, buildGraphNodeData],
   );
 
   const onDrop = useCallback(

@@ -206,7 +206,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
     @classmethod
     def get_config_options(
-            cls, field: str, values: dict[str, Any] | None = None
+        cls, field: str, values: dict[str, Any] | None = None
     ) -> list[dict[str, str]] | None:
         if field != "config.character_card":
             return None
@@ -275,8 +275,8 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 with self._lock:
                     # Append or start new assistant message
                     if (
-                            self._history
-                            and self._history[-1][0] == self.config.chatbot_name
+                        self._history
+                        and self._history[-1][0] == self.config.chatbot_name
                     ):
                         name, text = self._history[-1]
                         self._history[-1] = (name, text + chunk)

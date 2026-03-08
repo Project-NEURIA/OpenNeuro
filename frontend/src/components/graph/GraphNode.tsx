@@ -1,5 +1,6 @@
 import { memo, useCallback, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
 import { useUIVideoOutput } from "@/hooks/useUIVideoOutput";
@@ -209,7 +210,7 @@ function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: 
   );
 }
 
-function GraphNodeComponent({ id, data }: NodeProps) {
+function GraphNodeComponent({ id, data, selected }: NodeProps) {
   const d = data as GraphNodeData;
   const colors = categoryColors[d.category]!;
 
@@ -230,11 +231,12 @@ function GraphNodeComponent({ id, data }: NodeProps) {
   return (
     <div
       className={cn(
-        "relative rounded-2xl border px-6 py-5 min-w-[360px]",
+        "relative rounded-2xl border px-6 py-5 min-w-[360px] transition-shadow",
         "bg-gradient-to-b backdrop-blur-xs",
         "bg-glass backdrop-saturate-150",
         colors.border,
         colors.bg,
+        selected && "ring-2 ring-conduit/60 shadow-[0_0_0_1px_rgba(59,130,246,0.3)]",
       )}
     >
       {/* Header */}
@@ -255,6 +257,19 @@ function GraphNodeComponent({ id, data }: NodeProps) {
         >
           {d.category}
         </span>
+        {selected && d.onEditConfig && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              d.onEditConfig?.();
+            }}
+            className="ml-2 p-1.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-foreground/80 hover:bg-glass-hover transition-colors"
+            title="Edit settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* UI Widgets */}
