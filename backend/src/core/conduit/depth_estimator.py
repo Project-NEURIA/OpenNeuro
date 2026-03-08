@@ -21,9 +21,9 @@ from src.core.utils import auto_device, auto_dtype, resize_and_crop
 class DepthEstimatorConfig(BaseModel):
     model_config = ConfigDict(json_schema_extra={"configOptions": {"model": {}}})
 
-    output_width: int = 640
-    output_height: int = 480
     process_res: int = 504
+    output_width: int = 504
+    output_height: int = 504
     device: str = "auto"
     model: str = "depth-anything/DA3METRIC-LARGE"
 
@@ -59,7 +59,10 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
         if field != "config.model":
             return None
         return [
-            {"value": "depth-anything/DA3METRIC-LARGE", "label": "DA3 Metric Large"},
+            {
+                "value": "depth-anything/DA3METRIC-LARGE",
+                "label": "DA3 Metric Large (Recommended)",
+            },
             {
                 "value": "depth-anything/DA3NESTED-GIANT-LARGE",
                 "label": "DA3 Nested Giant-Large",
@@ -86,10 +89,36 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
         self._model.eval()
         print("[DepthEstimator] Model loaded")
 
-    def run(self, inputs: DepthEstimatorInputs, outputs: DepthEstimatorOutputs) -> None:
+    def _infer(self, rgb: np.ndarray, K: np.ndarray) -> np.ndarray:
+        """Run DA3 inference and return metric depth in metres."""
         import torch
         from depth_anything_3.utils.alignment import apply_metric_scaling
 
+        with torch.inference_mode():
+            pred = self._model.inference(
+                image=[rgb],
+                intrinsics=K[np.newaxis],
+                process_res=self.config.process_res,
+            )
+
+        raw_depth = pred.depth[0].astype(np.float32)
+        if pred.is_metric:
+            return raw_depth
+
+        depth_t = torch.from_numpy(raw_depth).float()[None, None]
+        K_t = torch.from_numpy(K).float()[None, None]
+        return apply_metric_scaling(depth_t, K_t)[0, 0].numpy()
+
+    def _resize_outputs(
+        self, depth: np.ndarray, vframe: VideoFrame
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Resize/crop depth and video to the configured output dimensions."""
+        ow, oh = self.config.output_width, self.config.output_height
+        return resize_and_crop(depth, ow, oh), resize_and_crop(
+            vframe.get(VideoDataFormat.BGR), ow, oh
+        )
+
+    def run(self, inputs: DepthEstimatorInputs, outputs: DepthEstimatorOutputs) -> None:
         self._ensure_model()
         cam_iter = inputs.camera_params(self, newest=True)
 
@@ -105,26 +134,8 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
             rgb = vframe.get(VideoDataFormat.RGB)
             K = cam_frame.intrinsics.astype(np.float32)
 
-            with torch.inference_mode():
-                pred = self._model.inference(
-                    image=[rgb],
-                    intrinsics=K[np.newaxis],
-                    process_res=self.config.process_res,
-                )
-
-            raw_depth = pred.depth[0].astype(np.float32)
-
-            if pred.is_metric:
-                depth_m = raw_depth
-            else:
-                depth_t = torch.from_numpy(raw_depth).float()[None, None]
-                K_t = torch.from_numpy(K).float()[None, None]
-                depth_m = apply_metric_scaling(depth_t, K_t)[0, 0].numpy()
-
-            ow, oh = self.config.output_width, self.config.output_height
-            depth_out = resize_and_crop(depth_m, ow, oh)
-            bgr = vframe.get(VideoDataFormat.BGR)
-            video_out = resize_and_crop(bgr, ow, oh)
+            depth_m = self._infer(rgb, K)
+            depth_out, video_out = self._resize_outputs(depth_m, vframe)
 
             outputs.depth.send(DepthFrame.new(data=depth_out, is_metric=True))
             outputs.video.send(
