@@ -66,23 +66,15 @@ def auto_dtype(device):  # type: ignore[return]
     return torch.float32
 
 
-def center_crop_and_resize(frame: np.ndarray, width: int, height: int) -> np.ndarray:
-    """Center-crop to the largest rectangle matching the target aspect ratio, then resize."""
+def resize_and_crop(frame: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Resize to cover target dimensions, then center-crop to exact size."""
     import cv2
 
-    h, w = frame.shape[:2]
-    target_ratio = width / height
-    src_ratio = w / h
-
-    if src_ratio > target_ratio:
-        crop_w = int(h * target_ratio)
-        x0 = (w - crop_w) // 2
-        cropped = frame[:, x0 : x0 + crop_w]
-    else:
-        crop_h = int(w / target_ratio)
-        y0 = (h - crop_h) // 2
-        cropped = frame[y0 : y0 + crop_h, :]
-
-    if cropped.shape[:2] == (height, width):
-        return cropped
-    return cv2.resize(cropped, (width, height), interpolation=cv2.INTER_AREA)
+    h_src, w_src = frame.shape[:2]
+    scale = max(width / w_src, height / h_src)
+    w_s = int(round(w_src * scale))
+    h_s = int(round(h_src * scale))
+    resized = cv2.resize(frame, (w_s, h_s), interpolation=cv2.INTER_LINEAR)
+    y0 = (h_s - height) // 2
+    x0 = (w_s - width) // 2
+    return resized[y0 : y0 + height, x0 : x0 + width]

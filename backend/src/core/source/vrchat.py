@@ -7,11 +7,12 @@ import numpy as np
 
 from src.core.channel import Sender
 from src.core.component import Component
-from src.core.frames import VideoDataFormat, VideoFrame
+from src.core.frames import CameraParamsFrame, VideoDataFormat, VideoFrame
 
 
 class VRChatVideoOutputs(NamedTuple):
     video: Sender[VideoFrame]
+    camera_params: Sender[CameraParamsFrame]
 
 
 class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
@@ -37,6 +38,7 @@ class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
 
         with Client(host=self._host, port=self._port) as client:
             last_send = 0.0
+            intrinsics = client.get_intrinsics()
 
             with client.frame_stream() as frames:
                 for frame in frames:
@@ -51,9 +53,17 @@ class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
                         continue
                     last_send = now
 
-                    bgra = np.frombuffer(frame.data, dtype=np.uint8).reshape(
+                    rgba = np.frombuffer(frame.data, dtype=np.uint8).reshape(
                         frame.height, frame.width, 4
                     )
-                    bgr = bgra[:, :, :3]  # BGRA -> BGR (drop alpha)
+                    rgb = rgba[:, :, :3]  # RGBA -> RGB (drop alpha)
 
-                    outputs.video.send(VideoFrame.new(data=bgr))
+                    outputs.video.send(
+                        VideoFrame.new(data=rgb, format=VideoDataFormat.RGB)
+                    )
+                    outputs.camera_params.send(
+                        CameraParamsFrame.new(
+                            intrinsics=intrinsics,
+                            extrinsics=client.get_extrinsics(frame),
+                        )
+                    )
