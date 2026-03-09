@@ -3,7 +3,7 @@ name = "openneuro"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"  # DA3 depends on open3d which has no Python 3.13 wheels
 dependencies = [
     "clip @ git+https://github.com/openai/CLIP.git",
     "fastapi>=0.115.0",
@@ -32,11 +32,12 @@ dependencies = [
     "tyro>=0.9.0",
     "python-osc>=1.9.3",
     "mem0ai",
+    "depth-anything-3 @ git+https://github.com/MarksonChen/Depth-Anything-3.git",
 ]
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*"]
 ignore_missing_imports = true
 
 

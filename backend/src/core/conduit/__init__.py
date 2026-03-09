@@ -13,3 +13,7 @@ from src.core.conduit.pose_renderer import PoseRenderer as PoseRenderer
 from src.core.conduit.buffer import Buffer as Buffer
 from src.core.conduit.passthrough import Passthrough as Passthrough
 from src.core.conduit.memory import Mem0 as Mem0
+from src.core.conduit.depth_estimator import DepthEstimator as DepthEstimator
+from src.core.conduit.depth_estimation_visualizer import (
+    DepthEstimationVisualizer as DepthEstimationVisualizer,
+)

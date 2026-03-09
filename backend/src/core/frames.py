@@ -329,6 +329,47 @@ class GoalFrame(Frame):
         return cls(pts=time.time_ns(), id=obj_id(), x=x, y=y, z=z)
 
 
+@dataclass(frozen=True, slots=True)
+class CameraParamsFrame(Frame):
+    """Camera intrinsics (3x3) and extrinsics (4x4) for a single frame."""
+
+    intrinsics: np.ndarray
+    extrinsics: np.ndarray
+
+    @classmethod
+    def new(
+        cls, *, intrinsics: np.ndarray, extrinsics: np.ndarray
+    ) -> CameraParamsFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DepthFrame(Frame):
+    """Per-pixel depth map (HxW float32)."""
+
+    data: np.ndarray
+    width: int
+    height: int
+    is_metric: bool
+
+    @classmethod
+    def new(cls, *, data: np.ndarray, is_metric: bool = False) -> DepthFrame:
+        h, w = data.shape[:2]
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            data=data,
+            width=w,
+            height=h,
+            is_metric=is_metric,
+        )
+
+
 class VideoDataFormat(Enum):
     BGR = "bgr"
     RGB = "rgb"
