@@ -10,3 +10,4 @@ backend/src/core/conduit/mem0_demo.py
 node_modules/
 bun.lock
 .DS_Store
+uv.lock
