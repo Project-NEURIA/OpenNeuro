@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.stream_filter import StreamFilter
+from src.core.utils import StreamFilter
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 

@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
 from src.core.component import Component
-from src.core.stream_filter import StreamFilter
+from src.core.utils import StreamFilter
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 _ASSETS_DIR = Path(__file__).resolve().parents[3] / "assets" / "qwen_tts_voices"
