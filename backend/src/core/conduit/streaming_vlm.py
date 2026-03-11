@@ -20,6 +20,7 @@ from src.core.frames import TextFrame, VideoFrame, VideoDataFormat
 
 class StreamingVLMConfig(BaseModel):
     base_url: str
+    api_key: str = ""
     model_id: str = "Qwen/Qwen3.5-0.8B"
     vlm_fps: int = 3
     window_duration: float = 3.0
@@ -57,7 +58,9 @@ class StreamingVLM(Component[StreamingVLMInputs, StreamingVLMOutputs]):
     def __init__(self, config: StreamingVLMConfig) -> None:
         super().__init__()
         self.config = config
-        self._client = OpenAI(base_url=config.base_url, api_key="unused")
+        self._client = OpenAI(
+            base_url=config.base_url, api_key=config.api_key or "unused"
+        )
         self._frame_buffer: collections.deque[tuple[float, VideoFrame]] = (
             collections.deque(maxlen=max(1, int(config.window_duration * 60)))
         )
@@ -87,7 +90,7 @@ class StreamingVLM(Component[StreamingVLMInputs, StreamingVLMOutputs]):
             response = self._client.chat.completions.create(
                 model=self.config.model_id,
                 messages=[{"role": "user", "content": content}],
-                max_tokens=512,
+                max_completion_tokens=512,
                 temperature=0.7,
             )
             text = response.choices[0].message.content
@@ -109,7 +112,9 @@ class StreamingVLM(Component[StreamingVLMInputs, StreamingVLMOutputs]):
         sample_count = min(frames_per_window, len(window_frames))
         indices = np.linspace(0, len(window_frames) - 1, sample_count, dtype=int)
 
-        return [Image.fromarray(window_frames[i].get(VideoDataFormat.RGB)) for i in indices]
+        return [
+            Image.fromarray(window_frames[i].get(VideoDataFormat.RGB)) for i in indices
+        ]
 
     def _build_prompt(self, window_count: int) -> str:
         if not self._captions_history or self._should_use_key_window_prompt(
@@ -148,7 +153,10 @@ class StreamingVLM(Component[StreamingVLMInputs, StreamingVLMOutputs]):
                 pending = None
 
             # Submit new VLM call if none in flight and enough time has passed
-            if pending is None and time.time() - last_submit_time >= self.config.window_duration:
+            if (
+                pending is None
+                and time.time() - last_submit_time >= self.config.window_duration
+            ):
                 pil_frames = self._sample_window()
                 if pil_frames:
                     window_count += 1
