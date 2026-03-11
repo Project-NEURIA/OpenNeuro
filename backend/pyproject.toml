@@ -3,7 +3,7 @@ name = "openneuro"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"  # DA3 depends on open3d which has no Python 3.13 wheels
+requires-python = ">=3.12"
 dependencies = [
     "clip @ git+https://github.com/openai/CLIP.git",
     "fastapi>=0.115.0",
@@ -33,18 +33,30 @@ dependencies = [
     "python-osc>=1.9.3",
     "mem0ai",
     "depth-anything-3 @ git+https://github.com/MarksonChen/Depth-Anything-3.git",
+    "librosa>=0.10.0",
 ]
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["src.core.conduit.qwen_tts.tts_model.*"]
+ignore_errors = true
+
+
+[tool.ruff]
+extend-exclude = ["src/core/conduit/qwen_tts/tts_model"]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
+
+[tool.uv]
+# DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
+override-dependencies = ["open3d ; python_version < '0'"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu126", marker = "sys_platform != 'darwin'" }
