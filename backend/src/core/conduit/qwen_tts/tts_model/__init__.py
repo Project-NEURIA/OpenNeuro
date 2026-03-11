@@ -13,6 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .configuration_qwen3_tts import Qwen3TTSConfig
-from .modeling_qwen3_tts import Qwen3TTSForConditionalGeneration
-from .processing_qwen3_tts import Qwen3TTSProcessor
+from .configuration_qwen3_tts import Qwen3TTSConfig as Qwen3TTSConfig
+from .modeling_qwen3_tts import Qwen3TTSForConditionalGeneration as Qwen3TTSForConditionalGeneration
+from .processing_qwen3_tts import Qwen3TTSProcessor as Qwen3TTSProcessor

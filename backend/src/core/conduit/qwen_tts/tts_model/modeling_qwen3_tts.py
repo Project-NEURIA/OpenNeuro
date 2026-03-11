@@ -43,8 +43,8 @@ from transformers.processing_utils import Unpack
 from transformers.utils import can_return_tuple, logging
 from transformers.utils.hub import cached_file
 
-from tts_model.qwen3_tts_tokenizer import Qwen3TTSTokenizer
-from tts_model.configuration_qwen3_tts import (Qwen3TTSConfig,
+from .qwen3_tts_tokenizer import Qwen3TTSTokenizer
+from .configuration_qwen3_tts import (Qwen3TTSConfig,
                                       Qwen3TTSSpeakerEncoderConfig,
                                       Qwen3TTSTalkerCodePredictorConfig,
                                       Qwen3TTSTalkerConfig)

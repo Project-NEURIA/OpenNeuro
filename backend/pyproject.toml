@@ -33,13 +33,21 @@ dependencies = [
     "python-osc>=1.9.3",
     "mem0ai",
     "depth-anything-3 @ git+https://github.com/MarksonChen/Depth-Anything-3.git",
+    "librosa>=0.10.0",
 ]
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["src.core.conduit.qwen_tts.tts_model.*"]
+ignore_errors = true
+
+
+[tool.ruff]
+extend-exclude = ["src/core/conduit/qwen_tts/tts_model"]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

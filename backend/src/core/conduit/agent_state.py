@@ -51,7 +51,9 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
             lines.append(f"{self.config.chatbot_name}:")
             return "\n".join(lines)
 
-    def _build_messages(self, memory_prefix: str = "", observation: str = "") -> list[dict[str, str]]:
+    def _build_messages(
+        self, memory_prefix: str = "", observation: str = ""
+    ) -> list[dict[str, str]]:
         with self._lock:
             system = self.config.system_prompt
             if memory_prefix or observation:
@@ -121,8 +123,12 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 outputs.messages.send(
                     MessagesFrame.new(
-                        text=self._build_context(memory_prefix=mem_text, observation=current_obs),
-                        messages=self._build_messages(memory_prefix=mem_text, observation=current_obs),
+                        text=self._build_context(
+                            memory_prefix=mem_text, observation=current_obs
+                        ),
+                        messages=self._build_messages(
+                            memory_prefix=mem_text, observation=current_obs
+                        ),
                     )
                 )
 

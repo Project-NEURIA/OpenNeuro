@@ -26,7 +26,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from transformers import AutoConfig, AutoFeatureExtractor, AutoModel
 
-from tts_model.modeling_qwen3_tts_tokenizer_v2 import (
+from .modeling_qwen3_tts_tokenizer_v2 import (
     Qwen3TTSTokenizerV2Config,
     Qwen3TTSTokenizerV2Model,
 )

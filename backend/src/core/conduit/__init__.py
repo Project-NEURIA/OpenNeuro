@@ -19,3 +19,4 @@ from src.core.conduit.depth_estimation_visualizer import (
     DepthEstimationVisualizer as DepthEstimationVisualizer,
 )
 from src.core.conduit.streaming_vlm import StreamingVLM as StreamingVLM
+from src.core.conduit.qwen_tts import QwenTTS as QwenTTS
