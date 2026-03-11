@@ -112,7 +112,7 @@ function UIVideoWidget({ nodeId, channel }: { nodeId: string; channel: string })
   return (
     <div
       className="relative w-full rounded-lg overflow-hidden bg-black/60 border border-white/[0.04]"
-      style={{ aspectRatio: "16/9" }}
+      // style={{ aspectRatio: "16/9" }}
     >
       {frameUrl ? (
         <img

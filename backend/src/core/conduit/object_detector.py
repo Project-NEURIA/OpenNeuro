@@ -16,7 +16,7 @@ from src.core.frames import (
     VideoDataFormat,
     VideoFrame,
 )
-from src.core.utils import auto_device, auto_dtype, center_crop_and_resize, to_numpy
+from src.core.utils import auto_device, auto_dtype, resize_and_crop, to_numpy
 
 MODEL_ID = "facebook/sam3"
 
@@ -201,7 +201,7 @@ class ObjectDetector(Component[ObjectDetectorInputs, ObjectDetectorOutputs]):
 
             rgb = frame.get(VideoDataFormat.RGB)
             res = self.config.resolution
-            cropped = center_crop_and_resize(rgb, res, res)
+            cropped = resize_and_crop(rgb, res, res)
 
             if not self._prompts:
                 continue

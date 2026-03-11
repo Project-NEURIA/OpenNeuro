@@ -161,6 +161,7 @@ class AgentStateInputs(NamedTuple):
     feedback: Receiver[TextFrame]
     interrupt: Receiver[InterruptFrame] | None = None
     memory_prefix: Receiver[TextFrame] | None = None
+    observation: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
@@ -175,6 +176,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
         super().__init__()
         self.config = config
         self._history: list[tuple[str, str]] = []
+        self._latest_observation: str = ""
         self._lock = threading.Lock()
 
     def _system_prompt(self) -> str:
@@ -183,21 +185,30 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
             card = CHARACTER_CARDS["gentle_big_sister"]
         return card["prompt"]
 
-    def _build_context(self, memory_prefix: str = "") -> str:
+    def _build_context(self, memory_prefix: str = "", observation: str = "") -> str:
         with self._lock:
             lines = [self._system_prompt()]
             if memory_prefix:
                 lines += ["", memory_prefix]
+            if observation:
+                lines += ["", f"[Current Vision Observation]\n{observation}"]
             lines.append("***")
             lines += [f"{n}: {t}" for n, t in self._history]
             lines.append(f"{self.config.chatbot_name}:")
             return "\n".join(lines)
 
-    def _build_messages(self, memory_prefix: str = "") -> list[dict[str, str]]:
+    def _build_messages(
+        self, memory_prefix: str = "", observation: str = ""
+    ) -> list[dict[str, str]]:
         with self._lock:
             system = self._system_prompt()
-            if memory_prefix:
-                system = f"{system}\n\n{memory_prefix}"
+            if memory_prefix or observation:
+                parts = [system]
+                if memory_prefix:
+                    parts.append(memory_prefix)
+                if observation:
+                    parts.append(f"[Current Vision Observation]\n{observation}")
+                system = "\n\n".join(parts)
             messages = [{"role": "system", "content": system}]
             for name, text in self._history:
                 role = "user" if name == self.config.user_name else "assistant"
@@ -228,6 +239,16 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
             f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}"
         )
 
+        def process_observation() -> None:
+            if inputs.observation is None:
+                return
+            for obs_frame in inputs.observation(self):
+                if obs_frame is None:
+                    break
+                with self._lock:
+                    self._latest_observation = obs_frame.text
+                print(f"[AgentState] Observation updated: {obs_frame.text}")
+
         def process_asr() -> None:
             for text_frame in inputs.asr(self):
                 if text_frame is None:
@@ -239,6 +260,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 with self._lock:
                     self._history.append((self.config.user_name, text))
+                    current_obs = self._latest_observation
                 print(f"[AgentState] User: {text}")
 
                 # Memory retrieval (optional)
@@ -246,8 +268,8 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 if has_memory and memory_sender is not None and memory_gen is not None:
                     memory_sender.send(
                         MessagesFrame.new(
-                            text=self._build_context(),
-                            messages=self._build_messages(),
+                            text=self._build_context(observation=current_obs),
+                            messages=self._build_messages(observation=current_obs),
                         )
                     )
                     # Block until Mem0 returns the memory prefix
@@ -258,8 +280,12 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
 
                 outputs.messages.send(
                     MessagesFrame.new(
-                        text=self._build_context(memory_prefix=mem_text),
-                        messages=self._build_messages(memory_prefix=mem_text),
+                        text=self._build_context(
+                            memory_prefix=mem_text, observation=current_obs
+                        ),
+                        messages=self._build_messages(
+                            memory_prefix=mem_text, observation=current_obs
+                        ),
                     )
                 )
 
@@ -292,6 +318,7 @@ class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
                 print(f"[AgentState] Interrupt received: {frame.reason}")
 
         threads = [
+            threading.Thread(target=process_observation, daemon=True),
             threading.Thread(target=process_asr, daemon=True),
             threading.Thread(target=process_feedback, daemon=True),
             threading.Thread(target=process_interrupts, daemon=True),

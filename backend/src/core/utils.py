@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import collections
 import itertools
+import re
 import threading
+from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
 
@@ -66,23 +69,105 @@ def auto_dtype(device):  # type: ignore[return]
     return torch.float32
 
 
-def center_crop_and_resize(frame: np.ndarray, width: int, height: int) -> np.ndarray:
-    """Center-crop to the largest rectangle matching the target aspect ratio, then resize."""
+def cut_space(buf: str) -> int:
+    return max(buf.rfind(" "), buf.rfind("\n"), buf.rfind("\t"))
+
+
+_SENT_END = re.compile(r"""[.!?…]+["'\)\]\}]*($|\s)""")
+
+
+def cut_sentence(buf: str) -> int:
+    last = -1
+    for m in _SENT_END.finditer(buf):
+        cut = m.end() - 1
+        while cut >= 0 and buf[cut].isspace():
+            cut -= 1
+        last = max(last, cut)
+    return last
+
+
+@dataclass
+class StreamFilter:
+    speak_buf: str = ""
+    in_square: int = 0
+    in_paren: int = 0
+    in_angle: int = 0
+    in_bold: bool = False
+    in_italic: bool = False
+    cut_fn: Callable[[str], int] = field(default=cut_sentence)
+
+    def feed(self, token: str, force: bool = False) -> str:
+        self._consume(token)
+        if force:
+            out, self.speak_buf = self.speak_buf, ""
+            return out
+
+        cut = self.cut_fn(self.speak_buf)
+        if cut < 0:
+            return ""
+        out = self.speak_buf[: cut + 1]
+        self.speak_buf = self.speak_buf[cut + 1 :]
+        return out
+
+    def _consume(self, token: str) -> None:
+        i = 0
+        while i < len(token):
+            ch = token[i]
+            if ch == "*" and i + 1 < len(token) and token[i + 1] == "*":
+                self.in_bold = not self.in_bold
+                i += 2
+                continue
+            if ch == "*":
+                self.in_italic = not self.in_italic
+                i += 1
+                continue
+            if not (self.in_bold or self.in_italic):
+                if ch == "[":
+                    self.in_square += 1
+                    i += 1
+                    continue
+                if ch == "]" and self.in_square:
+                    self.in_square -= 1
+                    i += 1
+                    continue
+                if ch == "(":
+                    self.in_paren += 1
+                    i += 1
+                    continue
+                if ch == ")" and self.in_paren:
+                    self.in_paren -= 1
+                    i += 1
+                    continue
+                if ch == "<":
+                    self.in_angle += 1
+                    i += 1
+                    continue
+                if ch == ">" and self.in_angle:
+                    self.in_angle -= 1
+                    i += 1
+                    continue
+            if (
+                self.in_square
+                or self.in_paren
+                or self.in_angle
+                or self.in_bold
+                or self.in_italic
+            ):
+                i += 1
+                continue
+            self.speak_buf += ch
+            i += 1
+
+
+def resize_and_crop(frame: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Resize to cover target dimensions, then center-crop to exact size."""
     import cv2
 
-    h, w = frame.shape[:2]
-    target_ratio = width / height
-    src_ratio = w / h
-
-    if src_ratio > target_ratio:
-        crop_w = int(h * target_ratio)
-        x0 = (w - crop_w) // 2
-        cropped = frame[:, x0 : x0 + crop_w]
-    else:
-        crop_h = int(w / target_ratio)
-        y0 = (h - crop_h) // 2
-        cropped = frame[y0 : y0 + crop_h, :]
-
-    if cropped.shape[:2] == (height, width):
-        return cropped
-    return cv2.resize(cropped, (width, height), interpolation=cv2.INTER_AREA)
+    h_src, w_src = frame.shape[:2]
+    scale = max(width / w_src, height / h_src)
+    w_s = int(round(w_src * scale))
+    h_s = int(round(h_src * scale))
+    resized = cv2.resize(frame, (w_s, h_s), interpolation=cv2.INTER_LINEAR)
+    y0 = (h_s - height) // 2
+    x0 = (w_s - width) // 2
+    return resized[y0 : y0 + height, x0 : x0 + width]

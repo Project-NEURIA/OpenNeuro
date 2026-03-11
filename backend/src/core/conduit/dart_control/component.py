@@ -109,14 +109,38 @@ def _rot6d_to_quaternion(rot6d: torch.Tensor) -> tuple[float, float, float, floa
     return (w, x, y, z)
 
 
+# Quaternion for -90° rotation around X: converts Z-up (SMPL) → Y-up (standard)
+_SQRT2_2 = math.sqrt(2.0) / 2.0
+_Q_ZUP_TO_YUP = (_SQRT2_2, -_SQRT2_2, 0.0, 0.0)  # (w, x, y, z)
+
+
+def _quat_multiply(
+    a: tuple[float, float, float, float],
+    b: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Multiply two quaternions (w, x, y, z)."""
+    aw, ax, ay, az = a
+    bw, bx, by, bz = b
+    return (
+        aw * bw - ax * bx - ay * by - az * bz,
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+    )
+
+
 def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]:
     """Convert a single frame of 276 SMPL features to a dict of BonePoses.
+
+    Converts from SMPL's Z-up to Y-up (standard for OpenVR/Unity/Unreal):
+      position: (x, y, z)_zup → (x, z, -y)_yup
+      rotation: q_yup = q_conversion * q_zup
 
     Args:
         features: [276] tensor — one frame of denormalized motion features.
 
     Returns:
-        Dict mapping OpenVR body part names to BonePose.
+        Dict mapping body part names to BonePose in Y-up coordinates.
     """
     joints = features[_JOINTS_OFFSET : _JOINTS_OFFSET + _N_JOINTS * 3].reshape(
         _N_JOINTS, 3
@@ -128,15 +152,16 @@ def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]
     poses: dict[str, BonePose | None] = {}
     for joint_idx, part_name in _SMPL_TO_OPENVR.items():
         pos = joints[joint_idx]
-        qw, qx, qy, qz = _rot6d_to_quaternion(poses_6d[joint_idx])
+        q_zup = _rot6d_to_quaternion(poses_6d[joint_idx])
+        q_yup = _quat_multiply(_Q_ZUP_TO_YUP, q_zup)
         poses[part_name] = BonePose(
             pos_x=pos[0].item(),
-            pos_y=pos[1].item(),
-            pos_z=pos[2].item(),
-            rot_w=qw,
-            rot_x=qx,
-            rot_y=qy,
-            rot_z=qz,
+            pos_y=pos[2].item(),
+            pos_z=-pos[1].item(),
+            rot_w=q_yup[0],
+            rot_x=q_yup[1],
+            rot_y=q_yup[2],
+            rot_z=q_yup[3],
         )
     return poses
 

@@ -289,6 +289,9 @@ class GraphManager:
                 skey: SenderKey = (node_id, slot)
                 if skey in self._sender_handles:
                     output_handles[slot] = self._sender_handles[skey]
+                else:
+                    # Unconnected output: no-op Sender (sends are discarded)
+                    output_handles[slot] = Sender()
 
             # Wire UI input channels (frontend -> component)
             for slot, slot_type in ui_input_slots.items():
