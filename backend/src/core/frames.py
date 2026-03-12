@@ -317,6 +317,46 @@ class ObjectDetectionFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectSegmentationFrame(Frame):
+    """Instance segmentation results for a single video frame."""
+
+    masks: np.ndarray
+    """(K, H, W) bool — per-instance binary masks."""
+
+    boxes: np.ndarray
+    """(K, 4) float32 — XYXY bounding boxes."""
+
+    scores: np.ndarray
+    """(K,) float32 — detection confidence."""
+
+    object_ids: np.ndarray
+    """(K,) int64 — SAM3 tracking object IDs."""
+
+    labels: tuple[str, ...]
+    """(K,) — prompt label for each detection."""
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        masks: np.ndarray,
+        boxes: np.ndarray,
+        scores: np.ndarray,
+        object_ids: np.ndarray,
+        labels: tuple[str, ...],
+    ) -> ObjectSegmentationFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            masks=masks,
+            boxes=boxes,
+            scores=scores,
+            object_ids=object_ids,
+            labels=labels,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class GoalFrame(Frame):
     """Frame containing a 3D goal coordinate for motion control."""
 

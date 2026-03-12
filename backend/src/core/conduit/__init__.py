@@ -17,3 +17,7 @@ from src.core.conduit.depth_estimator import DepthEstimator as DepthEstimator
 from src.core.conduit.depth_estimation_visualizer import (
     DepthEstimationVisualizer as DepthEstimationVisualizer,
 )
+from src.core.conduit.object_segmenter import ObjectSegmenter as ObjectSegmenter
+from src.core.conduit.object_segmentation_visualizer import (
+    ObjectSegmentationVisualizer as ObjectSegmentationVisualizer,
+)
