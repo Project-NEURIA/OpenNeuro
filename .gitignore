@@ -9,6 +9,3 @@ backend/src/core/conduit/mem0_demo.py
 
 node_modules/
 .DS_Store
-
-CLAUDE.md
-tmp/
