@@ -36,6 +36,7 @@ const categoryColors: Record<string, { border: string; badge: string; badgeColor
 
 const statusDot: Record<string, string> = {
   running: "bg-status-running shadow-status-running/50 shadow-[0_0_6px] animate-pulse",
+  setup: "bg-status-setup animate-pulse",
   startup: "bg-status-startup",
   stopped: "bg-status-stopped",
 };

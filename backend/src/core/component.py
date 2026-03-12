@@ -13,6 +13,7 @@ from src.core.channel import UIReceiver, UISender
 
 class Status(Enum):
     STARTUP = "startup"
+    SETUP = "setup"
     RUNNING = "running"
     STOPPED = "stopped"
 
@@ -34,12 +35,18 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     def stop_event(self) -> threading.Event:
         return self._stop_event
 
+    def setup(self) -> None:
+        """Override to perform heavy initialization (e.g. model loading) before
+        channels are wired.  Runs on the component thread before ``run()``."""
+
     @abstractmethod
     def run(self, inputs: I, outputs: O) -> None: ...
 
     def _safe_run(self, inputs: I, outputs: O) -> None:
-        self._status = Status.RUNNING
         try:
+            self._status = Status.SETUP
+            self.setup()
+            self._status = Status.RUNNING
             self.run(inputs, outputs)
         finally:
             self._status = Status.STOPPED
