@@ -12,6 +12,7 @@ from src.core.conduit.object_detection_visualizer import (
 from src.core.conduit.pose_renderer import PoseRenderer as PoseRenderer
 from src.core.conduit.buffer import Buffer as Buffer
 from src.core.conduit.passthrough import Passthrough as Passthrough
+from src.core.conduit.messages_to_text import MessagesToText as MessagesToText
 from src.core.conduit.memory import Mem0 as Mem0
 from src.core.conduit.depth_estimator import DepthEstimator as DepthEstimator
 from src.core.conduit.depth_estimation_visualizer import (
@@ -21,3 +22,6 @@ from src.core.conduit.object_segmenter import ObjectSegmenter as ObjectSegmenter
 from src.core.conduit.object_segmentation_visualizer import (
     ObjectSegmentationVisualizer as ObjectSegmentationVisualizer,
 )
+from src.core.conduit.streaming_vlm import StreamingVLM as StreamingVLM
+from src.core.conduit.qwen_tts import QwenTTS as QwenTTS
+

@@ -105,6 +105,55 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
         async def on_ready() -> None:
             print(f"[DiscordIO] Bot ready: {bot.user}")
 
+        async def cleanup_guild_voice(
+            guild_id: int, voice_client: discord.VoiceClient | None = None
+        ) -> None:
+            task = _playback_tasks.pop(guild_id, None)
+            if task:
+                task.cancel()
+            _rings.pop(guild_id, None)
+            _buffer.pop(guild_id, None)
+
+            vc = voice_client or _voice_clients.pop(guild_id, None)
+            if vc:
+                try:
+                    if vc.recording:
+                        vc.stop_recording()
+                except Exception:
+                    pass
+                try:
+                    await vc.disconnect(force=True)
+                except Exception:
+                    pass
+
+        async def purge_stale_voice(guild: discord.Guild) -> None:
+            """Remove any stale voice client from py-cord's internal state."""
+            existing = guild.voice_client
+            if existing is None:
+                return
+            print(f"[DiscordIO] Purging stale voice client for guild {guild.id}")
+            try:
+                await existing.disconnect(force=True)
+            except Exception:
+                pass
+            # If disconnect didn't clean up the state, remove it manually
+            if guild.voice_client is not None:
+                try:
+                    existing.cleanup()
+                except Exception:
+                    pass
+            await asyncio.sleep(0.5)
+
+        async def wait_voice_connected(
+            vc: discord.VoiceClient, timeout: float = 15.0
+        ) -> bool:
+            """Wait for the VoiceClient's internal _connected threading.Event."""
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, vc._connected.wait, timeout)
+
+        async def finished_recording(_sink: PCMSink, *_args: object) -> None:
+            return None
+
         @bot.slash_command(name="join", guild_ids=self.config.guild_ids or None)
         async def join(ctx: discord.ApplicationContext) -> None:
             member = ctx.author
@@ -117,7 +166,7 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 return
 
             gid = ctx.guild.id
-            ring: deque[bytes] = deque(maxlen=2000)  # Use a sane default or active's
+            ring: deque[bytes] = deque(maxlen=2000)
             if _active_discord_io:
                 ring = deque(maxlen=_active_discord_io.max_frames)
             _rings[gid] = ring
@@ -127,19 +176,52 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 await ctx.respond("Join a voice channel first")
                 return
 
-            vc = cast(discord.VoiceClient, await channel.connect())
-            sink = _DiscordSink()
+            await ctx.defer()
 
-            vc.start_recording(sink, lambda *_args: None)
+            vc: discord.VoiceClient | None = None
+            try:
+                await purge_stale_voice(ctx.guild)
 
-            _voice_clients[gid] = vc
-            _buffer[gid] = deque(maxlen=1000)
-            if _discord_loop:
-                task = asyncio.run_coroutine_threadsafe(
-                    self._playback_loop(gid), _discord_loop
+                vc = cast(
+                    discord.VoiceClient,
+                    await channel.connect(timeout=30.0, reconnect=False),
                 )
-                _playback_tasks[gid] = cast(asyncio.Task[None], task)
-            await ctx.respond("Connected")
+
+                # Wait for the voice WS handshake to actually complete
+                connected = await wait_voice_connected(vc, timeout=15.0)
+                print(
+                    f"[DiscordIO] Voice handshake for guild {gid}: "
+                    f"connected={connected}, is_connected={vc.is_connected()}"
+                )
+                if not connected:
+                    raise TimeoutError(
+                        "Voice WebSocket handshake did not complete. "
+                        "Ensure PyNaCl is installed (pip install PyNaCl) "
+                        "and the bot can reach Discord voice servers."
+                    )
+
+                _voice_clients[gid] = vc
+                sink = _DiscordSink()
+                vc.start_recording(sink, finished_recording)
+
+                _buffer[gid] = deque(maxlen=1000)
+                if gid not in _playback_tasks or _playback_tasks[gid].done():
+                    _playback_tasks[gid] = asyncio.create_task(self._playback_loop(gid))
+
+                await ctx.followup.send("Connected")
+            except Exception as e:
+                await cleanup_guild_voice(gid, vc)
+                err_str = str(e)
+                if "4017" in err_str:
+                    msg = (
+                        "This voice channel requires end-to-end encryption "
+                        "(DAVE protocol) which we currently cannot support. Kinda fucked."
+                    )
+                    print(f"[DiscordIO] Join failed for guild {gid}: {msg}")
+                    await ctx.followup.send(msg)
+                else:
+                    print(f"[DiscordIO] Join failed for guild {gid}: {e}")
+                    await ctx.followup.send(f"Failed to join voice channel: {e}")
 
         @bot.slash_command(name="leave", guild_ids=self.config.guild_ids or None)
         async def leave(ctx: discord.ApplicationContext) -> None:
@@ -148,15 +230,7 @@ class DiscordIO(Component[DiscordInputs, DiscordOutputs]):
                 return
 
             gid = ctx.guild.id
-            vc = ctx.guild.voice_client
-            if vc:
-                await vc.disconnect()
-                _rings.pop(gid, None)
-                _voice_clients.pop(gid, None)
-                _buffer.pop(gid, None)
-                task = _playback_tasks.pop(gid, None)
-                if task:
-                    task.cancel()
+            await cleanup_guild_voice(gid)
             await ctx.respond("Disconnected")
 
     async def _playback_loop(self, guild_id: int) -> None:

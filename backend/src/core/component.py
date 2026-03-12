@@ -87,10 +87,12 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         origin = get_origin(tp)
         # Parameterized generic NamedTuple, e.g. PassthroughInputs[T]
         if origin is not None and hasattr(origin, "_fields"):
-            hints = get_type_hints(origin)
             # Build substitution map: TypeVar -> actual arg
             params = getattr(origin, "__type_params__", ())
             args = get_args(tp)
+            # Include type params in localns so get_type_hints can resolve them
+            localns = dict(zip((p.__name__ for p in params), args))
+            hints = get_type_hints(origin, localns=localns)
             sub = dict(zip(params, args))
 
             def _subst(t: type) -> type:
