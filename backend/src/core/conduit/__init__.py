@@ -10,6 +10,7 @@ from src.core.conduit.object_detection_visualizer import (
     ObjectDetectionVisualizer as ObjectDetectionVisualizer,
 )
 from src.core.conduit.pose_renderer import PoseRenderer as PoseRenderer
+from src.core.conduit.pose_renderer_3d import PoseRenderer3D as PoseRenderer3D
 from src.core.conduit.buffer import Buffer as Buffer
 from src.core.conduit.passthrough import Passthrough as Passthrough
 from src.core.conduit.messages_to_text import MessagesToText as MessagesToText

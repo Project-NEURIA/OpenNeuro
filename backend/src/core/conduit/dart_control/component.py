@@ -59,59 +59,12 @@ _SMPL_TO_OPENVR: dict[int, str] = {
 }
 
 
-def _rot6d_to_quaternion(rot6d: torch.Tensor) -> tuple[float, float, float, float]:
-    """Convert a 6D continuous rotation to quaternion (w, x, y, z).
-
-    The 6D representation is the first two columns of the rotation matrix.
-    Uses Gram-Schmidt to reconstruct the full rotation matrix, then converts.
-    """
-    a1 = rot6d[:3]
-    a2 = rot6d[3:6]
-
-    # Gram-Schmidt: orthonormalize
-    e1 = a1 / (a1.norm() + 1e-8)
-    e2 = a2 - (a2 @ e1) * e1
-    e2 = e2 / (e2.norm() + 1e-8)
-    e3 = torch.linalg.cross(e1, e2)
-
-    # Rotation matrix columns → rows of 3×3
-    m00, m01, m02 = e1[0].item(), e2[0].item(), e3[0].item()
-    m10, m11, m12 = e1[1].item(), e2[1].item(), e3[1].item()
-    m20, m21, m22 = e1[2].item(), e2[2].item(), e3[2].item()
-
-    # Rotation matrix to quaternion (Shepperd's method)
-    tr = m00 + m11 + m22
-    if tr > 0:
-        s = 0.5 / math.sqrt(tr + 1.0)
-        w = 0.25 / s
-        x = (m21 - m12) * s
-        y = (m02 - m20) * s
-        z = (m10 - m01) * s
-    elif m00 > m11 and m00 > m22:
-        s = 2.0 * math.sqrt(1.0 + m00 - m11 - m22)
-        w = (m21 - m12) / s
-        x = 0.25 * s
-        y = (m01 + m10) / s
-        z = (m02 + m20) / s
-    elif m11 > m22:
-        s = 2.0 * math.sqrt(1.0 + m11 - m00 - m22)
-        w = (m02 - m20) / s
-        x = (m01 + m10) / s
-        y = 0.25 * s
-        z = (m12 + m21) / s
-    else:
-        s = 2.0 * math.sqrt(1.0 + m22 - m00 - m11)
-        w = (m10 - m01) / s
-        x = (m02 + m20) / s
-        y = (m12 + m21) / s
-        z = 0.25 * s
-
-    return (w, x, y, z)
 
 
 # Quaternion for -90° rotation around X: converts Z-up (SMPL) → Y-up (standard)
 _SQRT2_2 = math.sqrt(2.0) / 2.0
 _Q_ZUP_TO_YUP = (_SQRT2_2, -_SQRT2_2, 0.0, 0.0)  # (w, x, y, z)
+_Q_ZUP_TO_YUP_INV = (_SQRT2_2, _SQRT2_2, 0.0, 0.0)  # conjugate
 
 
 def _quat_multiply(
@@ -129,12 +82,49 @@ def _quat_multiply(
     )
 
 
+
+# SMPLX kinematic tree: parent index for each of the 22 joints
+_SMPL_PARENTS = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19]
+
+
+def _rot6d_to_matrix(rot6d: torch.Tensor) -> torch.Tensor:
+    """Convert 6D rotation to 3x3 matrix via Gram-Schmidt."""
+    a1 = rot6d[:3]
+    a2 = rot6d[3:6]
+    e1 = a1 / (a1.norm() + 1e-8)
+    e2 = a2 - (a2 @ e1) * e1
+    e2 = e2 / (e2.norm() + 1e-8)
+    e3 = torch.linalg.cross(e1, e2)
+    return torch.stack([e1, e2, e3], dim=0)  # [3, 3] — rows, matching DART
+
+
+def _rotmat_to_quaternion(m: torch.Tensor) -> tuple[float, float, float, float]:
+    """Convert 3x3 rotation matrix to quaternion (w, x, y, z)."""
+    m00, m01, m02 = m[0, 0].item(), m[0, 1].item(), m[0, 2].item()
+    m10, m11, m12 = m[1, 0].item(), m[1, 1].item(), m[1, 2].item()
+    m20, m21, m22 = m[2, 0].item(), m[2, 1].item(), m[2, 2].item()
+    tr = m00 + m11 + m22
+    if tr > 0:
+        s = 0.5 / math.sqrt(tr + 1.0)
+        return (0.25 / s, (m21 - m12) * s, (m02 - m20) * s, (m10 - m01) * s)
+    elif m00 > m11 and m00 > m22:
+        s = 2.0 * math.sqrt(1.0 + m00 - m11 - m22)
+        return ((m21 - m12) / s, 0.25 * s, (m01 + m10) / s, (m02 + m20) / s)
+    elif m11 > m22:
+        s = 2.0 * math.sqrt(1.0 + m11 - m00 - m22)
+        return ((m02 - m20) / s, (m01 + m10) / s, 0.25 * s, (m12 + m21) / s)
+    else:
+        s = 2.0 * math.sqrt(1.0 + m22 - m00 - m11)
+        return ((m10 - m01) / s, (m02 + m20) / s, (m12 + m21) / s, 0.25 * s)
+
+
 def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]:
     """Convert a single frame of 276 SMPL features to a dict of BonePoses.
 
-    Converts from SMPL's Z-up to Y-up (standard for OpenVR/Unity/Unreal):
+    Uses forward kinematics to compute world-space rotations from local
+    joint rotations, then converts from SMPL's Z-up to Y-up:
       position: (x, y, z)_zup → (x, z, -y)_yup
-      rotation: q_yup = q_conversion * q_zup
+      rotation: q_yup = q_conversion * q_zup_world
 
     Args:
         features: [276] tensor — one frame of denormalized motion features.
@@ -149,10 +139,24 @@ def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]
         _N_JOINTS, 6
     )
 
+    # Convert all local rotations to 3x3 matrices
+    local_rots = [_rot6d_to_matrix(poses_6d[j]) for j in range(_N_JOINTS)]
+
+    # Forward kinematics: accumulate world rotations through kinematic chain
+    world_rots: list[torch.Tensor] = [torch.empty(0)] * _N_JOINTS
+    for j in range(_N_JOINTS):
+        parent = _SMPL_PARENTS[j]
+        if parent == -1:
+            world_rots[j] = local_rots[j]  # root = global orient (already world-space)
+        else:
+            world_rots[j] = world_rots[parent] @ local_rots[j]
+
     poses: dict[str, BonePose | None] = {}
     for joint_idx, part_name in _SMPL_TO_OPENVR.items():
         pos = joints[joint_idx]
-        q_zup = _rot6d_to_quaternion(poses_6d[joint_idx])
+        # World-space quaternion in Z-up
+        q_zup = _rotmat_to_quaternion(world_rots[joint_idx])
+        # Convert to Y-up
         q_yup = _quat_multiply(_Q_ZUP_TO_YUP, q_zup)
         poses[part_name] = BonePose(
             pos_x=pos[0].item(),
