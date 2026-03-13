@@ -59,8 +59,6 @@ _SMPL_TO_OPENVR: dict[int, str] = {
 }
 
 
-
-
 # Quaternion for -90° rotation around X: converts Z-up (SMPL) → Y-up (standard)
 _SQRT2_2 = math.sqrt(2.0) / 2.0
 _Q_ZUP_TO_YUP = (_SQRT2_2, -_SQRT2_2, 0.0, 0.0)  # (w, x, y, z)
@@ -82,9 +80,31 @@ def _quat_multiply(
     )
 
 
-
 # SMPLX kinematic tree: parent index for each of the 22 joints
-_SMPL_PARENTS = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19]
+_SMPL_PARENTS = [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    9,
+    9,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+]
 
 
 def _rot6d_to_matrix(rot6d: torch.Tensor) -> torch.Tensor:

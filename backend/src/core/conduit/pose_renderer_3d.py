@@ -34,7 +34,30 @@ _SMPL_TO_OPENVR: dict[int, str] = {
 _OPENVR_TO_SMPL: dict[str, int] = {v: k for k, v in _SMPL_TO_OPENVR.items()}
 
 # SMPLX kinematic tree parents
-_SMPL_PARENTS = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19]
+_SMPL_PARENTS = [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    9,
+    9,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+]
 _N_JOINTS = 22
 
 # Quaternion for converting Y-up back to Z-up (+90° around X, inverse of Z-up→Y-up)
@@ -60,11 +83,14 @@ def _quat_to_rotmat(w: float, x: float, y: float, z: float) -> np.ndarray:
     ww, xx, yy, zz = w * w, x * x, y * y, z * z
     wx, wy, wz = w * x, w * y, w * z
     xy, xz, yz = x * y, x * z, y * z
-    return np.array([
-        [ww + xx - yy - zz, 2 * (xy - wz), 2 * (xz + wy)],
-        [2 * (xy + wz), ww - xx + yy - zz, 2 * (yz - wx)],
-        [2 * (xz - wy), 2 * (yz + wx), ww - xx - yy + zz],
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [ww + xx - yy - zz, 2 * (xy - wz), 2 * (xz + wy)],
+            [2 * (xy + wz), ww - xx + yy - zz, 2 * (yz - wx)],
+            [2 * (xz - wy), 2 * (yz + wx), ww - xx - yy + zz],
+        ],
+        dtype=np.float32,
+    )
 
 
 class PoseRenderer3DConfig(BaseModel):
@@ -108,7 +134,10 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
 
         # Load SMPL body model
         body_model_dir = (
-            Path(__file__).resolve().parents[3] / "assets" / "dart_control" / "smplx_models"
+            Path(__file__).resolve().parents[3]
+            / "assets"
+            / "dart_control"
+            / "smplx_models"
         )
         self._body_model = (
             smplx.build_layer(
@@ -191,7 +220,9 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
         # Y-up (x, y, z) → Z-up: x_z = x_y, y_z = -z_y, z_z = y_y
         waist = poses.get("waist")
         if waist is not None:
-            transl = np.array([waist.pos_x, -waist.pos_z, waist.pos_y], dtype=np.float32)
+            transl = np.array(
+                [waist.pos_x, -waist.pos_z, waist.pos_y], dtype=np.float32
+            )
         else:
             transl = np.zeros(3, dtype=np.float32)
 
@@ -216,7 +247,9 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
         """Render SMPL mesh to an RGB image."""
         pyrender = self._pyrender
 
-        mesh = self._trimesh.Trimesh(vertices=vertices, faces=self._faces, process=False)
+        mesh = self._trimesh.Trimesh(
+            vertices=vertices, faces=self._faces, process=False
+        )
 
         material = pyrender.MetallicRoughnessMaterial(
             metallicFactor=0.0,
@@ -238,7 +271,8 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
         ]
         for direction, color in axes:
             cyl = self._trimesh.creation.cylinder(
-                radius=axis_radius, height=axis_len,
+                radius=axis_radius,
+                height=axis_len,
                 sections=8,
             )
             # Cylinder is along Z by default — rotate to target axis
@@ -257,11 +291,13 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
             T[:3, 3] = d * axis_len / 2
             cyl.apply_transform(T @ R)
             mat = pyrender.MetallicRoughnessMaterial(
-                metallicFactor=0.0, alphaMode="OPAQUE", baseColorFactor=color,
+                metallicFactor=0.0,
+                alphaMode="OPAQUE",
+                baseColorFactor=color,
             )
-            axis_nodes.append(self._scene.add(
-                pyrender.Mesh.from_trimesh(cyl, material=mat), "axis"
-            ))
+            axis_nodes.append(
+                self._scene.add(pyrender.Mesh.from_trimesh(cyl, material=mat), "axis")
+            )
 
         # Camera looks at mesh center from the front (+Y in SMPL's Z-up space)
         center = mesh.bounds.mean(axis=0)
@@ -295,9 +331,15 @@ class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
             with torch.no_grad():
                 output = self._body_model(
                     betas=torch.zeros(1, 10, device=device),
-                    global_orient=torch.tensor(global_orient, dtype=torch.float32, device=device).unsqueeze(0),
-                    body_pose=torch.tensor(body_pose, dtype=torch.float32, device=device).unsqueeze(0),
-                    transl=torch.tensor(transl, dtype=torch.float32, device=device).unsqueeze(0),
+                    global_orient=torch.tensor(
+                        global_orient, dtype=torch.float32, device=device
+                    ).unsqueeze(0),
+                    body_pose=torch.tensor(
+                        body_pose, dtype=torch.float32, device=device
+                    ).unsqueeze(0),
+                    transl=torch.tensor(
+                        transl, dtype=torch.float32, device=device
+                    ).unsqueeze(0),
                 )
 
             vertices = output.vertices[0].cpu().numpy()
