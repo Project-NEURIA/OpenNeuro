@@ -1,4 +1,4 @@
-"""DepthEstimator conduit — monocular depth estimation via DA3."""
+"""MonocularDepthEstimator conduit — monocular depth estimation via DA3."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from src.core.frames import (
 from src.core.utils import auto_device, auto_dtype, resize_and_crop
 
 
-class DepthEstimatorConfig(BaseModel):
+class MonocularDepthEstimatorConfig(BaseModel):
     model_config = ConfigDict(json_schema_extra={"configOptions": {"model": {}}})
 
     process_res: int = 504
@@ -28,24 +28,26 @@ class DepthEstimatorConfig(BaseModel):
     model: str = "depth-anything/DA3METRIC-LARGE"
 
 
-class DepthEstimatorInputs(NamedTuple):
+class MonocularDepthEstimatorInputs(NamedTuple):
     video: Receiver[VideoFrame]
     camera_params: Receiver[CameraParamsFrame]
 
 
-class DepthEstimatorOutputs(NamedTuple):
+class MonocularDepthEstimatorOutputs(NamedTuple):
     depth: Sender[DepthFrame]
     video: Sender[VideoFrame]
 
 
-class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
+class MonocularDepthEstimator(
+    Component[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
+):
     """Monocular depth estimation backed by Depth Anything 3.
 
     Consumes VideoFrames and CameraParamsFrames, runs DA3 inference,
     and emits DepthFrames plus the resized/cropped VideoFrame.
     """
 
-    def __init__(self, config: DepthEstimatorConfig) -> None:
+    def __init__(self, config: MonocularDepthEstimatorConfig) -> None:
         super().__init__()
         self.config = config
         self._model: Any = None
@@ -69,11 +71,7 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
             },
         ]
 
-    def _ensure_model(self) -> None:
-        """Lazy-load DA3 model on first use."""
-        if self._model is not None:
-            return
-
+    def setup(self) -> None:
         import os
 
         os.environ.setdefault("DA3_LOG_LEVEL", "WARN")
@@ -81,13 +79,13 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
         from depth_anything_3.api import DepthAnything3
 
         print(
-            f"[DepthEstimator] Loading {self.config.model} on {self._device} ({self._dtype})"
+            f"[MonocularDepthEstimator] Loading {self.config.model} on {self._device} ({self._dtype})"
         )
         self._model = DepthAnything3.from_pretrained(self.config.model).to(
             device=self._device
         )
         self._model.eval()
-        print("[DepthEstimator] Model loaded")
+        print("[MonocularDepthEstimator] Model loaded")
 
     def _infer(self, rgb: np.ndarray, K: np.ndarray) -> np.ndarray:
         """Run DA3 inference and return metric depth in metres."""
@@ -118,11 +116,14 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
             vframe.get(VideoDataFormat.BGR), ow, oh
         )
 
-    def run(self, inputs: DepthEstimatorInputs, outputs: DepthEstimatorOutputs) -> None:
-        self._ensure_model()
+    def run(
+        self,
+        inputs: MonocularDepthEstimatorInputs,
+        outputs: MonocularDepthEstimatorOutputs,
+    ) -> None:
         cam_iter = inputs.camera_params(self, newest=True)
 
-        print("[DepthEstimator] Running inference loop")
+        print("[MonocularDepthEstimator] Running inference loop")
         for vframe in inputs.video(self, newest=True):
             if vframe is None:
                 break
@@ -142,4 +143,4 @@ class DepthEstimator(Component[DepthEstimatorInputs, DepthEstimatorOutputs]):
                 VideoFrame.new(data=video_out, format=VideoDataFormat.BGR)
             )
 
-        print("[DepthEstimator] Stopped")
+        print("[MonocularDepthEstimator] Stopped")
