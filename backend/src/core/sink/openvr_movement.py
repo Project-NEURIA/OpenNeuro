@@ -77,9 +77,13 @@ class OpenVRMovementOutputs(NamedTuple):
 
 def _to_ovd_pose(
     bone: BonePose | None,
-    ox: float, oy: float, oz: float,
-    cos_yaw: float, sin_yaw: float,
-    yaw_qw: float, yaw_qy: float,
+    ox: float,
+    oy: float,
+    oz: float,
+    cos_yaw: float,
+    sin_yaw: float,
+    yaw_qw: float,
+    yaw_qy: float,
 ) -> Pose | None:
     """Convert a BonePose to an ovd_client Pose with offset and yaw rotation."""
     if bone is None:
@@ -154,12 +158,22 @@ class OpenVRMovementSink(
                         break
 
                     p = frame.get()
-                    ox, oy, oz = self.config.offset_x, self.config.offset_y, self.config.offset_z
+                    ox, oy, oz = (
+                        self.config.offset_x,
+                        self.config.offset_y,
+                        self.config.offset_z,
+                    )
                     yaw = math.radians(self.config.yaw_degrees)
                     cy, sy = math.cos(yaw), math.sin(yaw)
                     qw = math.cos(yaw / 2)
                     qy = math.sin(yaw / 2)
-                    _send_poses(client, {k: _to_ovd_pose(v, ox, oy, oz, cy, sy, qw, qy) for k, v in p.items()})
+                    _send_poses(
+                        client,
+                        {
+                            k: _to_ovd_pose(v, ox, oy, oz, cy, sy, qw, qy)
+                            for k, v in p.items()
+                        },
+                    )
         finally:
             client.disconnect()
             print("[OpenVRMovement] Disconnected from driver")
