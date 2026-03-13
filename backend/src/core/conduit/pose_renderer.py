@@ -138,5 +138,7 @@ class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
         for frame in inputs.pose(self):
             if frame is None:
                 break
-            img = self._render_pose(frame.get())
+            poses = frame.get()
+
+            img = self._render_pose(poses)
             outputs.video.send(VideoFrame.new(data=img, format=VideoDataFormat.BGR))

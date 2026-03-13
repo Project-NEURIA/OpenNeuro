@@ -703,7 +703,33 @@ class DartControl(Component[DartControlInputs, DartControlOutputs]):
                 for f in range(batch.shape[0]):
                     if self.stop_event.is_set():
                         break
-                    frame_queue.put(_features_to_body_pose(batch[f]))
+                    pose = _features_to_body_pose(batch[f])
+                    # Floor clamp: if lowest foot is below ground, shift entire skeleton up
+                    foot_ys = [
+                        bp.pos_y
+                        for k in ("left_foot", "right_foot")
+                        if (bp := pose.get(k)) is not None
+                    ]
+                    if foot_ys:
+                        min_y = min(foot_ys)
+                        if min_y < 0:
+                            pose = {
+                                name: (
+                                    BonePose(
+                                        pos_x=bp.pos_x,
+                                        pos_y=bp.pos_y - min_y,
+                                        pos_z=bp.pos_z,
+                                        rot_w=bp.rot_w,
+                                        rot_x=bp.rot_x,
+                                        rot_y=bp.rot_y,
+                                        rot_z=bp.rot_z,
+                                    )
+                                    if bp is not None
+                                    else None
+                                )
+                                for name, bp in pose.items()
+                            }
+                    frame_queue.put(pose)
 
             except Exception as e:
                 print(f"[DartControl] Generation error: {e}")
