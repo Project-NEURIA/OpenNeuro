@@ -18,6 +18,8 @@ dependencies = [
     "pillow>=12.1.1",
     "python-dotenv>=1.2.1",
     "smplx",
+    "pyrender>=0.1.45",
+    "trimesh>=4.0.0",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
     "torch>=2.6.0",
@@ -38,7 +40,7 @@ dependencies = [
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa", "pyrender", "pyrender.*", "trimesh", "trimesh.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
