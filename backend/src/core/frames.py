@@ -317,6 +317,46 @@ class ObjectDetectionFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectSegmentationFrame(Frame):
+    """Instance segmentation results for a single video frame."""
+
+    masks: np.ndarray
+    """(K, H, W) bool — per-instance binary masks."""
+
+    boxes: np.ndarray
+    """(K, 4) float32 — XYXY bounding boxes."""
+
+    scores: np.ndarray
+    """(K,) float32 — detection confidence."""
+
+    object_ids: np.ndarray
+    """(K,) int64 — SAM3 tracking object IDs."""
+
+    labels: tuple[str, ...]
+    """(K,) — prompt label for each detection."""
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        masks: np.ndarray,
+        boxes: np.ndarray,
+        scores: np.ndarray,
+        object_ids: np.ndarray,
+        labels: tuple[str, ...],
+    ) -> ObjectSegmentationFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            masks=masks,
+            boxes=boxes,
+            scores=scores,
+            object_ids=object_ids,
+            labels=labels,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class GoalFrame(Frame):
     """Frame containing a 3D goal coordinate for motion control."""
 
@@ -415,3 +455,71 @@ class VideoFrame(Frame):
             (VideoDataFormat.RGB, VideoDataFormat.BGR): cv2.COLOR_RGB2BGR,
         }
         return cv2.cvtColor(self.data, conv[(self.format, format)])
+
+
+@dataclass(frozen=True, slots=True)
+class StereoVideoFrame(Frame):
+    """Stereo video frame carrying left and right eye pixel data."""
+
+    left: np.ndarray
+    right: np.ndarray
+    width: int
+    height: int
+    format: VideoDataFormat
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        left: np.ndarray,
+        right: np.ndarray,
+        format: VideoDataFormat = VideoDataFormat.BGR,
+    ) -> StereoVideoFrame:
+        h, w = left.shape[:2]
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            left=left,
+            right=right,
+            width=w,
+            height=h,
+            format=format,
+        )
+
+    def get(self, eye: Literal["left", "right"], format: VideoDataFormat) -> np.ndarray:
+        """Get pixel data for the requested eye in the requested color format."""
+        data = self.left if eye == "left" else self.right
+        if self.format == format:
+            return data
+        import cv2
+
+        conv = {
+            (VideoDataFormat.BGR, VideoDataFormat.RGB): cv2.COLOR_BGR2RGB,
+            (VideoDataFormat.RGB, VideoDataFormat.BGR): cv2.COLOR_RGB2BGR,
+        }
+        return cv2.cvtColor(data, conv[(self.format, format)])
+
+
+@dataclass(frozen=True, slots=True)
+class StereoCameraParamsFrame(Frame):
+    """Stereo camera parameters: intrinsics (3x3), extrinsics (4x4), and baseline (metres)."""
+
+    intrinsics: np.ndarray
+    extrinsics: np.ndarray
+    baseline: float
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        intrinsics: np.ndarray,
+        extrinsics: np.ndarray,
+        baseline: float,
+    ) -> StereoCameraParamsFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            baseline=baseline,
+        )

@@ -14,7 +14,7 @@ dependencies = [
     "openai>=2.17.0",
     "cv2-enumerate-cameras>=1.1.10",
     "opencv-python-headless>=4.13.0.92",
-    "openvr-virtual-driver-client>=0.0.8",
+    "openvr-virtual-driver-client>=0.0.9",
     "pillow>=12.1.1",
     "python-dotenv>=1.2.1",
     "smplx",
@@ -33,12 +33,13 @@ dependencies = [
     "python-osc>=1.9.3",
     "mem0ai",
     "depth-anything-3 @ git+https://github.com/MarksonChen/Depth-Anything-3.git",
+    "fast-foundation-stereo @ git+https://github.com/MarksonChen/Fast-FoundationStereo.git",
     "librosa>=0.10.0",
 ]
 
 [tool.mypy]
 [[tool.mypy.overrides]]
-module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa"]
+module = ["sounddevice", "onnxruntime", "clip", "smplx", "yaml", "tqdm", "tqdm.*", "depth_anything_3", "depth_anything_3.*", "librosa", "core", "core.*", "Utils"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
