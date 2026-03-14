@@ -20,6 +20,7 @@ class Node(BaseModel):
     init_args: dict[str, Any]
     x: float = 0.0
     y: float = 0.0
+    sub_graph: Graph | None = None
 
 
 class Edge(BaseModel):
@@ -32,6 +33,10 @@ class Edge(BaseModel):
 class Graph(BaseModel):
     edges: list[Edge]
     nodes: dict[str, Node]
+
+
+# Resolve forward reference: Node.sub_graph uses Graph which is defined after Node.
+Node.model_rebuild()
 
 
 class GraphManager:
@@ -160,9 +165,14 @@ class GraphManager:
 
         classes = Component.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
-            cls = classes.get(node.type)
-            if cls is not None:
-                self._components[node_id] = cls.from_args(node.init_args)
+            if node.sub_graph is not None:
+                from src.core.component import CompositeComponent
+
+                self._components[node_id] = CompositeComponent(node.sub_graph)
+            else:
+                cls = classes.get(node.type)
+                if cls is not None:
+                    self._components[node_id] = cls.from_args(node.init_args)
 
         self._reconcile()
 
@@ -242,10 +252,11 @@ class GraphManager:
             input_type = cls._get_type_param(0)
             output_type = cls._get_type_param(1)
 
-            input_slots = cls.get_input_types()
-            output_slots = cls.get_output_types()
-            ui_input_slots = cls.get_ui_input_types()
-            ui_output_slots = cls.get_ui_output_types()
+            # Use instance calls so CompositeComponent overrides take effect
+            input_slots = comp.get_input_types()
+            output_slots = comp.get_output_types()
+            ui_input_slots = comp.get_ui_input_types()
+            ui_output_slots = comp.get_ui_output_types()
 
             input_handles: dict[str, Receiver[Any] | None] = {}
             for slot, slot_type in input_slots.items():

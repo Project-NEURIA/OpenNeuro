@@ -46,13 +46,13 @@ This is required to describe the syntax of OpenNeuro's graphical editor, since
 components can compose to form graphs.
 ### Example 1.3 (The category of frame types and components)
 
-We construct a simple category **Proc** whose:
+We construct a simple category **Comp** whose:
 
 - **Objects** are frame types: $\text{Audio}$, $\text{Text}$, $\text{Video}$,
   $\text{Interrupt}$, $\text{BodyPose}$.
 - **Morphisms** are components. Each component $f$ has a typed interface $f : A \to B$,
   meaning it receives frames of type $A$ and produces frames of type $B$. The morphisms
-  of **Proc** are the following components:
+  of **Comp** are the following components:
 
 $$\text{ASR} : \text{Audio} \to \text{Text}$$
 $$\text{TTS} : \text{Text} \to \text{Audio}$$
@@ -82,14 +82,14 @@ See [nLab: free category](https://ncatlab.org/nlab/show/free+category).
 
 ### Remark 1.5
 
-**Proc** as constructed in Example 1.3 is a free category, where the primitive
-morphisms are the components and the objects are the frame types.
+**Comp** as constructed in Example 1.3 is a free category, where the primitive
+morphisms are the (primitive) components and the objects are the frame types.
 
 ### Remark 1.6 (Limitation)
 
 Consider a graph where $\text{ASR} : \text{Audio} \to \text{Text}$ and
 $\text{PoseRenderer} : \text{BodyPose} \to \text{Video}$ run side by side with no
-connection between them. This cannot be expressed in **Proc** — composition ($\circ$)
+connection between them. This cannot be expressed in **Comp** — composition ($\circ$)
 requires the output of one morphism to match the input of the next. There is no
 operation for placing two independent morphisms in parallel. To model this, we need
 additional structure.
@@ -136,18 +136,18 @@ is trivial. This is a stronger condition than mere symmetry.
 
 ### Remark 2.5 (Interfaces)
 
-In the simple **Proc** of §1, objects are bare frame types like $\text{Audio}$ or
+In the simple **Comp** of §1, objects are bare frame types like $\text{Audio}$ or
 $\text{Text}$. In practice, components often have multiple input or output ports. For
 example, an LLM component takes both text and an interrupt signal:
 
 $$\text{LLM} : (\text{text}: \text{Text},\; \text{interrupt}: \text{Interrupt}) \to \text{Text}$$
 
-We therefore refine our notion of object: objects in **Proc** are **interfaces** —
+We therefore refine our notion of object: objects in **Comp** are **interfaces** —
 named records of typed ports. A single-port interface like $\text{Audio}$ is just a
 record with one field. Multi-port interfaces arise naturally from the components
 themselves, not only from parallel composition.
 
-### Remark 2.6 (Parallel composition in Proc)
+### Remark 2.6 (Parallel composition in Comp)
 
 In OpenNeuro, the tensor product is commutative on the nose at both levels:
 
@@ -159,12 +159,12 @@ In OpenNeuro, the tensor product is commutative on the nose at both levels:
 - **Morphisms.** Parallel execution has no notion of "first" or "second" — both
   components run independently on their own threads. So $f \otimes g = g \otimes f$.
 
-This makes **Proc** a commutative monoidal category with:
+This makes **Comp** a commutative monoidal category with:
 
 - $A \otimes B$ = the combined interface with all ports from $A$ and $B$.
 - $I$ = the empty interface (a component with no inputs or no outputs).
 
-### Example 2.7 (Parallel composition in Proc)
+### Example 2.7 (Parallel composition in Comp)
 
 Recall from Remark 1.6 that $\text{ASR}$ and $\text{PoseRenderer}$ running side by side
 could not be expressed in a plain category. With the monoidal product, we can now write:
@@ -220,7 +220,7 @@ Intuitively, $\text{Tr}^X_{A,B}$ takes a morphism that has an "extra" input and 
 of type $X$ and produces a morphism where $X$ is wired internally as a feedback loop.
 The external interface shrinks from $(A \otimes X) \to (B \otimes X)$ to just $A \to B$.
 
-### Example 3.3 (Feedback in Proc)
+### Example 3.3 (Feedback in Comp)
 
 Recall from Remark 2.9 the $\text{AgentState} : \text{Text} \to \text{History}$ and
 $\text{LLM} : \text{History} \to \text{Text}$ components. Their composition
@@ -302,7 +302,7 @@ We extend the gs-monoidal structure by additionally equipping every object with 
 commutative monoid structure $(\nabla_A, \eta_A)$. This gives every object the structure
 of a **commutative bimonoid**: both a commutative monoid and a commutative comonoid.
 
-### Example 4.5 (Fan-out, fan-in, and discard in Proc)
+### Example 4.5 (Fan-out, fan-in, and discard in Comp)
 
 In OpenNeuro, these operations are provided by the channel system:
 
@@ -328,7 +328,7 @@ from arbitrarily many upstream components, without any special wiring logic.
 
 ### Definition 5.1 (Partial order on objects)
 
-The objects of **Proc** carry a **partial order** $\leq$ given by the subtyping
+The objects of **Comp** carry a **partial order** $\leq$ given by the subtyping
 relation on frame types. We write $A \leq B$ when $A$ is a subtype of $B$.
 
 In OpenNeuro, this is the class hierarchy:
@@ -382,14 +382,14 @@ See [nLab: functor](https://ncatlab.org/nlab/show/functor).
 
 ### Example 6.2 (Generic components as endofunctors)
 
-A component that is **generic over its frame type** defines an endofunctor on **Proc**.
+A component that is **generic over its frame type** defines an endofunctor on **Comp**.
 For instance, a `Passthrough[T]` component — parameterized by a type $T$ — maps:
 
 - Each object $T$ to itself.
 - Each morphism $f : A \to B$ to a morphism $\text{Passthrough}(f) : A \to B$ that applies
   $f$ while passing data through.
 
-More practical examples of endofunctors on **Proc** include:
+More practical examples of endofunctors on **Comp** include:
 
 - A **profiler** that wraps any component and adds timing measurements, without changing
   its interface type.
