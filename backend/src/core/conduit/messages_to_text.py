@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import MessagesFrame, TextFrame
 
 
@@ -15,7 +15,7 @@ class MessagesToTextOutputs(NamedTuple):
     text: Sender[TextFrame]
 
 
-class MessagesToText(Component[MessagesToTextInputs, MessagesToTextOutputs]):
+class MessagesToText(PrimitiveComponent[MessagesToTextInputs, MessagesToTextOutputs]):
     """Converts MessagesFrame to TextFrame for display purposes."""
 
     def run(self, inputs: MessagesToTextInputs, outputs: MessagesToTextOutputs) -> None:

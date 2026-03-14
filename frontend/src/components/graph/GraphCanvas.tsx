@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -10,6 +11,7 @@ import {
   type OnEdgesChange,
   type OnConnect,
   type OnNodeDrag,
+  type OnSelectionChangeFunc,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GraphNode } from "./GraphNode";
@@ -34,6 +36,9 @@ interface GraphCanvasProps {
   onDrop?: (event: React.DragEvent) => void;
   onDragOver?: (event: React.DragEvent) => void;
   onNodeDragStop?: OnNodeDrag;
+  onSelectionChange?: OnSelectionChangeFunc;
+  onNodeContextMenu?: (event: React.MouseEvent, node: Node) => void;
+  onPaneClick?: () => void;
 }
 
 export function GraphCanvas({
@@ -45,7 +50,27 @@ export function GraphCanvas({
   onDrop,
   onDragOver,
   onNodeDragStop,
+  onSelectionChange,
+  onNodeContextMenu,
+  onPaneClick,
 }: GraphCanvasProps) {
+  const [shiftHeld, setShiftHeld] = useState(false);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
   return (
     <div className="w-full h-full">
       <ReactFlow
@@ -65,6 +90,13 @@ export function GraphCanvas({
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeDragStop={onNodeDragStop}
+        onSelectionChange={onSelectionChange}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneClick={onPaneClick}
+        selectionOnDrag={shiftHeld}
+        panOnDrag={shiftHeld ? false : [0]}
+        selectionKeyCode={null}
+        multiSelectionKeyCode="Shift"
       >
         <Background color="var(--grid)" gap={40} size={3} />
         <Controls

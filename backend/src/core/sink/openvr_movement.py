@@ -9,7 +9,7 @@ from typing import NamedTuple
 from ovd_client import Client, Pose
 from pydantic import BaseModel
 
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.channel import Receiver
 from src.core.frames import BodyPoseFrame, BonePose
 
@@ -128,7 +128,7 @@ def _send_poses(client: Client, poses: Mapping[str, Pose | None]) -> None:
 
 
 class OpenVRMovementSink(
-    Component[OpenVRMovementInputs, OpenVRMovementOutputs]  # type: ignore[type-var]
+    PrimitiveComponent[OpenVRMovementInputs, OpenVRMovementOutputs]  # type: ignore[type-var]
 ):
     """Sink that streams body pose frames to the OpenVR virtual driver.
 

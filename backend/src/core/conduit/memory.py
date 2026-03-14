@@ -8,7 +8,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import MessagesFrame, TextFrame
 
 from mem0 import Memory  # type: ignore[import-untyped]
@@ -156,7 +156,7 @@ def _get_or_create_memory(config: Mem0Config) -> Memory:
     return _memory_instance
 
 
-class Mem0(Component[Mem0Inputs, Mem0Outputs]):
+class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
     """Memory component backed by mem0.
 
     On each incoming MessagesFrame:

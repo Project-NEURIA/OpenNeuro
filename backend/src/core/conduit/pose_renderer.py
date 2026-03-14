@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import BodyPoseFrame, BonePose, VideoFrame, VideoDataFormat
 
 # Skeleton connectivity: (parent, child) pairs
@@ -97,7 +97,7 @@ def _project(
     return px, py
 
 
-class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
+class PoseRenderer(PrimitiveComponent[PoseRendererInputs, PoseRendererOutputs]):
     """Conduit that renders each BodyPoseFrame as a 2D skeleton and outputs JPEG bytes."""
 
     def __init__(self, config: PoseRendererConfig) -> None:

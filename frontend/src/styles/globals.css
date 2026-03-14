@@ -110,3 +110,17 @@ body {
 .react-flow__background {
   background-color: var(--background) !important;
 }
+
+.react-flow__pane {
+  cursor: default !important;
+}
+.react-flow__pane.dragging {
+  cursor: grabbing !important;
+}
+.react-flow__pane.selection {
+  cursor: crosshair !important;
+}
+
+.react-flow__nodesselection-rect {
+  display: none !important;
+}

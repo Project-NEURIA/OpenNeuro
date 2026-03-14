@@ -6,7 +6,7 @@ import sounddevice as sd
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import AudioFrame
 
 
@@ -20,7 +20,7 @@ class MicOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
 
-class Mic(Component[tuple[()], MicOutputs]):
+class Mic(PrimitiveComponent[tuple[()], MicOutputs]):
     def __init__(self, config: MicConfig) -> None:
         super().__init__()
         self.config: MicConfig = config

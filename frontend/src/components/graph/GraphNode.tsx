@@ -27,6 +27,12 @@ const categoryColors: Record<string, { border: string; bg: string; badge: string
     badge: "bg-sink/20",
     badgeText: "text-sink",
   },
+  composite: {
+    border: "border-purple-500/40",
+    bg: "from-purple-500/10 to-purple-500/5",
+    badge: "bg-purple-500/20",
+    badgeText: "text-purple-400",
+  },
 };
 
 const statusDot: Record<string, string> = {
@@ -210,9 +216,15 @@ function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: 
   );
 }
 
-function GraphNodeComponent({ id, data }: NodeProps) {
+/** For composite port names like "abc-123.audio", show just "audio". */
+function displaySlotName(name: string): string {
+  const dot = name.indexOf(".");
+  return dot >= 0 ? name.slice(dot + 1) : name;
+}
+
+function GraphNodeComponent({ id, data, selected }: NodeProps) {
   const d = data as GraphNodeData;
-  const colors = categoryColors[d.category]!;
+  const colors = categoryColors[d.category] ?? categoryColors.conduit!;
 
   const hasUIWidgets =
     Object.keys(d.ui_inputs ?? {}).length > 0 ||
@@ -234,7 +246,7 @@ function GraphNodeComponent({ id, data }: NodeProps) {
         "relative rounded-2xl border px-6 py-5 min-w-[360px]",
         "bg-gradient-to-b backdrop-blur-xs",
         "bg-glass backdrop-saturate-150",
-        colors.border,
+        selected ? "border-white/60 ring-1 ring-white/30" : colors.border,
         colors.bg,
       )}
     >
@@ -252,7 +264,7 @@ function GraphNodeComponent({ id, data }: NodeProps) {
             "ml-auto text-[11px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider",
             colors.badge,
           )}
-          style={{ color: `color(display-p3 ${d.category === "source" ? "0.2 1.2 0.6" : d.category === "sink" ? "1.2 0.8 0.1" : "0.3 0.6 1.3"})` }}
+          style={{ color: `color(display-p3 ${d.category === "source" ? "0.2 1.2 0.6" : d.category === "sink" ? "1.2 0.8 0.1" : d.category === "composite" ? "0.8 0.4 1.3" : "0.3 0.6 1.3"})` }}
         >
           {d.category}
         </span>
@@ -283,10 +295,10 @@ function GraphNodeComponent({ id, data }: NodeProps) {
                     className="!relative !transform-none !w-4 !h-4 !bg-handle !border-handle-border !inset-auto !-ml-[32px]"
                   />
                 )}
-                {inName && d.inputTypes[inName] && <TypeLabel name={inName} slot={d.inputTypes[inName]} side="in" resolved={d.resolvedTypes?.[`in.${inName}`]} />}
+                {inName && d.inputTypes[inName] && <TypeLabel name={displaySlotName(inName)} slot={d.inputTypes[inName]} side="in" resolved={d.resolvedTypes?.[`in.${inName}`]} />}
               </div>
               <div className="flex items-center gap-2">
-                {outName && d.outputTypes[outName] && <TypeLabel name={outName} slot={d.outputTypes[outName]} side="out" resolved={d.resolvedTypes?.[`out.${outName}`]} />}
+                {outName && d.outputTypes[outName] && <TypeLabel name={displaySlotName(outName)} slot={d.outputTypes[outName]} side="out" resolved={d.resolvedTypes?.[`out.${outName}`]} />}
                 {outName && (
                   <Handle
                     id={`out-${outName}`}

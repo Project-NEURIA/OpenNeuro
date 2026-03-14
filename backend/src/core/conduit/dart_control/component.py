@@ -20,7 +20,7 @@ import torch
 from . import rotation_conversions as transforms
 from pydantic import BaseModel
 
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.channel import Receiver, Sender
 from src.core.frames import BodyPoseFrame, BonePose, GoalFrame, TextFrame
 
@@ -246,7 +246,7 @@ class DartControlOutputs(NamedTuple):
     motion: Sender[BodyPoseFrame]
 
 
-class DartControl(Component[DartControlInputs, DartControlOutputs]):
+class DartControl(PrimitiveComponent[DartControlInputs, DartControlOutputs]):
     """
     DartControl motion generation conduit.
 

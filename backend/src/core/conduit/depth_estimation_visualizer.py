@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import DepthFrame, VideoDataFormat, VideoFrame
 
 _ALPHA = 0.5
@@ -24,7 +24,9 @@ class DepthEstimationVisualizerOutputs(NamedTuple):
 
 
 class DepthEstimationVisualizer(
-    Component[DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs]
+    PrimitiveComponent[
+        DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs
+    ]
 ):
     """Colorizes depth and overlays it on video frames."""
 

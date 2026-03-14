@@ -10,7 +10,7 @@ import requests
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import EOS, InterruptFrame, MessagesFrame, TextFrame
 
 
@@ -32,7 +32,7 @@ class LLMOutputs(NamedTuple):
     text: Sender[TextFrame | EOS]
 
 
-class LLM(Component[LLMInputs, LLMOutputs]):
+class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
     """LLM text generation component using Groq API."""
 
     def __init__(self, config: LLMConfig) -> None:

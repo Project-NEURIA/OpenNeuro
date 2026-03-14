@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import ObjectSegmentationFrame, VideoDataFormat, VideoFrame
 
 # Fixed BGR color palette, cycled per prompt
@@ -87,7 +87,9 @@ class ObjectSegmentationVisualizerOutputs(NamedTuple):
 
 
 class ObjectSegmentationVisualizer(
-    Component[ObjectSegmentationVisualizerInputs, ObjectSegmentationVisualizerOutputs]
+    PrimitiveComponent[
+        ObjectSegmentationVisualizerInputs, ObjectSegmentationVisualizerOutputs
+    ]
 ):
     """Composites instance masks, bounding boxes, and labels onto video frames."""
 
