@@ -20,6 +20,7 @@ class Node(BaseModel):
     init_args: dict[str, Any]
     x: float = 0.0
     y: float = 0.0
+    label: str | None = None
     sub_graph: Graph | None = None
 
 
@@ -64,6 +65,29 @@ class GraphManager:
         comp = cls.from_args(init_args)
         node_id = str(uuid.uuid4())
         node = Node(type=node_type, init_args=init_args)
+        self._graph.nodes[node_id] = node
+        self._components[node_id] = comp
+        return node_id, node
+
+    def add_composite_node(
+        self,
+        sub_graph: Graph,
+        x: float = 0.0,
+        y: float = 0.0,
+        label: str = "Subgraph",
+    ) -> tuple[str, Node]:
+        from src.core.component import CompositeComponent
+
+        comp = CompositeComponent(sub_graph)
+        node_id = str(uuid.uuid4())
+        node = Node(
+            type="__composite__",
+            init_args={},
+            x=x,
+            y=y,
+            label=label,
+            sub_graph=sub_graph,
+        )
         self._graph.nodes[node_id] = node
         self._components[node_id] = comp
         return node_id, node

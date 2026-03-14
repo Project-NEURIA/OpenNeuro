@@ -4,7 +4,7 @@ import type { ComponentInfo, MetricsSnapshot, NodeMetrics, SlotType } from "@/li
 
 export interface GraphNodeData extends Record<string, unknown> {
   label: string;
-  category: "source" | "conduit" | "sink";
+  category: "source" | "conduit" | "sink" | "composite";
   inputs: string[];
   outputs: string[];
   inputTypes: Record<string, SlotType>;

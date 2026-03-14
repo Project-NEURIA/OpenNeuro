@@ -25,9 +25,7 @@ export async function fetchIsSubtype(sub: string, sup: string): Promise<boolean>
   return res.json();
 }
 
-export async function fetchNodes(): Promise<
-  { id: string; type: string; status: string; x: number; y: number }[]
-> {
+export async function fetchNodes(): Promise<NodeResponse[]> {
   const res = await fetch("/graph/nodes");
   if (!res.ok) throw new Error(`Fetch nodes failed: ${res.status}`);
   return res.json();
@@ -39,20 +37,14 @@ export async function fetchEdges(): Promise<EdgeData[]> {
   return res.json();
 }
 
-export async function createNode(type: string, init_args?: Record<string, unknown>) {
+export async function createNode(type: string, init_args?: Record<string, unknown>): Promise<NodeResponse> {
   const res = await fetch("/graph/nodes", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, init_args }),
   });
   if (!res.ok) throw new Error(`Create node failed: ${res.status}`);
-  return res.json() as Promise<{
-    id: string;
-    type: string;
-    status: string;
-    x: number;
-    y: number;
-  }>;
+  return res.json();
 }
 
 export async function updateNode(id: string, data: { x?: number; y?: number }) {
@@ -96,6 +88,34 @@ export async function deleteEdge(
     body: JSON.stringify({ source_node, source_slot, target_node, target_slot }),
   });
   if (!res.ok) throw new Error(`Delete edge failed: ${res.status}`);
+}
+
+export interface NodeResponse {
+  id: string;
+  type: string;
+  label?: string | null;
+  status: string;
+  x: number;
+  y: number;
+  inputs?: Record<string, string> | null;
+  outputs?: Record<string, string> | null;
+  sub_graph?: { nodes: Record<string, unknown>; edges: unknown[] } | null;
+}
+
+export async function createSubgraph(nodeIds: string[], name: string = "Subgraph"): Promise<NodeResponse> {
+  const res = await fetch("/graph/subgraph", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_ids: nodeIds, name }),
+  });
+  if (!res.ok) throw new Error(`Create subgraph failed: ${res.status}`);
+  return res.json();
+}
+
+export async function ungroupNode(nodeId: string): Promise<NodeResponse[]> {
+  const res = await fetch(`/graph/ungroup/${nodeId}`, { method: "POST" });
+  if (!res.ok) throw new Error(`Ungroup failed: ${res.status}`);
+  return res.json();
 }
 
 export async function startAll() {

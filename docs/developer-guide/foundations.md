@@ -444,6 +444,87 @@ This is the categorical account of "plug-in" or "placeholder" components: the gr
 structure is well-defined regardless of whether implementations exist, but execution
 requires a complete interpretation.
 
+## 8. Subgraphs and named composition
+
+### Definition 8.1 (Graph expression language)
+
+We define an **expression language** for morphisms in the free category. An expression
+$e$ has the following grammar:
+
+$$e \;\;::=\;\; \text{prim}(c) \;\mid\; e_1 \circ e_2 \;\mid\; e_1 \otimes e_2 \;\mid\; \text{name}(x)$$
+
+where $c$ ranges over primitive components (generators), and $x$ ranges over names
+drawn from an **environment** $\Gamma : \text{Name} \to \text{Value}$, where values are
+morphisms in the free category.
+
+### Definition 8.2 (Operational semantics)
+
+The **evaluation judgment** $\Gamma \vdash e \Downarrow v$ maps an expression $e$ under
+environment $\Gamma$ to a morphism $v$ in $F(G)$:
+
+$$\frac{}{\Gamma \vdash \text{prim}(c) \Downarrow c}$$
+
+$$\frac{\Gamma \vdash e_1 \Downarrow f \quad \Gamma \vdash e_2 \Downarrow g}{\Gamma \vdash e_1 \circ e_2 \Downarrow f \circ g}$$
+
+$$\frac{\Gamma \vdash e_1 \Downarrow f \quad \Gamma \vdash e_2 \Downarrow g}{\Gamma \vdash e_1 \otimes e_2 \Downarrow f \otimes g}$$
+
+$$\frac{\Gamma(x) = v}{\Gamma \vdash \text{name}(x) \Downarrow v}$$
+
+### Remark 8.3 (Grouping as environment extension)
+
+When a user selects a subgraph and groups it under a name $x$, this corresponds to
+**extending the environment**:
+
+$$\Gamma' = \Gamma[x \mapsto v]$$
+
+where $v$ is the morphism obtained by evaluating the selected subexpression. For example,
+given a graph with $\text{ASR} : \text{Audio} \to \text{Text}$ and
+$\text{LLM} : \text{Text} \to \text{Text}$, the expression is:
+
+$$e = \text{LLM} \circ \text{ASR}$$
+
+Grouping under the name "understanding" produces:
+
+$$\Gamma' = \Gamma[\text{understanding} \mapsto \text{LLM} \circ \text{ASR}]$$
+
+The graph can now be written as $\text{name}(\text{understanding})$, which evaluates to
+the same morphism. The grouping operation does not change the denoted morphism — it
+introduces a **name** for a composite, making it referenceable.
+
+### Remark 8.4 (Ungrouping)
+
+Ungrouping is the inverse: given $\Gamma' = \Gamma[x \mapsto v]$, ungrouping $x$
+removes the binding and inlines $v$ back into the expression, recovering the original
+environment $\Gamma$.
+
+### Definition 8.5 (Open and closed expressions)
+
+An expression $e$ is **closed** under environment $\Gamma$ when every $\text{name}(x)$
+occurring in $e$ satisfies $x \in \text{dom}(\Gamma)$. A closed expression can be fully
+evaluated by the rules of Definition 8.2.
+
+An expression is **open** when it contains free names — $\text{name}(x)$ where
+$x \notin \text{dom}(\Gamma)$. Evaluation gets stuck at any free name since no rule
+applies.
+
+### Remark 8.6 (Abstract components)
+
+An open expression contains **abstract components**: it has a well-defined typed interface
+(its input and output types can be inferred from the structure), but it cannot be
+executed because some subexpressions are unresolved.
+
+To execute an abstract graph, the user must supply a **substitution**
+$\sigma : \text{FreeNames}(e) \to \text{Value}$ mapping each free name to a concrete
+morphism of matching type. Applying the substitution closes the expression:
+
+$$\Gamma' = \Gamma \cup \sigma$$
+
+$$\Gamma' \vdash e \Downarrow v$$
+
+This is the expression-language account of the abstract components described in
+Remark 7.3: an unbound name plays the same role as a generator without an
+interpretation — a typed placeholder that must be filled in before the graph can run.
+
 ## Summary
 
 The following table summarizes the correspondence between OpenNeuro concepts and their
@@ -465,6 +546,11 @@ categorical counterparts.
 | Frame subtyping (`EOS ≤ Text`) | Partial order on objects | §5 |
 | Generic / higher-order component | Endofunctor | §6 |
 | Runtime execution | Interpretation functor ($\llbracket - \rrbracket$) | §7 |
+| Subgraph (named composite) | Named expression / environment binding | §8 |
+| Group operation | Environment extension ($\Gamma' = \Gamma[x \mapsto v]$) | §8 |
+| Ungroup operation | Environment removal / inlining | §8 |
+| Abstract component (placeholder) | Open expression (free name) | §8 |
+| Supplying implementations | Substitution closing the expression | §8 |
 
 ## References
 
