@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import VideoFrame
 
 
@@ -24,7 +24,7 @@ class VideoSourceOutputs(NamedTuple):
     video: Sender[VideoFrame]
 
 
-class VideoSource(Component[tuple[()], VideoSourceOutputs]):
+class VideoSource(PrimitiveComponent[tuple[()], VideoSourceOutputs]):
     """Abstract base for components that read video via cv2.VideoCapture."""
 
     @abstractmethod

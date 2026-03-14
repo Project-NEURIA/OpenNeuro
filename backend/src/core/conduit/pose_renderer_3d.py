@@ -12,7 +12,7 @@ import torch
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import BodyPoseFrame, BonePose, VideoFrame, VideoDataFormat
 
 
@@ -111,7 +111,7 @@ class PoseRenderer3DOutputs(NamedTuple):
     video: Sender[VideoFrame]
 
 
-class PoseRenderer3D(Component[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
+class PoseRenderer3D(PrimitiveComponent[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
     """Renders BodyPoseFrame as a 3D SMPL body mesh.
 
     Uses pyrender with EGL on Linux, matplotlib software renderer on macOS.

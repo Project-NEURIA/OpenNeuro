@@ -13,7 +13,7 @@ import requests
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import AudioDataFormat, AudioFrame, TextFrame
 
 
@@ -32,7 +32,7 @@ class ASROutputs(NamedTuple):
     text: Sender[TextFrame]
 
 
-class ASR(Component[ASRInputs, ASROutputs]):
+class ASR(PrimitiveComponent[ASRInputs, ASROutputs]):
     def __init__(self, config: ASRConfig) -> None:
         super().__init__()
         self.config: ASRConfig = config

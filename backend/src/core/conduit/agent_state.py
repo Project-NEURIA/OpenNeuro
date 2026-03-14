@@ -6,7 +6,7 @@ from typing import NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 
@@ -29,7 +29,7 @@ class AgentStateOutputs(NamedTuple):
     messages_for_memory: Sender[MessagesFrame] | None = None
 
 
-class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
+class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
     """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
 
     def __init__(self, config: AgentStateConfig) -> None:

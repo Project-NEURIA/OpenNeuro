@@ -233,6 +233,16 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         return result
 
 
+class PrimitiveComponent[
+    I: tuple[Receiver[Any] | None, ...],
+    O: tuple[Sender[Any] | None, ...],
+](
+    Component[I, O],
+    ABC,
+):
+    """A primitive morphism: a single concrete component with a threaded run loop."""
+
+
 class CompositeComponent(Component[Any, Any]):
     """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from ovd_client import Client, Player
 
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 
 
 class OpenVRPlayerConfig(BaseModel):
@@ -29,7 +29,7 @@ class OpenVRPlayerOutputs(NamedTuple):
 
 
 class OpenVRPlayer(
-    Component[OpenVRPlayerInputs, OpenVRPlayerOutputs]  # type: ignore[type-var]
+    PrimitiveComponent[OpenVRPlayerInputs, OpenVRPlayerOutputs]  # type: ignore[type-var]
 ):
     """Interactive first-person VR player with mouse/keyboard controls.
 

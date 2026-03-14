@@ -6,7 +6,7 @@ from typing import NamedTuple
 import numpy as np
 
 from src.core.channel import Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import CameraParamsFrame, VideoDataFormat, VideoFrame
 
 
@@ -15,7 +15,7 @@ class VRChatVideoOutputs(NamedTuple):
     camera_params: Sender[CameraParamsFrame]
 
 
-class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
+class VRChatVideo(PrimitiveComponent[tuple[()], VRChatVideoOutputs]):
     """Captures video frames from VRChat via the OpenVR virtual driver.
 
     Streams left-eye frames only (monocular) at the configured FPS.

@@ -9,7 +9,7 @@ from typing import NamedTuple
 from websockets.sync.client import Connection, connect
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame
 from pydantic import BaseModel
 
@@ -29,7 +29,7 @@ class STSOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
 
-class STS(Component[STSInputs, STSOutputs]):
+class STS(PrimitiveComponent[STSInputs, STSOutputs]):
     def __init__(self, config: STSConfig) -> None:
         super().__init__()
         self.config: STSConfig = config

@@ -7,7 +7,7 @@ from typing import NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import TextFrame
 
 
@@ -20,7 +20,7 @@ class PromptRepeaterOutputs(NamedTuple):
     text: Sender[TextFrame]
 
 
-class PromptRepeater(Component[tuple[()], PromptRepeaterOutputs]):
+class PromptRepeater(PrimitiveComponent[tuple[()], PromptRepeaterOutputs]):
     def __init__(self, config: PromptRepeaterConfig) -> None:
         super().__init__()
         self.config = config
