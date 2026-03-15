@@ -9,6 +9,7 @@
     "preview": "bunx --bun vite preview"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
