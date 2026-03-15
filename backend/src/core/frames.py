@@ -357,6 +357,51 @@ class ObjectSegmentationFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectLocationFrame(Frame):
+    """Per-object 3D world locations derived from segmentation + depth."""
+
+    labels: tuple[str, ...]
+    """(K,) — label for each detected object."""
+
+    positions: np.ndarray
+    """(K, 3) float32 — world-frame (x, y, z) position for each object."""
+
+    depths: np.ndarray
+    """(K,) float32 — median depth in metres for each object."""
+
+    scores: np.ndarray
+    """(K,) float32 — segmentation confidence score for each object."""
+
+    boxes: np.ndarray
+    """(K, 4) float32 — XYXY bounding boxes in the segmentation coordinate frame."""
+
+    object_ids: np.ndarray
+    """(K,) int64 — tracking object IDs from the segmenter."""
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        labels: tuple[str, ...],
+        positions: np.ndarray,
+        depths: np.ndarray,
+        scores: np.ndarray,
+        boxes: np.ndarray,
+        object_ids: np.ndarray,
+    ) -> ObjectLocationFrame:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            labels=labels,
+            positions=positions,
+            depths=depths,
+            scores=scores,
+            boxes=boxes,
+            object_ids=object_ids,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class GoalFrame(Frame):
     """Frame containing a 3D goal coordinate for motion control."""
 
@@ -375,16 +420,25 @@ class CameraParamsFrame(Frame):
 
     intrinsics: np.ndarray
     extrinsics: np.ndarray
+    width: int
+    height: int
 
     @classmethod
     def new(
-        cls, *, intrinsics: np.ndarray, extrinsics: np.ndarray
+        cls,
+        *,
+        intrinsics: np.ndarray,
+        extrinsics: np.ndarray,
+        width: int,
+        height: int,
     ) -> CameraParamsFrame:
         return cls(
             pts=time.time_ns(),
             id=obj_id(),
             intrinsics=intrinsics,
             extrinsics=extrinsics,
+            width=width,
+            height=height,
         )
 
 
@@ -507,6 +561,8 @@ class StereoCameraParamsFrame(Frame):
     intrinsics: np.ndarray
     extrinsics: np.ndarray
     baseline: float
+    width: int
+    height: int
 
     @classmethod
     def new(
@@ -515,6 +571,8 @@ class StereoCameraParamsFrame(Frame):
         intrinsics: np.ndarray,
         extrinsics: np.ndarray,
         baseline: float,
+        width: int,
+        height: int,
     ) -> StereoCameraParamsFrame:
         return cls(
             pts=time.time_ns(),
@@ -522,4 +580,6 @@ class StereoCameraParamsFrame(Frame):
             intrinsics=intrinsics,
             extrinsics=extrinsics,
             baseline=baseline,
+            width=width,
+            height=height,
         )

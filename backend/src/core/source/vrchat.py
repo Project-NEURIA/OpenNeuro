@@ -65,5 +65,7 @@ class VRChatVideo(Component[tuple[()], VRChatVideoOutputs]):
                         CameraParamsFrame.new(
                             intrinsics=intrinsics,
                             extrinsics=client.get_extrinsics(frame),
+                            width=frame.width,
+                            height=frame.height,
                         )
                     )

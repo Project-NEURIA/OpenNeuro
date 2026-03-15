@@ -110,11 +110,10 @@ async def _watch_ui_channels(
             except asyncio.CancelledError:
                 return
 
-        # Cancel old tasks whose keys are gone (graph was re-run)
-        current_keys = set(manager.ui_receivers().keys())
+        # Cancel all stale tasks — even if the same keys exist, the
+        # underlying Receiver objects point to new channels after a restart.
         for key in list(tasks):
-            if key not in current_keys:
-                tasks.pop(key).cancel()
+            tasks.pop(key).cancel()
 
         last_version = manager._ui_version
 

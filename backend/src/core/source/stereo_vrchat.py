@@ -80,5 +80,7 @@ class StereoVRChatVideo(Component[tuple[()], StereoVRChatVideoOutputs]):
                             intrinsics=intrinsics,
                             extrinsics=client.get_extrinsics(stereo.left),
                             baseline=baseline,
+                            width=stereo.left.width,
+                            height=stereo.left.height,
                         )
                     )
