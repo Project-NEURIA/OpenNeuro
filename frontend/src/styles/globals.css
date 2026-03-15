@@ -124,3 +124,7 @@ body {
 .react-flow__nodesselection-rect {
   display: none !important;
 }
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}

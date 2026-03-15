@@ -13,6 +13,7 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import { Home } from "lucide-react";
+import { SplashScreen } from "@/components/SplashScreen";
 import { GraphCanvas } from "@/components/graph/GraphCanvas";
 import { NodeSidebar } from "@/components/graph/NodeSidebar";
 import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
@@ -683,6 +684,9 @@ function AppInner({
         </div>
       )}
 
+      {/* Window drag region */}
+      <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-[15px] z-50" />
+
       {/* Home button */}
       <button
         onClick={handleGoHome}
@@ -716,31 +720,40 @@ export default function App() {
     string | null | undefined
   >(undefined);
   const [showChooser, setShowChooser] = useState(false);
+  const [splashStatus, setSplashStatus] = useState("Connecting to backend...");
 
   useEffect(() => {
-    fetchCurrentProject()
-      .then(async ({ current_project }) => {
-        if (current_project) {
-          await apiStartProject(current_project);
-          setCurrentProject(current_project);
-        } else {
-          setCurrentProject(null);
-          setShowChooser(true);
+    let cancelled = false;
+
+    async function pollBackend() {
+      // Poll until backend is ready
+      while (!cancelled) {
+        try {
+          const { current_project } = await fetchCurrentProject();
+          if (cancelled) return;
+          if (current_project) {
+            setSplashStatus("Loading project...");
+            await apiStartProject(current_project);
+            setCurrentProject(current_project);
+          } else {
+            setCurrentProject(null);
+            setShowChooser(true);
+          }
+          return;
+        } catch {
+          // Backend not ready yet, retry
+          await new Promise((r) => setTimeout(r, 500));
         }
-      })
-      .catch(() => {
-        setCurrentProject(null);
-        setShowChooser(true);
-      });
+      }
+    }
+
+    pollBackend();
+    return () => { cancelled = true; };
   }, []);
 
-  // Loading
+  // Splash screen while waiting for backend
   if (currentProject === undefined && !showChooser) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
-        <span className="text-[var(--muted-foreground)]">Loading...</span>
-      </div>
-    );
+    return <SplashScreen status={splashStatus} />;
   }
 
   // Project chooser
