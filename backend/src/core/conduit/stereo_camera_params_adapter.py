@@ -18,7 +18,9 @@ class StereoCameraParamsAdapterOutputs(NamedTuple):
 
 
 class StereoCameraParamsAdapter(
-    PrimitiveComponent[StereoCameraParamsAdapterInputs, StereoCameraParamsAdapterOutputs]
+    PrimitiveComponent[
+        StereoCameraParamsAdapterInputs, StereoCameraParamsAdapterOutputs
+    ]
 ):
     """Strips baseline from StereoCameraParamsFrame, emitting CameraParamsFrame."""
 

@@ -63,9 +63,9 @@ class VRChatVideo(PrimitiveComponent[tuple[()], VRChatVideoOutputs]):
                     )
                     left_rgb = left_rgba[:, :, :3].copy()
 
-                    right_rgba = np.frombuffer(
-                        frame.right, dtype=np.uint8
-                    ).reshape(frame.height, frame.width, 4)
+                    right_rgba = np.frombuffer(frame.right, dtype=np.uint8).reshape(
+                        frame.height, frame.width, 4
+                    )
                     right_rgb = right_rgba[:, :, :3].copy()
 
                     outputs.stereo_video.send(
