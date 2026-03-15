@@ -11,7 +11,7 @@ from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
 
 if TYPE_CHECKING:
-    from src.core.graph import Graph
+    from src.core.graph import Graph, GraphManager
 
 
 class Status(Enum):
@@ -25,10 +25,13 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     ABC
 ):
     def __init__(self) -> None:
-        self.name: str = type(self).__name__
         self._status = Status.STARTUP
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+
+    @property
+    @abstractmethod
+    def type_(self) -> str: ...
 
     @property
     def status(self) -> Status:
@@ -242,17 +245,26 @@ class PrimitiveComponent[
 ):
     """A primitive morphism: a single concrete component with a threaded run loop."""
 
+    @property
+    def type_(self) -> str:
+        return type(self).__name__
+
 
 class CompositeComponent(Component[Any, Any]):
     """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
 
     _registerable = False
 
-    def __init__(self, sub_graph: Graph) -> None:
+    def __init__(self, type_: str, sub_graph: Graph) -> None:
         super().__init__()
+        self._type = type_
         self._sub_graph = sub_graph
-        self._inner_manager: Any = None
+        self._inner_manager: GraphManager | None = None
         self._ext_inputs, self._ext_outputs = self._compute_boundary()
+
+    @property
+    def type_(self) -> str:
+        return self._type
 
     def run(self, inputs: Any, outputs: Any) -> None:
         pass  # not used — start() is overridden

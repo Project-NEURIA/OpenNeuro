@@ -90,7 +90,7 @@ function toReactFlowNode(
     type: "graph",
     position,
     data: {
-      label: n.label ?? (isComposite ? "Subgraph" : n.type),
+      label: n.type,
       category: isComposite ? "composite" : (info?.category ?? "conduit"),
       inputs,
       outputs,

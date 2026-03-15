@@ -5,7 +5,7 @@ import uuid
 from collections import defaultdict
 from typing import Any, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import Component
@@ -16,12 +16,12 @@ ReceiverKey = tuple[str, str]  # (node_id, slot_name)
 
 
 class Node(BaseModel):
+    id_: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: str
     is_composite: bool = False
     init_args: dict[str, Any]
     x: float = 0.0
     y: float = 0.0
-    label: str | None = None
     sub_graph: Graph | None = None
 
 
@@ -64,35 +64,32 @@ class GraphManager:
         if cls is None:
             raise ValueError(f"Unknown node type: {node_type}")
         comp = cls.from_args(init_args)
-        node_id = str(uuid.uuid4())
         node = Node(type=node_type, init_args=init_args)
-        self._graph.nodes[node_id] = node
-        self._components[node_id] = comp
-        return node_id, node
+        self._graph.nodes[node.id_] = node
+        self._components[node.id_] = comp
+        return node.id_, node
 
     def add_composite_node(
         self,
+        type_: str,
         sub_graph: Graph,
         x: float = 0.0,
         y: float = 0.0,
-        label: str = "Subgraph",
     ) -> tuple[str, Node]:
         from src.core.component import CompositeComponent
 
-        comp = CompositeComponent(sub_graph)
-        node_id = str(uuid.uuid4())
+        comp = CompositeComponent(type_, sub_graph)
         node = Node(
-            type=label,
+            type=type_,
             is_composite=True,
             init_args={},
             x=x,
             y=y,
-            label=label,
             sub_graph=sub_graph,
         )
-        self._graph.nodes[node_id] = node
-        self._components[node_id] = comp
-        return node_id, node
+        self._graph.nodes[node.id_] = node
+        self._components[node.id_] = comp
+        return node.id_, node
 
     def get_node(self, node_id: str) -> Node | None:
         return self._graph.nodes.get(node_id)
@@ -194,7 +191,7 @@ class GraphManager:
             if node.is_composite:
                 from src.core.component import CompositeComponent
 
-                self._components[node_id] = CompositeComponent(node.sub_graph)  # type: ignore[arg-type]
+                self._components[node_id] = CompositeComponent(node.type, node.sub_graph)  # type: ignore[arg-type]
             else:
                 cls = classes.get(node.type)
                 if cls is not None:

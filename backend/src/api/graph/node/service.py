@@ -85,7 +85,7 @@ def create_subgraph(
     cy = sum(ys) / len(ys) if ys else 0.0
 
     # Create composite node
-    comp_id, comp_node = manager.add_composite_node(sub_graph, x=cx, y=cy, label=name)
+    comp_id, comp_node = manager.add_composite_node(name, sub_graph, x=cx, y=cy)  # name is the user-provided subgraph name
 
     # Rewire boundary edges to point to/from the composite node
     rewired_edges: list[Edge] = []
@@ -209,4 +209,4 @@ def create_from_project(
         raise ValueError(f"Project not found: {project_name}")
     data = json.loads(path.read_text())
     sub_graph = Graph.model_validate(data)
-    return manager.add_composite_node(sub_graph, x=x, y=y, label=project_name)
+    return manager.add_composite_node(project_name, sub_graph, x=x, y=y)
