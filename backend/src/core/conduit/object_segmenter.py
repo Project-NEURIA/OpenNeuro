@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import (
     ObjectSegmentationFrame,
     TextFrame,
@@ -41,7 +41,9 @@ class ObjectSegmenterOutputs(NamedTuple):
     video: Sender[VideoFrame]
 
 
-class ObjectSegmenter(Component[ObjectSegmenterInputs, ObjectSegmenterOutputs]):
+class ObjectSegmenter(
+    PrimitiveComponent[ObjectSegmenterInputs, ObjectSegmenterOutputs]
+):
     """Text-prompted instance segmenter backed by SAM3.
 
     Consumes VideoFrames, runs SAM3 inference, and emits

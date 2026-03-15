@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 
 
 class PassthroughInputs[T](NamedTuple):
@@ -14,7 +14,7 @@ class PassthroughOutputs[T](NamedTuple):
     data: Sender[T]
 
 
-class Passthrough[T](Component[PassthroughInputs[T], PassthroughOutputs[T]]):
+class Passthrough[T](PrimitiveComponent[PassthroughInputs[T], PassthroughOutputs[T]]):
     def run(self, inputs: PassthroughInputs[T], outputs: PassthroughOutputs[T]) -> None:
         for item in inputs.data(self):
             if item is None:

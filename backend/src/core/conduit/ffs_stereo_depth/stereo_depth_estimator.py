@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import (
     DepthFrame,
     StereoCameraParamsFrame,
@@ -41,7 +41,7 @@ class StereoDepthEstimatorOutputs(NamedTuple):
 
 
 class StereoDepthEstimator(
-    Component[StereoDepthEstimatorInputs, StereoDepthEstimatorOutputs]
+    PrimitiveComponent[StereoDepthEstimatorInputs, StereoDepthEstimatorOutputs]
 ):
     """Stereo depth estimation backed by Fast-FoundationStereo.
 

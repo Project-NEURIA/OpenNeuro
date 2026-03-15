@@ -14,7 +14,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat
 
 
@@ -48,7 +48,7 @@ class StreamingVLMOutputs(NamedTuple):
     observation: Sender[TextFrame]
 
 
-class StreamingVLM(Component[StreamingVLMInputs, StreamingVLMOutputs]):
+class StreamingVLM(PrimitiveComponent[StreamingVLMInputs, StreamingVLMOutputs]):
     """Streaming VLM component that generates captions from video frames.
 
     Single-threaded main loop consumes frames into a rolling buffer and

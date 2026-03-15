@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import (
     CameraParamsFrame,
     DepthFrame,
@@ -39,7 +39,7 @@ class MonocularDepthEstimatorOutputs(NamedTuple):
 
 
 class MonocularDepthEstimator(
-    Component[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
+    PrimitiveComponent[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
 ):
     """Monocular depth estimation backed by Depth Anything 3.
 

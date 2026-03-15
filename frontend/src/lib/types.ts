@@ -15,6 +15,7 @@ export interface GraphNode {
   init_args: Record<string, unknown>;
   x: number;
   y: number;
+  sub_graph?: Graph;
 }
 
 export interface GraphEdge {

@@ -8,7 +8,7 @@ from typing import NamedTuple
 import numpy as np
 
 from src.core.channel import Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import (
     StereoCameraParamsFrame,
     StereoVideoFrame,
@@ -21,7 +21,7 @@ class StereoVRChatVideoOutputs(NamedTuple):
     camera_params: Sender[StereoCameraParamsFrame]
 
 
-class StereoVRChatVideo(Component[tuple[()], StereoVRChatVideoOutputs]):
+class StereoVRChatVideo(PrimitiveComponent[tuple[()], StereoVRChatVideoOutputs]):
     """Captures stereo video frames from VRChat via the OpenVR virtual driver.
 
     Streams synchronized left+right eye pairs at the configured FPS.

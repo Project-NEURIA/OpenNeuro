@@ -8,6 +8,7 @@ from pydantic import BaseModel
 BASE_DIR = Path.home() / "Documents" / "OpenNeuro"
 PROJECTS_DIR = BASE_DIR / "projects"
 CONFIG_PATH = BASE_DIR / "config.json"
+PRESETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "presets"
 
 
 class AppConfig(BaseModel):

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.channel import Receiver
-from src.core.component import Component
+from src.core.component import PrimitiveComponent
 from src.core.frames import InterruptFrame, TextFrame
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
@@ -317,7 +317,7 @@ def preset_to_full(
     return full
 
 
-class OSCFace(Component[OSCFaceInputs, tuple[()]]):
+class OSCFace(PrimitiveComponent[OSCFaceInputs, tuple[()]]):
     def __init__(self, config: OSCFaceConfig | None = None) -> None:
         super().__init__()
         self.config = config or OSCFaceConfig()
