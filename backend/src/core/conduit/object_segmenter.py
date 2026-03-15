@@ -205,7 +205,8 @@ class ObjectSegmenter(
             print(f"[ObjectSegmenter] Prompts updated: {new_prompts}")
             with self._lock:
                 self._prompts = new_prompts
-                self._init_session()
+                if self._processor is not None:
+                    self._init_session()
 
     def run(
         self, inputs: ObjectSegmenterInputs, outputs: ObjectSegmenterOutputs
