@@ -25,6 +25,7 @@ class NodeUpdateRequest(BaseModel):
 class NodeResponse(BaseModel):
     id: str
     type: str
+    is_composite: bool = False
     label: str | None = None
     status: str
     x: float

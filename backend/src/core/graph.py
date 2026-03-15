@@ -17,6 +17,7 @@ ReceiverKey = tuple[str, str]  # (node_id, slot_name)
 
 class Node(BaseModel):
     type: str
+    is_composite: bool = False
     init_args: dict[str, Any]
     x: float = 0.0
     y: float = 0.0
@@ -81,7 +82,8 @@ class GraphManager:
         comp = CompositeComponent(sub_graph)
         node_id = str(uuid.uuid4())
         node = Node(
-            type="__composite__",
+            type=label,
+            is_composite=True,
             init_args={},
             x=x,
             y=y,
@@ -189,10 +191,10 @@ class GraphManager:
 
         classes = Component.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
-            if node.sub_graph is not None:
+            if node.is_composite:
                 from src.core.component import CompositeComponent
 
-                self._components[node_id] = CompositeComponent(node.sub_graph)
+                self._components[node_id] = CompositeComponent(node.sub_graph)  # type: ignore[arg-type]
             else:
                 cls = classes.get(node.type)
                 if cls is not None:

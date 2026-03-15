@@ -399,54 +399,9 @@ More practical examples of endofunctors on **Comp** include:
 These are structure-preserving: wrapping a composition is the same as composing the
 wrapped versions. That is precisely the functor law $F(g \circ f) = F(g) \circ F(f)$.
 
-## 7. Putting it together
+## 7. Subgraphs and named composition
 
-### Remark 7.1
-
-Extending the free category of Definition 1.4 with all the structure introduced in
-§2–§4, OpenNeuro's graph language generates a **free traced commutative gs-monoidal
-category with merges** — the free category built from the declared components as
-primitive morphisms, closed under sequential composition ($\circ$), parallel composition
-($\otimes$), trace ($\text{Tr}$), copy ($\Delta$), merge ($\nabla$), and discard
-($\varepsilon$), with no additional equations.
-
-Every morphism in this free category corresponds to a graph that can be constructed in
-the system. Every constructible graph corresponds to a morphism. The free category is
-exactly the space of all programs expressible in the system.
-
-### Definition 7.2 (Interpretation)
-
-An **interpretation** of the free category is a structure-preserving functor:
-
-$$\llbracket - \rrbracket : F(\text{Generators}) \to \mathbf{Sem}$$
-
-from the free category into a **semantic category** $\mathbf{Sem}$ where morphisms have
-computational meaning (e.g., actual running threads passing real frames through channels).
-
-The interpretation functor must preserve all structure:
-
-- $\llbracket g \circ f \rrbracket = \llbracket g \rrbracket \circ \llbracket f \rrbracket$
-- $\llbracket f \otimes g \rrbracket = \llbracket f \rrbracket \otimes \llbracket g \rrbracket$
-- $\llbracket \text{Tr}^X(f) \rrbracket = \text{Tr}^{\llbracket X \rrbracket}(\llbracket f \rrbracket)$
-
-Because the source is free, the interpretation is **uniquely determined** by its action
-on the generators. Once you assign a concrete implementation to each primitive component,
-the semantics of every composite graph is fixed automatically by functoriality.
-
-### Remark 7.3 (Abstract components)
-
-A generator in the free category that has not been assigned an interpretation is an
-**abstract component** — declared with a typed interface but no implementation. A graph
-containing abstract components cannot be fully interpreted (executed) until every
-abstract generator is given a concrete meaning.
-
-This is the categorical account of "plug-in" or "placeholder" components: the graph
-structure is well-defined regardless of whether implementations exist, but execution
-requires a complete interpretation.
-
-## 8. Subgraphs and named composition
-
-### Definition 8.1 (Graph expression language)
+### Definition 7.1 (Graph expression language)
 
 We define an **expression language** for morphisms in the free category. An expression
 $e$ has the following grammar:
@@ -457,7 +412,7 @@ where $c$ ranges over primitive components (generators), and $x$ ranges over nam
 drawn from an **environment** $\Gamma : \text{Name} \to \text{Value}$, where values are
 morphisms in the free category.
 
-### Definition 8.2 (Operational semantics)
+### Definition 7.2 (Operational semantics)
 
 The **evaluation judgment** $\Gamma \vdash e \Downarrow v$ maps an expression $e$ under
 environment $\Gamma$ to a morphism $v$ in $F(G)$:
@@ -470,7 +425,7 @@ $$\frac{\Gamma \vdash e_1 \Downarrow f \quad \Gamma \vdash e_2 \Downarrow g}{\Ga
 
 $$\frac{\Gamma(x) = v}{\Gamma \vdash \text{name}(x) \Downarrow v}$$
 
-### Remark 8.3 (Grouping as environment extension)
+### Remark 7.3 (Grouping as environment extension)
 
 When a user selects a subgraph and groups it under a name $x$, this corresponds to
 **extending the environment**:
@@ -491,23 +446,23 @@ The graph can now be written as $\text{name}(\text{understanding})$, which evalu
 the same morphism. The grouping operation does not change the denoted morphism — it
 introduces a **name** for a composite, making it referenceable.
 
-### Remark 8.4 (Ungrouping)
+### Remark 7.4 (Ungrouping)
 
 Ungrouping is the inverse: given $\Gamma' = \Gamma[x \mapsto v]$, ungrouping $x$
 removes the binding and inlines $v$ back into the expression, recovering the original
 environment $\Gamma$.
 
-### Definition 8.5 (Open and closed expressions)
+### Definition 7.5 (Open and closed expressions)
 
 An expression $e$ is **closed** under environment $\Gamma$ when every $\text{name}(x)$
 occurring in $e$ satisfies $x \in \text{dom}(\Gamma)$. A closed expression can be fully
-evaluated by the rules of Definition 8.2.
+evaluated by the rules of Definition 7.2.
 
 An expression is **open** when it contains free names — $\text{name}(x)$ where
 $x \notin \text{dom}(\Gamma)$. Evaluation gets stuck at any free name since no rule
 applies.
 
-### Remark 8.6 (Abstract components)
+### Remark 7.6 (Abstract components)
 
 An open expression contains **abstract components**: it has a well-defined typed interface
 (its input and output types can be inferred from the structure), but it cannot be
@@ -521,9 +476,51 @@ $$\Gamma' = \Gamma \cup \sigma$$
 
 $$\Gamma' \vdash e \Downarrow v$$
 
-This is the expression-language account of the abstract components described in
-Remark 7.3: an unbound name plays the same role as a generator without an
-interpretation — a typed placeholder that must be filled in before the graph can run.
+## 8. Putting it together
+
+### Remark 8.1
+
+Extending the free category of Definition 1.4 with all the structure introduced in
+§2–§4, OpenNeuro's graph language generates a **free traced commutative gs-monoidal
+category with merges** — the free category built from the declared components as
+primitive morphisms, closed under sequential composition ($\circ$), parallel composition
+($\otimes$), trace ($\text{Tr}$), copy ($\Delta$), merge ($\nabla$), and discard
+($\varepsilon$), with no additional equations.
+
+This free category is the **semantic domain** of the expression language defined in §7.
+Every closed expression evaluates to a morphism in this category. The expressions
+themselves — which may contain named subgraphs via $\text{name}(x)$ — are the syntax
+that users work with in the editor. The operational semantics of §7 bridges the two:
+it flattens named compositions into morphisms of the free category.
+
+### Definition 8.2 (Interpretation)
+
+An **interpretation** of the free category is a structure-preserving functor:
+
+$$\llbracket - \rrbracket : F(\text{Generators}) \to \mathbf{Sem}$$
+
+from the free category into a **semantic category** $\mathbf{Sem}$ where morphisms have
+computational meaning (e.g., actual running threads passing real frames through channels).
+
+The interpretation functor must preserve all structure:
+
+- $\llbracket g \circ f \rrbracket = \llbracket g \rrbracket \circ \llbracket f \rrbracket$
+- $\llbracket f \otimes g \rrbracket = \llbracket f \rrbracket \otimes \llbracket g \rrbracket$
+- $\llbracket \text{Tr}^X(f) \rrbracket = \text{Tr}^{\llbracket X \rrbracket}(\llbracket f \rrbracket)$
+
+Because the source is free, the interpretation is **uniquely determined** by its action
+on the generators. Once you assign a concrete implementation to each primitive component,
+the semantics of every composite graph is fixed automatically by functoriality.
+
+### Remark 8.3 (Abstract components)
+
+A generator in the free category that has not been assigned an interpretation is an
+**abstract component** — declared with a typed interface but no implementation. A graph
+containing abstract components cannot be fully interpreted (executed) until every
+abstract generator is given a concrete meaning. This is the categorical account of
+the open expressions described in Definition 7.5: an unbound name and an uninterpreted
+generator are two views of the same concept — a typed placeholder that must be filled
+in before the graph can run.
 
 ## Summary
 
@@ -545,12 +542,12 @@ categorical counterparts.
 | Source component (no inputs) | Create ($\eta$) | §4 |
 | Frame subtyping (`EOS ≤ Text`) | Partial order on objects | §5 |
 | Generic / higher-order component | Endofunctor | §6 |
-| Runtime execution | Interpretation functor ($\llbracket - \rrbracket$) | §7 |
-| Subgraph (named composite) | Named expression / environment binding | §8 |
-| Group operation | Environment extension ($\Gamma' = \Gamma[x \mapsto v]$) | §8 |
-| Ungroup operation | Environment removal / inlining | §8 |
-| Abstract component (placeholder) | Open expression (free name) | §8 |
-| Supplying implementations | Substitution closing the expression | §8 |
+| Subgraph (named composite) | Named expression / environment binding | §7 |
+| Group operation | Environment extension ($\Gamma' = \Gamma[x \mapsto v]$) | §7 |
+| Ungroup operation | Environment removal / inlining | §7 |
+| Abstract component (placeholder) | Open expression (free name) | §7 |
+| Supplying implementations | Substitution closing the expression | §7 |
+| Runtime execution | Interpretation functor ($\llbracket - \rrbracket$) | §8 |
 
 ## References
 

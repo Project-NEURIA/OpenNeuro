@@ -35,10 +35,12 @@ import {
   ungroupNode as apiUngroupNode,
   fetchCurrentProject,
   fetchIsType,
+  fetchProjects,
   startProject as apiStartProject,
   closeProject as apiCloseProject,
   saveGraph,
   type NodeResponse,
+  type ProjectSummary,
 } from "@/lib/api";
 import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
 import { checkTypes, collectLeafNames, typeToString, warmSubtypeCache } from "@/lib/typecheck";
@@ -62,7 +64,7 @@ function toReactFlowNode(
   componentMap: Record<string, ComponentInfo>,
   componentTypeInfo: { inputs: Record<string, Record<string, SlotType>>; outputs: Record<string, Record<string, SlotType>> },
 ): Node<GraphNodeData> {
-  const isComposite = n.type === "__composite__";
+  const isComposite = n.is_composite;
   const info = componentMap[n.type];
 
   // For composite nodes, derive ports from the response; for regular, from the component registry
@@ -124,6 +126,12 @@ function AppInner({
   } | null>(null);
   const [subgraphName, setSubgraphName] = useState("Subgraph");
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+
+  // Fetch projects for sidebar
+  useEffect(() => {
+    fetchProjects().then(setProjects).catch(console.error);
+  }, []);
 
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>([] as Node[]);
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([] as Edge[]);
@@ -456,6 +464,22 @@ function AppInner({
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+
+      // Handle project drops — create a composite node using project name as type
+      const projectName = e.dataTransfer.getData("application/project-node");
+      if (projectName) {
+        const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        apiCreateNode(projectName)
+          .then((res) => {
+            const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
+            setNodes((nds) => [...nds, newNode]);
+            runTypeCheck();
+            triggerSave();
+          })
+          .catch(console.error);
+        return;
+      }
+
       const raw = e.dataTransfer.getData("application/graph-node");
       if (!raw) return;
 
@@ -603,7 +627,7 @@ function AppInner({
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={() => setContextMenu(null)}
       />
-      <NodeSidebar components={components} />
+      <NodeSidebar components={components} projects={projects} currentProject={projectName} />
 
       {/* Context menu */}
       {contextMenu && (

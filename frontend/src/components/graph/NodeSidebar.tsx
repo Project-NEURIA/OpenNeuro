@@ -1,6 +1,7 @@
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle } from "lucide-react";
+import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo } from "@/lib/types";
+import type { ProjectSummary } from "@/lib/api";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Mic,
@@ -24,13 +25,23 @@ const catAccent: Record<string, { icon: string }> = {
 
 interface NodeSidebarProps {
   components: ComponentInfo[];
+  projects: ProjectSummary[];
+  currentProject: string;
 }
 
-export function NodeSidebar({ components }: NodeSidebarProps) {
+export function NodeSidebar({ components, projects, currentProject }: NodeSidebarProps) {
   function onDragStart(e: React.DragEvent, item: ComponentInfo) {
     e.dataTransfer.setData("application/graph-node", JSON.stringify(item));
     e.dataTransfer.effectAllowed = "move";
   }
+
+  function onProjectDragStart(e: React.DragEvent, project: ProjectSummary) {
+    e.dataTransfer.setData("application/project-node", project.name);
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  // Don't show the currently open project as a draggable component
+  const otherProjects = projects.filter((p) => p.name !== currentProject);
 
   return (
     <div
@@ -67,6 +78,31 @@ export function NodeSidebar({ components }: NodeSidebarProps) {
           </div>
         );
       })}
+      {otherProjects.length > 0 && (
+        <>
+          <div className="border-t border-white/10 my-1" />
+          <h2 className="text-sm font-semibold text-white px-1 mb-0.5 shrink-0">
+            Projects
+          </h2>
+          {otherProjects.map((project) => (
+            <div
+              key={project.name}
+              draggable
+              onDragStart={(e) => onProjectDragStart(e, project)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-grab",
+                "transition-all duration-200",
+                "bg-accent hover:bg-glass-hover",
+              )}
+            >
+              <FolderOpen className="w-4 h-4 shrink-0 text-purple-400/70" />
+              <span className="text-[13px] font-medium text-white/80 tracking-tight">
+                {project.name}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
       </div>
     </div>
   );

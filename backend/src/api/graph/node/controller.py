@@ -27,6 +27,7 @@ def _node_response(node_id: str, node: Node, manager: GraphManager) -> NodeRespo
     return NodeResponse(
         id=node_id,
         type=node.type,
+        is_composite=node.is_composite,
         label=node.label,
         status=comp.status.value,
         x=node.x,
