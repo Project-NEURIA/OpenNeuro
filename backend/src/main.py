@@ -15,13 +15,29 @@ from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
 from src.core.graph import Graph
-from src.core.config import PROJECTS_DIR, AppConfig
+from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
+
+
+def _copy_presets() -> None:
+    """Copy bundled presets into the user's projects directory (skip existing)."""
+    if not PRESETS_DIR.exists():
+        return
+    for preset in PRESETS_DIR.iterdir():
+        if not preset.is_dir():
+            continue
+        dest = PROJECTS_DIR / preset.name
+        if dest.exists():
+            continue
+        import shutil
+
+        shutil.copytree(preset, dest)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+    _copy_presets()
 
     config = AppConfig.load_config()
     app.state.current_project = config.current_project

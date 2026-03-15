@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from src.api.graph.node.dto import NodeUpdateRequest
+from src.core.config import PROJECTS_DIR
 from src.core.graph import Edge, Graph, GraphManager, Node
 
 
@@ -17,7 +19,12 @@ def get_node(manager: GraphManager, node_id: str) -> Node | None:
 def create_node(
     manager: GraphManager, node_type: str, init_args: dict[str, Any]
 ) -> tuple[str, Node]:
-    return manager.add_node(node_type, init_args)
+    try:
+        return manager.add_node(node_type, init_args)
+    except ValueError:
+        pass
+    # Fallback: try loading as a project
+    return create_from_project(manager, node_type)
 
 
 def update_node(
@@ -191,3 +198,15 @@ def ungroup(manager: GraphManager, node_id: str) -> None:
             manager.components()[inner_id] = cls.from_args(inner_node.init_args)
 
     manager._reconcile()
+
+
+def create_from_project(
+    manager: GraphManager, project_name: str, x: float = 0.0, y: float = 0.0
+) -> tuple[str, Node]:
+    """Create a composite node from a saved project's graph."""
+    path = PROJECTS_DIR / project_name / "graph.json"
+    if not path.exists():
+        raise ValueError(f"Project not found: {project_name}")
+    data = json.loads(path.read_text())
+    sub_graph = Graph.model_validate(data)
+    return manager.add_composite_node(sub_graph, x=x, y=y, label=project_name)
