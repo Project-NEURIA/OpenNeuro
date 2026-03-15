@@ -31,6 +31,7 @@ class STSOutputs(NamedTuple):
 
 class STS(PrimitiveComponent[STSInputs, STSOutputs]):
     _tags = Tag(io={"conduit"}, functionality={"audio"})
+    description = "Performs speech-to-speech conversion via WebSocket"
 
     def __init__(self, config: STSConfig) -> None:
         super().__init__()

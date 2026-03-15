@@ -76,6 +76,8 @@ class ObjectDetectionVisualizer(
         ObjectDetectionVisualizerInputs, ObjectDetectionVisualizerOutputs
     ]
 ):
+    description = "Visualizes object detection bounding boxes on video frames"
+
     """Composites bounding boxes and labels onto video frames."""
 
     _tags = Tag(io={"conduit"}, functionality={"image"})

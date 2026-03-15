@@ -98,6 +98,8 @@ def _project(
 
 
 class PoseRenderer(PrimitiveComponent[PoseRendererInputs, PoseRendererOutputs]):
+    description = "Renders 2D pose skeletons onto video frames"
+
     """Conduit that renders each BodyPoseFrame as a 2D skeleton and outputs JPEG bytes."""
 
     _tags = Tag(io={"conduit"}, functionality={"video", "movement"})

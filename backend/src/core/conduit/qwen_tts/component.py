@@ -39,6 +39,8 @@ class QwenTTSOutputs(NamedTuple):
 
 
 class QwenTTS(PrimitiveComponent[QwenTTSInputs, QwenTTSOutputs]):
+    description = "Converts text to speech using the Qwen TTS model"
+
     """Text-to-Speech using local Qwen3 TTS model."""
 
     _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})

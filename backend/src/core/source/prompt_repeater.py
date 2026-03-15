@@ -22,6 +22,7 @@ class PromptRepeaterOutputs(NamedTuple):
 
 class PromptRepeater(PrimitiveComponent[tuple[()], PromptRepeaterOutputs]):
     _tags = Tag(io={"source"}, functionality={"misc"})
+    description = "Repeatedly emits a configured text prompt"
 
     def __init__(self, config: PromptRepeaterConfig) -> None:
         super().__init__()

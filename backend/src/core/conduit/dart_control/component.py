@@ -247,6 +247,8 @@ class DartControlOutputs(NamedTuple):
 
 
 class DartControl(PrimitiveComponent[DartControlInputs, DartControlOutputs]):
+    description = "Controls DART robot movements from pose data"
+
     """
     DartControl motion generation conduit.
 

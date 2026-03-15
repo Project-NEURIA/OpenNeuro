@@ -41,6 +41,8 @@ class MonocularDepthEstimatorOutputs(NamedTuple):
 class MonocularDepthEstimator(
     PrimitiveComponent[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
 ):
+    description = "Estimates depth from monocular video frames"
+
     """Monocular depth estimation backed by Depth Anything 3.
 
     Consumes VideoFrames and CameraParamsFrames, runs DA3 inference,

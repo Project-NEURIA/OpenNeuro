@@ -35,6 +35,8 @@ class Status(Enum):
 class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
     ABC
 ):
+    description: str = ""
+
     def __init__(self) -> None:
         self._status = Status.STARTUP
         self._thread: threading.Thread | None = None
@@ -276,10 +278,11 @@ class CompositeComponent(Component[Any, Any]):
 
     _registerable = False
 
-    def __init__(self, type_: str, sub_graph: Graph, tags: Tag | None = None) -> None:
+    def __init__(self, type_: str, sub_graph: Graph, tags: Tag | None = None, description: str = "") -> None:
         super().__init__()
         self._type = type_
         self._tags = tags or Tag(io={"conduit"}, functionality={"misc"})
+        self.description = description
         self._sub_graph = sub_graph
         self._inner_manager: GraphManager | None = None
         self._ext_inputs, self._ext_outputs = self._compute_boundary()

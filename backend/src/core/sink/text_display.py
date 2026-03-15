@@ -17,6 +17,8 @@ class TextDisplayOutputs(NamedTuple):
 
 
 class TextDisplay(PrimitiveComponent[TextDisplayInputs, TextDisplayOutputs]):
+    description = "Displays text output in the UI"
+
     """Receives text frames and displays them in the node UI."""
 
     _tags = Tag(io={"sink"}, functionality={"misc"})

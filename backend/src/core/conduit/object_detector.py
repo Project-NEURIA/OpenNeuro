@@ -41,6 +41,8 @@ class ObjectDetectorOutputs(NamedTuple):
 
 
 class ObjectDetector(PrimitiveComponent[ObjectDetectorInputs, ObjectDetectorOutputs]):
+    description = "Detects objects in video frames"
+
     """Text-prompted object detector backed by SAM3.
 
     Consumes VideoFrames, runs SAM3 inference, and emits

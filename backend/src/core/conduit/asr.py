@@ -34,6 +34,7 @@ class ASROutputs(NamedTuple):
 
 class ASR(PrimitiveComponent[ASRInputs, ASROutputs]):
     _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
+    description = "Transcribes audio to text using speech recognition"
 
     def __init__(self, config: ASRConfig) -> None:
         super().__init__()

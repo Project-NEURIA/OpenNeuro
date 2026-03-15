@@ -49,6 +49,8 @@ class StreamingVLMOutputs(NamedTuple):
 
 
 class StreamingVLM(PrimitiveComponent[StreamingVLMInputs, StreamingVLMOutputs]):
+    description = "Streams visual language model inference on video frames"
+
     """Streaming VLM component that generates captions from video frames.
 
     Single-threaded main loop consumes frames into a rolling buffer and

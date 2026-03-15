@@ -47,6 +47,8 @@ class DiscordOutputs(NamedTuple):
 
 
 class DiscordIO(PrimitiveComponent[DiscordInputs, DiscordOutputs]):
+    description = "Sends and receives messages via Discord"
+
     """Discord audio conduit that handles both input and output."""
 
     _tags = Tag(io={"conduit"}, functionality={"misc"})

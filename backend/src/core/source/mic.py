@@ -22,6 +22,7 @@ class MicOutputs(NamedTuple):
 
 class Mic(PrimitiveComponent[tuple[()], MicOutputs]):
     _tags = Tag(io={"source"}, functionality={"audio"})
+    description = "Captures audio from a system microphone"
 
     def __init__(self, config: MicConfig) -> None:
         super().__init__()

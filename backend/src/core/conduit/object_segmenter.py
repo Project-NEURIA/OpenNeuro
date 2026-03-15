@@ -44,6 +44,8 @@ class ObjectSegmenterOutputs(NamedTuple):
 class ObjectSegmenter(
     PrimitiveComponent[ObjectSegmenterInputs, ObjectSegmenterOutputs]
 ):
+    description = "Segments objects in video frames"
+
     """Text-prompted instance segmenter backed by SAM3.
 
     Consumes VideoFrames, runs SAM3 inference, and emits

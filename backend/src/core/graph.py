@@ -75,10 +75,11 @@ class GraphManager:
         sub_graph: Graph,
         x: float = 0.0,
         y: float = 0.0,
+        description: str = "",
     ) -> tuple[str, Node]:
         from src.core.component import CompositeComponent
 
-        comp = CompositeComponent(type_, sub_graph)
+        comp = CompositeComponent(type_, sub_graph, description=description)
         node = Node(
             type=type_,
             is_composite=True,
@@ -191,7 +192,7 @@ class GraphManager:
             if node.is_composite:
                 from src.core.component import CompositeComponent
 
-                self._components[node_id] = CompositeComponent(node.type, node.sub_graph)  # type: ignore[arg-type]
+                self._components[node_id] = CompositeComponent(node.type, node.sub_graph, description="")  # type: ignore[arg-type]
             else:
                 cls = classes.get(node.type)
                 if cls is not None:

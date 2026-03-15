@@ -16,6 +16,7 @@ class PassthroughOutputs[T](NamedTuple):
 
 class Passthrough[T](PrimitiveComponent[PassthroughInputs[T], PassthroughOutputs[T]]):
     _tags = Tag(io={"conduit"}, functionality={"misc"})
+    description = "Passes data through unchanged"
 
     def run(self, inputs: PassthroughInputs[T], outputs: PassthroughOutputs[T]) -> None:
         for item in inputs.data(self):

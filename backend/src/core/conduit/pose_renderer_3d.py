@@ -112,6 +112,8 @@ class PoseRenderer3DOutputs(NamedTuple):
 
 
 class PoseRenderer3D(PrimitiveComponent[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
+    description = "Renders 3D pose skeletons onto video frames"
+
     """Renders BodyPoseFrame as a 3D SMPL body mesh.
 
     Uses pyrender with EGL on Linux, matplotlib software renderer on macOS.

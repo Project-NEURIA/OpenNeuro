@@ -17,6 +17,7 @@ class BufferOutputs[T](NamedTuple):
 
 class Buffer[T](PrimitiveComponent[BufferInputs[T], BufferOutputs[T]]):
     _tags = Tag(io={"conduit"}, functionality={"misc"})
+    description = "Buffers incoming data before forwarding"
 
     def run(self, inputs: BufferInputs[T], outputs: BufferOutputs[T]) -> None:
         buf: list[object] = []

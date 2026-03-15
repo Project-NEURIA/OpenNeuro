@@ -157,6 +157,8 @@ def _get_or_create_memory(config: Mem0Config) -> Memory:
 
 
 class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
+    description = "Stores and retrieves conversational memory"
+
     """Memory component backed by mem0.
 
     On each incoming MessagesFrame:

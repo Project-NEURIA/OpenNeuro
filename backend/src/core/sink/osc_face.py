@@ -319,6 +319,7 @@ def preset_to_full(
 
 class OSCFace(PrimitiveComponent[OSCFaceInputs, tuple[()]]):
     _tags = Tag(io={"sink"}, functionality={"movement"})
+    description = "Sends facial tracking data via OSC"
 
     def __init__(self, config: OSCFaceConfig | None = None) -> None:
         super().__init__()

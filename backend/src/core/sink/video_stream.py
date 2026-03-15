@@ -17,6 +17,8 @@ class VideoStreamOutputs(NamedTuple):
 
 
 class VideoStream(PrimitiveComponent[VideoStreamInputs, VideoStreamOutputs]):
+    description = "Streams video frames to the UI"
+
     """Receives video frames and streams JPEG to the frontend via UI channel."""
 
     _tags = Tag(io={"sink"}, functionality={"video"})

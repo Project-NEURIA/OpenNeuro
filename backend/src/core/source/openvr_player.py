@@ -31,6 +31,8 @@ class OpenVRPlayerOutputs(NamedTuple):
 class OpenVRPlayer(
     PrimitiveComponent[OpenVRPlayerInputs, OpenVRPlayerOutputs]  # type: ignore[type-var]
 ):
+    description = "Streams pose data from an OpenVR device"
+
     """Interactive first-person VR player with mouse/keyboard controls.
 
     Connects to the OpenVR virtual driver and lets you control the avatar

@@ -16,6 +16,8 @@ class MessagesToTextOutputs(NamedTuple):
 
 
 class MessagesToText(PrimitiveComponent[MessagesToTextInputs, MessagesToTextOutputs]):
+    description = "Converts message objects to plain text"
+
     """Converts MessagesFrame to TextFrame for display purposes."""
 
     _tags = Tag(io={"conduit"}, functionality={"misc"})

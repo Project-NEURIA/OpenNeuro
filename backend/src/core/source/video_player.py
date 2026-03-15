@@ -11,6 +11,8 @@ class VideoPlayerConfig(VideoSourceConfig):
 
 
 class VideoPlayer(VideoSource):
+    description = "Plays back video from a file"
+
     """Plays a local video file and sends VideoFrame through the pipeline."""
 
     _config: VideoPlayerConfig

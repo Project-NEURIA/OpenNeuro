@@ -12,6 +12,7 @@ class DoNothingInputs[T](NamedTuple):
 
 class DoNothing[T](PrimitiveComponent[DoNothingInputs[T], tuple[()]]):
     _tags = Tag(io={"sink"}, functionality={"misc"})
+    description = "Consumes input and discards it"
 
     def run(self, inputs: DoNothingInputs[T], outputs: tuple[()]) -> None:
         for _ in inputs.input(self):

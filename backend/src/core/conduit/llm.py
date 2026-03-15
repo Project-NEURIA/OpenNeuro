@@ -33,6 +33,8 @@ class LLMOutputs(NamedTuple):
 
 
 class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
+    description = "Generates text responses using a large language model"
+
     """LLM text generation component using Groq API."""
 
     _tags = Tag(io={"conduit"}, functionality={"llm"})

@@ -46,6 +46,8 @@ class DummyPosesOutputs(NamedTuple):
 
 
 class DummyPosesInput(PrimitiveComponent[tuple[()], DummyPosesOutputs]):
+    description = "Generates synthetic pose data for testing"
+
     """Source that emits a T-pose swaying back-and-forth along Z with the head turning left/right."""
 
     _tags = Tag(io={"source"}, functionality={"movement"})

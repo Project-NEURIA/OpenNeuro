@@ -130,6 +130,8 @@ def _send_poses(client: Client, poses: Mapping[str, Pose | None]) -> None:
 class OpenVRMovementSink(
     PrimitiveComponent[OpenVRMovementInputs, OpenVRMovementOutputs]  # type: ignore[type-var]
 ):
+    description = "Controls OpenVR movement from pose data"
+
     """Sink that streams body pose frames to the OpenVR virtual driver.
 
     If no input channel is provided, sends a static T-pose.

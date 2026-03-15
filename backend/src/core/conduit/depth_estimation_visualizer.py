@@ -28,6 +28,8 @@ class DepthEstimationVisualizer(
         DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs
     ]
 ):
+    description = "Visualizes depth estimation output as a color map"
+
     """Colorizes depth and overlays it on video frames."""
 
     _tags = Tag(io={"conduit"}, functionality={"image"})

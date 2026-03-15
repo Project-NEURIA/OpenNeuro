@@ -34,6 +34,8 @@ class TTSOutputs(NamedTuple):
 
 
 class TTS(PrimitiveComponent[TTSInputs, TTSOutputs]):
+    description = "Converts text to speech audio"
+
     """Text-to-Speech component using Inworld API."""
 
     _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})

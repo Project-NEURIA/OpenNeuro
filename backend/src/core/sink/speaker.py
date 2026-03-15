@@ -22,6 +22,7 @@ class SpeakerInputs(NamedTuple):
 
 class Speaker(PrimitiveComponent[SpeakerInputs, tuple[()]]):
     _tags = Tag(io={"sink"}, functionality={"audio"})
+    description = "Plays audio through a system speaker"
 
     def __init__(self, config: SpeakerConfig) -> None:
         super().__init__()

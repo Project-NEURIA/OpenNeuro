@@ -59,6 +59,7 @@ class OSCChatboxInputs(NamedTuple):
 
 class OSCChatbox(PrimitiveComponent[OSCChatboxInputs, tuple[()]]):
     _tags = Tag(io={"sink"}, functionality={"misc"})
+    description = "Sends text to a VRChat chatbox via OSC"
 
     def __init__(self, config: OSCChatboxConfig) -> None:
         super().__init__()

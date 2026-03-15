@@ -38,6 +38,7 @@ class VADOutputs(NamedTuple):
 
 class VAD(PrimitiveComponent[VADInputs, VADOutputs]):
     _tags = Tag(io={"conduit"}, functionality={"audio"})
+    description = "Detects voice activity in an audio stream"
 
     def __init__(self, config: VADConfig) -> None:
         super().__init__()

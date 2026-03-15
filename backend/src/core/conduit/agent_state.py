@@ -30,6 +30,8 @@ class AgentStateOutputs(NamedTuple):
 
 
 class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
+    description = "Tracks and manages agent conversation state"
+
     """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
 
     _tags = Tag(io={"conduit"}, functionality={"llm"})

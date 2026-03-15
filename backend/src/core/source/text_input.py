@@ -17,6 +17,8 @@ class TextInputOutputs(NamedTuple):
 
 
 class TextInput(PrimitiveComponent[TextInputInputs, TextInputOutputs]):
+    description = "Accepts text input from the UI"
+
     """Receives text from the frontend node UI and sends it downstream."""
 
     _tags = Tag(io={"source"}, functionality={"misc"})

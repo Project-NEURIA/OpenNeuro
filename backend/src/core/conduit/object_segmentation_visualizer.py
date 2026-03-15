@@ -91,6 +91,8 @@ class ObjectSegmentationVisualizer(
         ObjectSegmentationVisualizerInputs, ObjectSegmentationVisualizerOutputs
     ]
 ):
+    description = "Visualizes object segmentation masks on video frames"
+
     """Composites instance masks, bounding boxes, and labels onto video frames."""
 
     _tags = Tag(io={"conduit"}, functionality={"image"})

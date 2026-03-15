@@ -22,6 +22,8 @@ class VRChatVideoOutputs(NamedTuple):
 
 
 class VRChatVideo(PrimitiveComponent[tuple[()], VRChatVideoOutputs]):
+    description = "Captures stereo video from VRChat"
+
     """Captures stereo video frames from VRChat via the OpenVR virtual driver.
 
     Streams synchronized left+right eye pairs at the configured FPS.
