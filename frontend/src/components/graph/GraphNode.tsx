@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
 import { useUIVideoOutput } from "@/hooks/useUIVideoOutput";
 import { useUITextOutput } from "@/hooks/useUITextOutput";
+import { useUIOutput } from "@/hooks/useUIOutput";
+import { useUIInput } from "@/hooks/useUIInput";
 import { useUIChannel } from "@/contexts/UIChannelContext";
 import type { GraphNodeData } from "@/hooks/useGraphData";
 import type { SenderMetrics, ReceiverMetrics, SlotType } from "@/lib/types";
@@ -188,6 +190,52 @@ function UITextInputWidget({ nodeId, channel }: { nodeId: string; channel: strin
   );
 }
 
+function UIGenericOutputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const value = useUIOutput(nodeId, channel);
+  const display = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return (
+    <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 min-h-[2em]">
+      <pre className="text-[11px] font-mono text-foreground/70 whitespace-pre-wrap break-words m-0">
+        {display}
+      </pre>
+    </div>
+  );
+}
+
+function UIGenericInputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const send = useUIInput(nodeId, channel);
+  const [value, setValue] = useState("");
+
+  const handleSubmit = useCallback(() => {
+    if (!value.trim()) return;
+    try {
+      send(JSON.parse(value));
+    } catch {
+      send(value);
+    }
+    setValue("");
+  }, [value, send]);
+
+  return (
+    <div className="w-full flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+        className="flex-1 rounded-lg bg-black/40 border border-white/[0.08] px-3 py-1.5 text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20"
+        placeholder={`${channel} (JSON)...`}
+      />
+      <button
+        onClick={handleSubmit}
+        className="rounded-lg bg-white/[0.06] border border-white/[0.08] px-2.5 py-1.5 text-[11px] font-mono text-foreground/60 hover:bg-white/[0.1] transition-colors"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
 function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: Record<string, string>; uiOutputs: Record<string, string> }) {
   const outputWidgets = Object.entries(uiOutputs).map(([channel, typeName]) => {
     if (typeName === "UIVideoSender") {
@@ -196,14 +244,16 @@ function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: 
     if (typeName === "UITextSender") {
       return <UITextOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
     }
-    return null;
+    // Fallback: render raw JSON for any custom UISender type
+    return <UIGenericOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
   });
 
   const inputWidgets = Object.entries(uiInputs).map(([channel, typeName]) => {
     if (typeName === "UITextReceiver" || typeName === "UIKeystrokeReceiver") {
       return <UITextInputWidget key={channel} nodeId={nodeId} channel={channel} />;
     }
-    return null;
+    // Fallback: render JSON text input for any custom UIReceiver type
+    return <UIGenericInputWidget key={channel} nodeId={nodeId} channel={channel} />;
   });
 
   const widgets = [...outputWidgets, ...inputWidgets].filter(Boolean);

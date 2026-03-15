@@ -15,7 +15,7 @@ export function useUIVideoOutput(
   useEffect(() => {
     if (!nodeId) return;
 
-    const unsub = subscribe(nodeId, channel, (payload) => {
+    const unsub = subscribe(nodeId, channel, (payload: unknown) => {
       if (payload instanceof ArrayBuffer) {
         const blob = new Blob([payload], { type: "image/jpeg" });
         if (prevUrl.current) URL.revokeObjectURL(prevUrl.current);
