@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 from pythonosc.udp_client import SimpleUDPClient
 
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.channel import Receiver
 from src.core.frames import EOS, TextFrame, InterruptFrame
 
@@ -58,6 +58,8 @@ class OSCChatboxInputs(NamedTuple):
 
 
 class OSCChatbox(PrimitiveComponent[OSCChatboxInputs, tuple[()]]):
+    _tags = Tag(io={"sink"}, functionality={"misc"})
+
     def __init__(self, config: OSCChatboxConfig) -> None:
         super().__init__()
         self.config = config

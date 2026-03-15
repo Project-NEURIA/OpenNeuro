@@ -43,7 +43,7 @@ import {
   type NodeResponse,
   type ProjectSummary,
 } from "@/lib/api";
-import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
+import { parseSlotType, categoryFromTags, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
 import { checkTypes, collectLeafNames, typeToString, warmSubtypeCache } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
@@ -91,7 +91,7 @@ function toReactFlowNode(
     position,
     data: {
       label: n.type,
-      category: isComposite ? "composite" : (info?.category ?? "conduit"),
+      category: isComposite ? "composite" : (info ? categoryFromTags(info.tags) : "conduit"),
       inputs,
       outputs,
       inputTypes,
@@ -442,7 +442,7 @@ function AppInner({
             position,
             data: {
               label: item.name,
-              category: item.category,
+              category: categoryFromTags(item.tags),
               inputs: Object.keys(item.inputs),
               outputs: Object.keys(item.outputs),
               inputTypes: componentTypeInfo.inputs[item.name] ?? {},
@@ -466,11 +466,16 @@ function AppInner({
     (e: React.DragEvent) => {
       e.preventDefault();
 
-      // Handle project drops — create a composite node using project name as type
-      const projectName = e.dataTransfer.getData("application/project-node");
-      if (projectName) {
+      const raw = e.dataTransfer.getData("text/plain");
+      if (!raw) return;
+
+      let parsed: Record<string, unknown>;
+      try { parsed = JSON.parse(raw); } catch { return; }
+
+      // Handle project drops
+      if (parsed.kind === "project") {
         const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        apiCreateNode(projectName)
+        apiCreateNode(parsed.name as string)
           .then((res) => {
             const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
             setNodes((nds) => [...nds, newNode]);
@@ -481,10 +486,9 @@ function AppInner({
         return;
       }
 
-      const raw = e.dataTransfer.getData("application/graph-node");
-      if (!raw) return;
+      if (parsed.kind !== "component") return;
 
-      const item = JSON.parse(raw) as ComponentInfo;
+      const item = parsed as unknown as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
       const hasConfig = Object.values(item.init).some((schema) => {

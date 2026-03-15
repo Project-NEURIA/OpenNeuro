@@ -13,7 +13,7 @@ import requests
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import AudioDataFormat, AudioFrame, TextFrame
 
 
@@ -33,6 +33,8 @@ class ASROutputs(NamedTuple):
 
 
 class ASR(PrimitiveComponent[ASRInputs, ASROutputs]):
+    _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
+
     def __init__(self, config: ASRConfig) -> None:
         super().__init__()
         self.config: ASRConfig = config

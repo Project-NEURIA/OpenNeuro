@@ -9,7 +9,7 @@ from typing import NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import BodyPoseFrame, BonePose
 
 
@@ -47,6 +47,8 @@ class DummyPosesOutputs(NamedTuple):
 
 class DummyPosesInput(PrimitiveComponent[tuple[()], DummyPosesOutputs]):
     """Source that emits a T-pose swaying back-and-forth along Z with the head turning left/right."""
+
+    _tags = Tag(io={"source"}, functionality={"movement"})
 
     def __init__(self, config: DummyPosesConfig) -> None:
         super().__init__()

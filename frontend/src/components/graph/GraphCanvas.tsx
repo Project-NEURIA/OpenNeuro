@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,6 +12,7 @@ import {
   type OnConnect,
   type OnNodeDrag,
   type OnSelectionChangeFunc,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GraphNode } from "./GraphNode";
@@ -85,6 +86,15 @@ export function GraphCanvas({
         fitViewOptions={{ padding: 0.3 }}
         minZoom={0.3}
         maxZoom={2}
+        onViewportChange={(viewport: Viewport) => {
+          // Round viewport to prevent subpixel blur in WebKit
+          const el = document.querySelector('.react-flow__viewport') as HTMLElement | null;
+          if (el) {
+            const x = Math.round(viewport.x);
+            const y = Math.round(viewport.y);
+            el.style.transform = `translate(${x}px, ${y}px) scale(${viewport.zoom})`;
+          }
+        }}
         deleteKeyCode="Backspace"
         proOptions={{ hideAttribution: true }}
         onDrop={onDrop}

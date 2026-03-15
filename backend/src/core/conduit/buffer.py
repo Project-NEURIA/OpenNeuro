@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import EOS
 
 
@@ -16,6 +16,8 @@ class BufferOutputs[T](NamedTuple):
 
 
 class Buffer[T](PrimitiveComponent[BufferInputs[T], BufferOutputs[T]]):
+    _tags = Tag(io={"conduit"}, functionality={"misc"})
+
     def run(self, inputs: BufferInputs[T], outputs: BufferOutputs[T]) -> None:
         buf: list[object] = []
         for item in inputs.data(self):

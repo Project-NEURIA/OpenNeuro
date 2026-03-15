@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import (
     ObjectDetectionFrame,
     TextFrame,
@@ -46,6 +46,8 @@ class ObjectDetector(PrimitiveComponent[ObjectDetectorInputs, ObjectDetectorOutp
     Consumes VideoFrames, runs SAM3 inference, and emits
     ObjectDetectionFrames plus the processed VideoFrame.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: ObjectDetectorConfig) -> None:
         super().__init__()

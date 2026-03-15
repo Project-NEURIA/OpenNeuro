@@ -6,19 +6,7 @@ static BACKEND: Mutex<Option<Child>> = Mutex::new(None);
 fn kill_backend() {
     if let Ok(mut guard) = BACKEND.lock() {
         if let Some(ref mut child) = *guard {
-            // Kill the entire process group (uv + python subprocess)
-            #[cfg(unix)]
-            {
-                use std::os::unix::process::CommandExt;
-                unsafe {
-                    let pid = child.id() as i32;
-                    libc::kill(-pid, libc::SIGTERM);
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                let _ = child.kill();
-            }
+            let _ = child.kill();
             let _ = child.wait();
         }
         *guard = None;
@@ -27,34 +15,44 @@ fn kill_backend() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    ctrlc::set_handler(move || {
+        kill_backend();
+        std::process::exit(0);
+    })
+    .expect("failed to set Ctrl+C handler");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|_app| {
             let cwd = std::env::current_dir().unwrap().join("..");
             let cwd = cwd.canonicalize().unwrap();
+            let backend_dir = cwd.join("backend");
 
-            // Spawn backend in its own process group so we can kill the whole tree
-            let mut cmd = Command::new("uv");
-            cmd.args(["run", "python", "-m", "src.main"])
-                .current_dir(cwd.join("backend"));
-
-            #[cfg(unix)]
+            // Run python directly from venv — no uv middleman
+            // This ensures kill() actually kills the python process
+            let python = backend_dir.join(".venv/bin/python");
+            match Command::new(&python)
+                .args(["-m", "src.main"])
+                .current_dir(&backend_dir)
+                .spawn()
             {
-                use std::os::unix::process::CommandExt;
-                unsafe {
-                    cmd.pre_exec(|| {
-                        libc::setpgid(0, 0);
-                        Ok(())
-                    });
-                }
-            }
-
-            match cmd.spawn() {
                 Ok(child) => {
                     *BACKEND.lock().unwrap() = Some(child);
                 }
-                Err(e) => {
-                    eprintln!("[tauri] failed to start backend: {e}");
+                Err(_) => {
+                    // Fallback to uv if venv doesn't exist
+                    match Command::new("uv")
+                        .args(["run", "python", "-m", "src.main"])
+                        .current_dir(&backend_dir)
+                        .spawn()
+                    {
+                        Ok(child) => {
+                            *BACKEND.lock().unwrap() = Some(child);
+                        }
+                        Err(e) => {
+                            eprintln!("[tauri] failed to start backend: {e}");
+                        }
+                    }
                 }
             }
 

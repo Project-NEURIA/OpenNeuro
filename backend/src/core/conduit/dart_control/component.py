@@ -20,7 +20,7 @@ import torch
 from . import rotation_conversions as transforms
 from pydantic import BaseModel
 
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.channel import Receiver, Sender
 from src.core.frames import BodyPoseFrame, BonePose, GoalFrame, TextFrame
 
@@ -254,6 +254,8 @@ class DartControl(PrimitiveComponent[DartControlInputs, DartControlOutputs]):
     on the output channel. Uses DART's canonicalization pipeline for
     smooth, continuous motion generation.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"movement"})
 
     def __init__(self, config: DartControlConfig) -> None:
         super().__init__()

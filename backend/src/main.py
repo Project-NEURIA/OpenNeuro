@@ -66,8 +66,28 @@ app.include_router(project_router)
 app.include_router(ui_router)
 
 
+def _start_parent_watchdog() -> None:
+    """Exit if parent process dies (e.g. Tauri/bun killed by Ctrl+C)."""
+    import os
+    import threading
+
+    ppid = os.getppid()
+
+    def watch() -> None:
+        import time
+
+        while True:
+            time.sleep(1)
+            if os.getppid() != ppid:
+                os._exit(0)
+
+    t = threading.Thread(target=watch, daemon=True)
+    t.start()
+
+
 def main() -> None:
     load_dotenv(override=True)
+    _start_parent_watchdog()
 
     import uvicorn
 

@@ -9,7 +9,7 @@ from typing import NamedTuple
 from ovd_client import Client, Pose
 from pydantic import BaseModel
 
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.channel import Receiver
 from src.core.frames import BodyPoseFrame, BonePose
 
@@ -134,6 +134,8 @@ class OpenVRMovementSink(
 
     If no input channel is provided, sends a static T-pose.
     """
+
+    _tags = Tag(io={"sink"}, functionality={"movement"})
 
     def __init__(self, config: OpenVRMovementConfig) -> None:
         super().__init__()

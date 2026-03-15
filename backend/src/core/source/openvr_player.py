@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from ovd_client import Client, Player
 
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 
 
 class OpenVRPlayerConfig(BaseModel):
@@ -36,6 +36,8 @@ class OpenVRPlayer(
     Connects to the OpenVR virtual driver and lets you control the avatar
     directly with WASD + mouse. No inputs or outputs — standalone component.
     """
+
+    _tags = Tag(io={"source"}, functionality={"movement"})
 
     def __init__(self, config: OpenVRPlayerConfig) -> None:
         super().__init__()

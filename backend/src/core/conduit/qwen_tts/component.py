@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.utils import StreamFilter
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
@@ -40,6 +40,8 @@ class QwenTTSOutputs(NamedTuple):
 
 class QwenTTS(PrimitiveComponent[QwenTTSInputs, QwenTTSOutputs]):
     """Text-to-Speech using local Qwen3 TTS model."""
+
+    _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: QwenTTSConfig) -> None:
         super().__init__()

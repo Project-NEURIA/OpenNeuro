@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import (
     ObjectSegmentationFrame,
     TextFrame,
@@ -49,6 +49,8 @@ class ObjectSegmenter(
     Consumes VideoFrames, runs SAM3 inference, and emits
     ObjectSegmentationFrames (with masks) plus the processed VideoFrame.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: ObjectSegmenterConfig) -> None:
         super().__init__()

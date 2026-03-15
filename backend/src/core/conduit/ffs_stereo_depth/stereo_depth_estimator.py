@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import (
     DepthFrame,
     StereoCameraParamsFrame,
@@ -49,6 +49,8 @@ class StereoDepthEstimator(
     disparity inference, converts to metric depth, and emits DepthFrames
     plus the resized/cropped StereoVideoFrame.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: StereoDepthEstimatorConfig) -> None:
         super().__init__()

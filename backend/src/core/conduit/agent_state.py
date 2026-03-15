@@ -6,7 +6,7 @@ from typing import NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 
@@ -31,6 +31,8 @@ class AgentStateOutputs(NamedTuple):
 
 class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
     """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
+
+    _tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
