@@ -85,7 +85,9 @@ def create_subgraph(
     cy = sum(ys) / len(ys) if ys else 0.0
 
     # Create composite node
-    comp_id, comp_node = manager.add_composite_node(name, sub_graph, x=cx, y=cy)  # name is the user-provided subgraph name
+    comp_id, comp_node = manager.add_composite_node(
+        name, sub_graph, x=cx, y=cy
+    )  # name is the user-provided subgraph name
 
     # Rewire boundary edges to point to/from the composite node
     rewired_edges: list[Edge] = []

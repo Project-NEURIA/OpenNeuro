@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo, IOTag, FunctionalityTag } from "@/lib/types";
@@ -68,28 +68,125 @@ function groupComponents(components: ComponentInfo[]) {
   return groups;
 }
 
+function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: React.RefObject<HTMLDivElement | null>; y: number }) {
+  const inputs = Object.entries(item.inputs);
+  const outputs = Object.entries(item.outputs);
+  const rect = sidebarRef.current?.getBoundingClientRect();
+  if (!rect) return null;
+
+  return (
+    <div
+      className={cn(
+        "fixed z-50 w-64",
+        "bg-glass backdrop-blur-xs backdrop-saturate-150",
+        "border border-glass-border rounded-lg",
+        "shadow-2xl shadow-black/40",
+        "p-3 text-[11px]",
+      )}
+      style={{ left: rect.right + 8, top: Math.max(8, rect.top + y - 40) }}
+    >
+      {/* Type */}
+      <div className="font-bold text-[13px] text-white mb-1">{item.type_}</div>
+
+      {/* Description */}
+      {item.description && (
+        <div className="text-muted-foreground mb-2 leading-relaxed">{item.description}</div>
+      )}
+
+      {/* Tags */}
+      <div className="flex flex-wrap gap-1 mb-2">
+        {item.tags.io.map((t) => (
+          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
+        ))}
+        {item.tags.functionality.map((t) => (
+          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
+        ))}
+        {item.tags.gpu.filter((g) => g !== "cpu").map((t) => (
+          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
+        ))}
+      </div>
+
+      {/* IO */}
+      {inputs.length > 0 && (
+        <div className="mb-1.5">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Inputs</div>
+          {inputs.map(([k, v]) => (
+            <div key={k} className="flex gap-1.5 text-white/70">
+              <span className="text-muted-foreground">{k}:</span>
+              <span>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {outputs.length > 0 && (
+        <div>
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Outputs</div>
+          {outputs.map(([k, v]) => (
+            <div key={k} className="flex gap-1.5 text-white/70">
+              <span className="text-muted-foreground">{k}:</span>
+              <span>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Init params */}
+      {Object.keys(item.init).length > 0 && (
+        <div className="mt-1.5">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Config</div>
+          {Object.keys(item.init).map((k) => (
+            <div key={k} className="text-white/70">{k}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NodeSidebar({ components, projects, currentProject }: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [hovered, setHovered] = useState<{ item: ComponentInfo; y: number } | null>(null);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   function toggle(key: string) {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   function onDragStart(e: React.DragEvent, item: ComponentInfo) {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "component", ...item }));
+    const data = JSON.stringify({ kind: "component", ...item });
+    e.dataTransfer.setData("text/plain", data);
+    e.dataTransfer.setData("application/openneuro", data);
     e.dataTransfer.effectAllowed = "move";
+    setHovered(null);
   }
 
   function onProjectDragStart(e: React.DragEvent, project: ProjectSummary) {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "project", name: project.name }));
+    const data = JSON.stringify({ kind: "project", name: project.name });
+    e.dataTransfer.setData("text/plain", data);
+    e.dataTransfer.setData("application/openneuro", data);
     e.dataTransfer.effectAllowed = "move";
+  }
+
+  function onItemEnter(e: React.MouseEvent, item: ComponentInfo) {
+    clearTimeout(hoverTimeout.current);
+    const sidebarRect = sidebarRef.current?.getBoundingClientRect();
+    const y = e.currentTarget.getBoundingClientRect().top - (sidebarRect?.top ?? 0);
+    hoverTimeout.current = setTimeout(() => setHovered({ item, y }), 300);
+  }
+
+  function onItemLeave() {
+    clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => setHovered(null), 100);
   }
 
   const otherProjects = projects.filter((p) => p.name !== currentProject);
   const groups = groupComponents(components);
 
   return (
+    <>
     <div
+      ref={sidebarRef}
       className={cn(
         "absolute top-4 left-4 z-10 w-52",
         "rounded-2xl border border-glass-border",
@@ -112,7 +209,6 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
 
           return (
             <div key={io}>
-              {/* IO section header */}
               <button
                 onClick={() => toggle(ioKey)}
                 className={cn(
@@ -131,7 +227,6 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
 
                 return (
                   <div key={func} className="ml-2">
-                    {/* Functionality sub-header */}
                     <button
                       onClick={() => toggle(funcKey)}
                       className="flex items-center gap-1.5 w-full px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
@@ -141,12 +236,14 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
                     </button>
 
                     {!funcCollapsed && items.map((item) => {
-                      const Icon = iconMap[item.name] ?? Puzzle;
+                      const Icon = iconMap[item.type_] ?? Puzzle;
                       return (
                         <div
-                          key={item.name}
+                          key={item.type_}
                           draggable
                           onDragStart={(e) => onDragStart(e, item)}
+                          onMouseEnter={(e) => onItemEnter(e, item)}
+                          onMouseLeave={onItemLeave}
                           className={cn(
                             "flex items-center gap-2.5 px-3 py-2 ml-2 cursor-grab",
                             "transition-all duration-200",
@@ -155,7 +252,7 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
                         >
                           <Icon className={cn("w-3.5 h-3.5 shrink-0", ioAccent[io] + "/70")} />
                           <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
-                            {item.name}
+                            {item.type_}
                           </span>
                         </div>
                       );
@@ -198,6 +295,22 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
           </div>
         )}
       </div>
+
     </div>
+
+    {/* Hover info panel — rendered outside sidebar to avoid overflow clip */}
+    {hovered && (
+      <div
+        onMouseEnter={() => clearTimeout(hoverTimeout.current)}
+        onMouseLeave={onItemLeave}
+      >
+        <InfoPanel
+          item={hovered.item}
+          sidebarRef={sidebarRef}
+          y={hovered.y}
+        />
+      </div>
+    )}
+  </>
   );
 }

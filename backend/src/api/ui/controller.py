@@ -26,7 +26,9 @@ from src.core.graph import GraphManager
 router = APIRouter(prefix="/ui")
 
 
-def _resolve_ui_output_type(manager: GraphManager, node_id: str, slot: str) -> type | None:
+def _resolve_ui_output_type(
+    manager: GraphManager, node_id: str, slot: str
+) -> type | None:
     """Extract the inner T from UISender[T] for the given output slot."""
     comp = manager.components().get(node_id)
     if comp is None:
@@ -51,7 +53,9 @@ def _resolve_ui_output_type(manager: GraphManager, node_id: str, slot: str) -> t
     return None
 
 
-def _resolve_ui_input_type(manager: GraphManager, node_id: str, slot: str) -> type | None:
+def _resolve_ui_input_type(
+    manager: GraphManager, node_id: str, slot: str
+) -> type | None:
     """Extract the inner T from UIReceiver[T] for the given input slot."""
     comp = manager.components().get(node_id)
     if comp is None:
@@ -191,9 +195,17 @@ async def ui_ws(ws: WebSocket) -> None:
                 sender = manager.ui_senders().get((node_id, channel))
                 if sender is not None:
                     inner_type = _resolve_ui_input_type(manager, node_id, channel)
-                    if inner_type is not None and issubclass(inner_type, BaseModel) and isinstance(payload, dict):
+                    if (
+                        inner_type is not None
+                        and issubclass(inner_type, BaseModel)
+                        and isinstance(payload, dict)
+                    ):
                         sender.send(inner_type.model_validate(payload))
-                    elif inner_type is not None and hasattr(inner_type, "new") and isinstance(payload, str):
+                    elif (
+                        inner_type is not None
+                        and hasattr(inner_type, "new")
+                        and isinstance(payload, str)
+                    ):
                         sender.send(inner_type.new(text=payload))
                     else:
                         sender.send(payload)

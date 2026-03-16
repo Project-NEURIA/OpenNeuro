@@ -57,7 +57,9 @@ class StreamingVLM(PrimitiveComponent[StreamingVLMInputs, StreamingVLMOutputs]):
     submits VLM calls to a thread pool, polling for results each iteration.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"video", "llm"}, gpu={"cpu", "nvidia", "apple"})
+    _tags = Tag(
+        io={"conduit"}, functionality={"video", "llm"}, gpu={"cpu", "nvidia", "apple"}
+    )
 
     def __init__(self, config: StreamingVLMConfig) -> None:
         super().__init__()

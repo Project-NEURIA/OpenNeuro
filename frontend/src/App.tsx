@@ -150,10 +150,10 @@ function AppInner({
     const inputs: Record<string, Record<string, SlotType>> = {};
     const outputs: Record<string, Record<string, SlotType>> = {};
     for (const c of components) {
-      inputs[c.name] = Object.fromEntries(
+      inputs[c.type_] = Object.fromEntries(
         Object.entries(c.inputs).map(([k, v]) => [k, parseSlotType(v)]),
       );
-      outputs[c.name] = Object.fromEntries(
+      outputs[c.type_] = Object.fromEntries(
         Object.entries(c.outputs).map(([k, v]) => [k, parseSlotType(v)]),
       );
     }
@@ -425,6 +425,7 @@ function AppInner({
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
   }, []);
 
@@ -434,19 +435,19 @@ function AppInner({
       position: { x: number; y: number },
       initArgs?: Record<string, unknown>,
     ) => {
-      apiCreateNode(item.name, initArgs)
+      apiCreateNode(item.type_, initArgs)
         .then((res) => {
           const newNode: Node<GraphNodeData> = {
             id: res.id,
             type: "graph",
             position,
             data: {
-              label: item.name,
+              label: item.type_,
               category: categoryFromTags(item.tags),
               inputs: Object.keys(item.inputs),
               outputs: Object.keys(item.outputs),
-              inputTypes: componentTypeInfo.inputs[item.name] ?? {},
-              outputTypes: componentTypeInfo.outputs[item.name] ?? {},
+              inputTypes: componentTypeInfo.inputs[item.type_] ?? {},
+              outputTypes: componentTypeInfo.outputs[item.type_] ?? {},
               status: "startup",
               nodeMetrics: null,
               ui_inputs: item.ui_inputs ?? {},
@@ -466,7 +467,7 @@ function AppInner({
     (e: React.DragEvent) => {
       e.preventDefault();
 
-      const raw = e.dataTransfer.getData("text/plain");
+      const raw = e.dataTransfer.getData("application/openneuro") || e.dataTransfer.getData("text/plain");
       if (!raw) return;
 
       let parsed: Record<string, unknown>;

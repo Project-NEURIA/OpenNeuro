@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 
 
 IOTag = Literal["source", "conduit", "sink"]
-FunctionalityTag = Literal["audio", "video", "llm", "image", "movement", "misc", "other"]
+FunctionalityTag = Literal[
+    "audio", "video", "llm", "image", "movement", "misc", "other"
+]
 GPUTag = Literal["cpu", "nvidia", "apple", "intel", "amd"]
 
 
@@ -274,11 +276,17 @@ class PrimitiveComponent[
 
 
 class CompositeComponent(Component[Any, Any]):
-    """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
+    """A composite component that is made from a graph of components."""
 
     _registerable = False
 
-    def __init__(self, type_: str, sub_graph: Graph, tags: Tag | None = None, description: str = "") -> None:
+    def __init__(
+        self,
+        type_: str,
+        sub_graph: Graph,
+        tags: Tag | None = None,
+        description: str = "",
+    ) -> None:
         super().__init__()
         self._type = type_
         self._tags = tags or Tag(io={"conduit"}, functionality={"misc"})
