@@ -43,7 +43,8 @@ dependencies = [
     "cachetools",
     "descript-audio-codec",
     "descript-audiotools",
-    "safetensors"
+    "safetensors",
+    "bitsandbytes"
 ]
 
 [project.optional-dependencies]
