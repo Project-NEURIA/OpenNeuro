@@ -4,6 +4,7 @@ from src.core.conduit.vad import VAD as VAD
 from src.core.conduit.agent_state import AgentState as AgentState
 from src.core.conduit.llm import LLM as LLM
 from src.core.conduit.tts import TTS as TTS
+from src.core.conduit.tts_fish import FishTTS as FishTTS
 from src.core.conduit.discord import DiscordIO as DiscordIO
 from src.core.conduit.dart_control import DartControl as DartControl
 from src.core.conduit.object_detection_visualizer import (
