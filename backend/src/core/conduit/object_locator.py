@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import ThreadedComponent
 from src.core.frames import (
     CameraParamsFrame,
     DepthFrame,
@@ -27,7 +27,7 @@ class ObjectLocatorOutputs(NamedTuple):
     locations: Sender[ObjectLocationFrame]
 
 
-class ObjectLocator(PrimitiveComponent[ObjectLocatorInputs, ObjectLocatorOutputs]):
+class ObjectLocator(ThreadedComponent[ObjectLocatorInputs, ObjectLocatorOutputs]):
     """Computes 3D world positions for segmented objects using depth deprojection.
 
     For each segmentation mask, applies it to the depth map, deprojects

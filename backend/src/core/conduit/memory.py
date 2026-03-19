@@ -8,8 +8,8 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
-from src.core.frames import MessagesFrame, TextFrame
+from src.core.component import ThreadedComponent, Tag
+from src.core.frames import MessageFrame, TextFrame
 
 from mem0 import Memory  # type: ignore[import-untyped]
 
@@ -48,7 +48,7 @@ class Mem0Config(BaseModel):
 
 
 class Mem0Inputs(NamedTuple):
-    messages: Receiver[MessagesFrame]
+    messages: Receiver[list[MessageFrame]]
 
 
 class Mem0Outputs(NamedTuple):
@@ -156,18 +156,18 @@ def _get_or_create_memory(config: Mem0Config) -> Memory:
     return _memory_instance
 
 
-class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
+class Mem0(ThreadedComponent[Mem0Inputs, Mem0Outputs]):
     description = "Stores and retrieves conversational memory"
 
     """Memory component backed by mem0.
 
-    On each incoming MessagesFrame:
+    On each incoming list[MessageFrame]:
       1. Query memory using the last_k turns as search context.
       2. Send the formatted memory prefix back as a TextFrame.
       3. Asynchronously update memory with the new conversation turns.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"llm"})
+    tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: Mem0Config) -> None:
         super().__init__()
@@ -176,12 +176,10 @@ class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
         self._memory = _get_or_create_memory(config)
         print("[Mem0] Memory initialised")
 
-    def _query_memory(self, turns: list[dict[str, str]]) -> str:
+    def _query_memory(self, turns: list[MessageFrame]) -> str:
         if not turns:
             return ""
-        query = "\n".join(
-            f"{m['role']}: {m['content']}" for m in turns if m.get("content")
-        )
+        query = "\n".join(f"{m.role}: {m.content}" for m in turns if m.content)
         try:
             results = self._memory.search(
                 query=query,
@@ -194,9 +192,12 @@ class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
             print(f"[Mem0] Search error: {e}")
             return ""
 
-    def _update_memory(self, new_messages: list[dict[str, str]]) -> None:
+    def _update_memory(self, new_messages: list[MessageFrame]) -> None:
         try:
-            self._memory.add(new_messages, user_id=self.config.user_id)
+            self._memory.add(
+                [{"role": m.role, "content": m.content} for m in new_messages],
+                user_id=self.config.user_id,
+            )
         except Exception as e:
             print(f"[Mem0] Add error: {e}")
 
@@ -206,11 +207,11 @@ class Mem0(PrimitiveComponent[Mem0Inputs, Mem0Outputs]):
         for frame in inputs.messages(self):
             if frame is None:
                 break
-            if not frame.messages:
+            if not frame:
                 continue
 
             # 1. Query memory with the last k turns
-            non_system = [m for m in frame.messages if m.get("role") != "system"]
+            non_system = [m for m in frame if m.role != "system"]
             recent = non_system[-(self.config.last_k * 2) :]
             prefix = self._query_memory(recent)
 

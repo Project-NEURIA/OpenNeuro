@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.utils import StreamFilter
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
@@ -19,7 +19,7 @@ _AUDIO_EXTENSIONS = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
 
 
 class QwenTTSConfig(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"configOptions": {"voice_id": {}}})
+    model_config = ConfigDict(json_schema_extra={"options": {"voice_id": {}}})
 
     model_id: str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
     device: str = "auto"
@@ -38,12 +38,12 @@ class QwenTTSOutputs(NamedTuple):
     text: Sender[TextFrame]
 
 
-class QwenTTS(PrimitiveComponent[QwenTTSInputs, QwenTTSOutputs]):
+class QwenTTS(ThreadedComponent[QwenTTSInputs, QwenTTSOutputs]):
     description = "Converts text to speech using the Qwen TTS model"
 
     """Text-to-Speech using local Qwen3 TTS model."""
 
-    _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
+    tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: QwenTTSConfig) -> None:
         super().__init__()
@@ -56,12 +56,8 @@ class QwenTTS(PrimitiveComponent[QwenTTSInputs, QwenTTSOutputs]):
         self._voice_paths: dict[str, Path] = {}
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        if field != "config.voice_id":
-            return None
-        ref_dir = Path((values or {}).get("ref_samples_dir", str(_ASSETS_DIR)))
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        ref_dir = Path(values.get("ref_samples_dir", str(_ASSETS_DIR)))
         options: list[dict[str, str]] = []
         if ref_dir.is_dir():
             for p in sorted(ref_dir.iterdir()):
@@ -69,7 +65,9 @@ class QwenTTS(PrimitiveComponent[QwenTTSInputs, QwenTTSOutputs]):
                     txt = ref_dir / f"{p.stem}.txt"
                     if txt.is_file():
                         options.append({"value": p.stem, "label": p.stem})
-        return options or None
+        if not options:
+            return {}
+        return {"config": {"voice_id": options}}
 
     def _load_model(self) -> None:
         from src.core.conduit.qwen_tts.model import SimpleStreamingTTS

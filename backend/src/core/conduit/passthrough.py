@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 
 
 class PassthroughInputs[T](NamedTuple):
@@ -14,8 +14,8 @@ class PassthroughOutputs[T](NamedTuple):
     data: Sender[T]
 
 
-class Passthrough[T](PrimitiveComponent[PassthroughInputs[T], PassthroughOutputs[T]]):
-    _tags = Tag(io={"conduit"}, functionality={"misc"})
+class Passthrough[T](ThreadedComponent[PassthroughInputs[T], PassthroughOutputs[T]]):
+    tags = Tag(io={"conduit"}, functionality={"misc"})
     description = "Passes data through unchanged"
 
     def run(self, inputs: PassthroughInputs[T], outputs: PassthroughOutputs[T]) -> None:

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 from src.core.frames import TextFrame
 
 if TYPE_CHECKING:
-    from src.core.component import Component
+    from src.core.component import ThreadedComponent
 
 
 class Channel[T]:
@@ -170,10 +170,10 @@ class Receiver[T]:
 
     def __call__(
         self,
-        subscriber: Component[Any, Any],
+        subscriber: ThreadedComponent[Any, Any],
         newest: bool = False,
         no_block: bool = False,
-    ) -> ReceiverIterator[T]:
+    ) -> Iterator[T | None]:
         """Return an iterator over items from the channel.
 
         The channel cursor is registered immediately (not deferred to the
@@ -209,6 +209,26 @@ class Receiver[T]:
                 return 0
             head = ch._offset + len(ch._items)
             return head - cursor
+
+
+class ConstantReceiver[T](Receiver[T]):
+    """Receiver that yields a fixed value infinitely. No channel needed."""
+
+    def __init__(self, value: T) -> None:
+        super().__init__(Channel())  # dummy, never used
+        self._value = value
+
+    def __call__(
+        self,
+        subscriber: ThreadedComponent[Any, Any],
+        newest: bool = False,
+        no_block: bool = False,
+    ) -> Iterator[T]:
+        def _repeat() -> Iterator[T]:
+            while not subscriber.stop_event.is_set():
+                yield self._value
+
+        return _repeat()
 
 
 # -- UI channel markers --

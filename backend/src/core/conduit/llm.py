@@ -10,8 +10,8 @@ import requests
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
-from src.core.frames import EOS, InterruptFrame, MessagesFrame, TextFrame
+from src.core.component import ThreadedComponent, Tag
+from src.core.frames import EOS, InterruptFrame, MessageFrame, TextFrame
 
 
 class LLMConfig(BaseModel):
@@ -24,7 +24,7 @@ class LLMConfig(BaseModel):
 
 
 class LLMInputs(NamedTuple):
-    messages: Receiver[MessagesFrame]
+    messages: Receiver[list[MessageFrame]]
     interrupt: Receiver[InterruptFrame] | None = None
 
 
@@ -32,12 +32,12 @@ class LLMOutputs(NamedTuple):
     text: Sender[TextFrame | EOS]
 
 
-class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
+class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
     description = "Generates text responses using a large language model"
 
     """LLM text generation component using Groq API."""
 
-    _tags = Tag(io={"conduit"}, functionality={"llm"})
+    tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__()
@@ -48,7 +48,7 @@ class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
         self._gen_lock = threading.Lock()
 
         # Task queue for worker thread
-        self._task_queue: Queue[tuple[int, MessagesFrame]] = Queue()
+        self._task_queue: Queue[tuple[int, list[MessageFrame]]] = Queue()
 
     def _worker(self, outputs: LLMOutputs) -> None:
         print("[LLM] Worker thread started")
@@ -108,7 +108,7 @@ class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
         print("[LLM] LLM generation stopped")
 
     def _process_generation(
-        self, gen: int, frame: MessagesFrame, outputs: LLMOutputs
+        self, gen: int, frame: list[MessageFrame], outputs: LLMOutputs
     ) -> None:
         api_key = os.getenv(self.config.api_key_env_var)
         if not api_key:
@@ -123,7 +123,7 @@ class LLM(PrimitiveComponent[LLMInputs, LLMOutputs]):
 
         payload = {
             "model": self.config.model_id,
-            "messages": frame.messages,
+            "messages": [{"role": m.role, "content": m.content} for m in frame],
             "stream": True,
             "top_p": self.config.top_p,
             "temperature": self.config.temperature,

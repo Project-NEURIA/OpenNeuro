@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import DepthFrame, VideoDataFormat, VideoFrame
 
 _ALPHA = 0.5
@@ -24,15 +24,13 @@ class DepthEstimationVisualizerOutputs(NamedTuple):
 
 
 class DepthEstimationVisualizer(
-    PrimitiveComponent[
-        DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs
-    ]
+    ThreadedComponent[DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs]
 ):
     description = "Visualizes depth estimation output as a color map"
 
     """Colorizes depth and overlays it on video frames."""
 
-    _tags = Tag(io={"conduit"}, functionality={"image"})
+    tags = Tag(io={"conduit"}, functionality={"image"})
 
     @staticmethod
     def _colorize_depth(depth_data: np.ndarray) -> np.ndarray:

@@ -7,8 +7,8 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel, Field
 
-from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component
+from src.core.channel import Channel, ConstantReceiver, Receiver, Sender
+from src.core.component import Component, ConstantComponent
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -99,6 +99,32 @@ class GraphManager:
             return None
         node.x = x
         node.y = y
+        return node
+
+    def update_node_init_args(
+        self, node_id: str, init_args: dict[str, Any]
+    ) -> Node | None:
+        node = self._graph.nodes.get(node_id)
+        if node is None:
+            return None
+
+        classes = Component.registered_subclasses()
+        cls = classes.get(node.type)
+        if cls is None:
+            return None
+
+        was_running = any(
+            c.status.value == "running" for c in self._components.values()
+        )
+        if was_running:
+            self.stop()
+
+        node.init_args = init_args
+        self._components[node_id] = cls.from_args(init_args)
+        self._reconcile()
+
+        if was_running:
+            self.run()
         return node
 
     def delete_node(self, node_id: str) -> None:
@@ -262,12 +288,28 @@ class GraphManager:
                     new_receiver_handles[recv_key] = Receiver(channel)
         self._receiver_handles = new_receiver_handles
 
+    def _wire_constants(self) -> None:
+        """Replace receivers fed by ConstantComponent outputs with ConstantReceivers."""
+        for edge in self._graph.edges:
+            comp = self._components.get(edge.source_node)
+            if not isinstance(comp, ConstantComponent):
+                continue
+            values = comp.get_values()
+            if not hasattr(values, "_fields"):
+                continue
+            val = getattr(values, edge.source_slot, None)
+            if val is None:
+                continue
+            rkey: ReceiverKey = (edge.target_node, edge.target_slot)
+            self._receiver_handles[rkey] = ConstantReceiver(val)
+
     def run(self) -> None:
         """Stop all running components, then start each with wired handles."""
         self.stop()
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
+        self._wire_constants()
 
         for node_id in self._graph.nodes:
             comp = self._components[node_id]

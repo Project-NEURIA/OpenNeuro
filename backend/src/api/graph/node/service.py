@@ -37,6 +37,14 @@ def delete_node(manager: GraphManager, node_id: str) -> None:
     manager.delete_node(node_id)
 
 
+def update_node_init_args(
+    manager: GraphManager,
+    node_id: str,
+    init_args: dict[str, Any],
+) -> Node | None:
+    return manager.update_node_init_args(node_id, init_args)
+
+
 def create_subgraph(
     manager: GraphManager, node_ids: list[str], name: str = "Subgraph"
 ) -> tuple[str, Node]:

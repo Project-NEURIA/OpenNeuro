@@ -2,10 +2,14 @@ import { memo, useEffect, useState } from "react";
 import { type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo } from "@/lib/types";
-import { fetchConfigOptions, type ConfigOption } from "@/lib/api";
+import { fetchOptions, type Option } from "@/lib/api";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 interface ConfiguringNodeData {
   componentInfo: ComponentInfo;
+  mode?: "create" | "edit";
+  submitLabel?: string;
+  initialValues?: Record<string, unknown>;
   onConfirm: (config: Record<string, unknown>) => void;
   onCancel: () => void;
 }
@@ -20,10 +24,10 @@ type SchemaObj = {
   anyOf?: SchemaObj[];
   description?: string;
   enum?: unknown[];
-  configOptions?: Record<string, object>;
+  options?: Record<string, object>;
 };
 
-type ResolvedSchema = { properties: Record<string, SchemaObj>; title?: string; configOptions?: Record<string, object> };
+type ResolvedSchema = { properties: Record<string, SchemaObj>; title?: string; options?: Record<string, object> };
 
 function hasProps(s: SchemaObj): s is SchemaObj & { properties: Record<string, SchemaObj> } {
   return s.type === "object" && s.properties !== undefined;
@@ -61,31 +65,33 @@ function getDefaultValue(prop: SchemaObj): unknown {
 /** Collect all fields from every init parameter's schema. */
 function collectFields(init: Record<string, unknown>): {
   fields: Record<string, SchemaObj>;
-  configOptionFields: Set<string>;
+  optionFields: Set<string>;
 } {
   const fields: Record<string, SchemaObj> = {};
-  const configOptionFields = new Set<string>();
+  const optionFields = new Set<string>();
   for (const [paramName, rawSchema] of Object.entries(init)) {
     if (!rawSchema || typeof rawSchema !== "object") continue;
     const schema = rawSchema as SchemaObj;
     const resolved = resolveSchema(schema);
     if (resolved) {
-      // Detect configOptions from the parent schema
-      const coKeys = schema.configOptions ?? resolved.configOptions;
+      // Detect options from the parent schema
+      const coKeys = schema.options ?? resolved.options;
       // Object schema — each property becomes a field
       for (const [prop, propSchema] of Object.entries(resolved.properties)) {
         const key = `${paramName}.${prop}`;
         fields[key] = propSchema;
         if (coKeys && prop in coKeys) {
-          configOptionFields.add(key);
+          optionFields.add(key);
         }
       }
     } else {
       // Simple type — the param itself is a field
       fields[paramName] = schema;
+      // Also check for config options on simple fields
+      optionFields.add(paramName);
     }
   }
-  return { fields, configOptionFields };
+  return { fields, optionFields };
 }
 
 /** Rebuild the nested init values dict from flat "param.prop" keys. */
@@ -110,34 +116,73 @@ function buildInitValues(
   return result;
 }
 
+function flattenInitValues(initValues: Record<string, unknown>): Record<string, unknown> {
+  const flat: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(initValues)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      for (const [subK, subV] of Object.entries(v as Record<string, unknown>)) {
+        flat[`${k}.${subK}`] = subV;
+      }
+    } else {
+      flat[k] = v;
+    }
+  }
+  return flat;
+}
+
 function ConfiguringNodeComponent({ data }: NodeProps) {
   const d = data as unknown as ConfiguringNodeData;
-  const { componentInfo, onConfirm, onCancel } = d;
+  const { componentInfo, onConfirm, onCancel, initialValues, mode = "create" } = d;
 
-  const { fields, configOptionFields } = collectFields(componentInfo.init);
+  const { fields, optionFields } = collectFields(componentInfo.init);
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
+    const flatInitial = initialValues ? flattenInitValues(initialValues) : {};
     const initial: Record<string, unknown> = {};
     for (const [key, prop] of Object.entries(fields)) {
-      initial[key] = getDefaultValue(prop);
+      initial[key] = flatInitial[key] ?? getDefaultValue(prop);
     }
     return initial;
   });
 
-  const [configOptions, setConfigOptions] = useState<Record<string, ConfigOption[]>>({});
+  const [options, setOptions] = useState<Record<string, Option[]>>({});
 
   useEffect(() => {
-    for (const fieldKey of configOptionFields) {
-      fetchConfigOptions(componentInfo.name, fieldKey)
-        .then((opts) => setConfigOptions((prev) => ({ ...prev, [fieldKey]: opts })))
-        .catch(() => {});
-    }
-  }, [componentInfo.name, configOptionFields]);
+    fetchOptions(componentInfo.type_)
+      .then((raw) => {
+        // Flatten nested dict: {"config": {"field": [...]}} → {"config.field": [...]}
+        const flat: Record<string, Option[]> = {};
+        for (const [key, val] of Object.entries(raw)) {
+          if (Array.isArray(val)) {
+            flat[key] = val as Option[];
+          } else if (val && typeof val === "object") {
+            for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
+              if (Array.isArray(subVal)) {
+                flat[`${key}.${subKey}`] = subVal as Option[];
+              }
+            }
+          }
+        }
+        setOptions(flat);
+        // Set default values for fields with options
+        setValues((prev) => {
+          const updated = { ...prev };
+          for (const [fieldKey, opts] of Object.entries(flat)) {
+            if (opts.length > 0 && (updated[fieldKey] === "" || updated[fieldKey] === undefined)) {
+              updated[fieldKey] = opts[0]!.value;
+            }
+          }
+          return updated;
+        });
+      })
+      .catch(() => {});
+  }, [componentInfo.type_]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onConfirm(buildInitValues(fields, values));
   };
+
 
   return (
     <div
@@ -153,12 +198,12 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
           className="font-bold text-lg truncate"
           style={{ color: "color(display-p3 1.4 1.4 1.4)" }}
         >
-          Configure {componentInfo.name}
+          Configure {componentInfo.type_}
         </span>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="pt-4 flex flex-col gap-3">
+      <form onSubmit={handleSubmit} className="nodrag nopan pt-4 flex flex-col gap-3">
         {Object.entries(fields).map(([key, prop]) => {
           const propType = prop.type ?? "string";
 
@@ -179,32 +224,16 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
           }
 
           // Dynamic config options dropdown
-          if (configOptionFields.has(key)) {
-            const opts = configOptions[key];
+          if (options[key]) {
+            const opts = options[key];
             return (
               <label key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
-                <select
+                <Dropdown
                   value={String(values[key] ?? "")}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, [key]: e.target.value }))
-                  }
-                  className={cn(
-                    "rounded-lg px-3 py-1.5 text-[13px] font-mono",
-                    "bg-white/[0.06] border border-white/[0.08] text-white/90",
-                    "focus:outline-none focus:border-conduit/60",
-                  )}
-                >
-                  {!opts ? (
-                    <option value="">Loading...</option>
-                  ) : (
-                    opts.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))
-                  )}
-                </select>
+                  options={opts ?? []}
+                  onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
+                />
               </label>
             );
           }
@@ -213,23 +242,11 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
             return (
               <label key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
-                <select
+                <Dropdown
                   value={String(values[key] ?? "")}
-                  onChange={(e) =>
-                    setValues((v) => ({ ...v, [key]: e.target.value }))
-                  }
-                  className={cn(
-                    "rounded-lg px-3 py-1.5 text-[13px] font-mono",
-                    "bg-white/[0.06] border border-white/[0.08] text-white/90",
-                    "focus:outline-none focus:border-conduit/60",
-                  )}
-                >
-                  {prop.enum.map((val: unknown) => (
-                    <option key={String(val)} value={String(val)}>
-                      {String(val)}
-                    </option>
-                  ))}
-                </select>
+                  options={prop.enum.map((val: unknown) => ({ value: String(val), label: String(val) }))}
+                  onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
+                />
               </label>
             );
           }
@@ -269,7 +286,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
               "transition-colors cursor-pointer",
             )}
           >
-            Create
+            {d.submitLabel ?? (mode === "edit" ? "Save" : "Create")}
           </button>
           <button
             type="button"

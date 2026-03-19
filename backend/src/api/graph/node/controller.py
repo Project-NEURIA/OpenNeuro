@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.dep import get_manager
 from src.api.graph.node.dto import (
+    NodeInitArgsUpdateRequest,
     NodeCreateRequest,
     NodeResponse,
     NodeUpdateRequest,
@@ -31,6 +32,7 @@ def _node_response(node_id: str, node: Node, manager: GraphManager) -> NodeRespo
         status=comp.status.value,
         x=node.x,
         y=node.y,
+        init_args=node.init_args,
         inputs=inputs,
         outputs=outputs,
         sub_graph=node.sub_graph,
@@ -71,6 +73,18 @@ def update_node(
     node_id: str, req: NodeUpdateRequest, manager: GraphManager = Depends(get_manager)
 ) -> NodeResponse:
     node = service.update_node(manager, node_id, req)
+    if node is None:
+        raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
+    return _node_response(node_id, node, manager)
+
+
+@router.patch("/nodes/{node_id}/init-args")
+def update_node_init_args(
+    node_id: str,
+    req: NodeInitArgsUpdateRequest,
+    manager: GraphManager = Depends(get_manager),
+) -> NodeResponse:
+    node = service.update_node_init_args(manager, node_id, req.init_args)
     if node is None:
         raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
     return _node_response(node_id, node, manager)

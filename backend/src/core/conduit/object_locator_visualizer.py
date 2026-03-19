@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import ThreadedComponent
 from src.core.frames import ObjectLocationFrame, VideoDataFormat, VideoFrame
 
 # Fixed BGR colour palette, cycled per prompt.
@@ -79,7 +79,7 @@ class ObjectLocatorVisualizerOutputs(NamedTuple):
 
 
 class ObjectLocatorVisualizer(
-    PrimitiveComponent[ObjectLocatorVisualizerInputs, ObjectLocatorVisualizerOutputs]
+    ThreadedComponent[ObjectLocatorVisualizerInputs, ObjectLocatorVisualizerOutputs]
 ):
     """Draws bounding boxes with 3D world coordinate labels onto video frames."""
 

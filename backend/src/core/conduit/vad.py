@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from transformers import WhisperFeatureExtractor
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame
 
 
@@ -36,8 +36,8 @@ class VADOutputs(NamedTuple):
     interrupt: Sender[InterruptFrame]
 
 
-class VAD(PrimitiveComponent[VADInputs, VADOutputs]):
-    _tags = Tag(io={"conduit"}, functionality={"audio"})
+class VAD(ThreadedComponent[VADInputs, VADOutputs]):
+    tags = Tag(io={"conduit"}, functionality={"audio"})
     description = "Detects voice activity in an audio stream"
 
     def __init__(self, config: VADConfig) -> None:

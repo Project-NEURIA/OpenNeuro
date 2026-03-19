@@ -213,27 +213,24 @@ class InterruptFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
-class MessagesFrame(Frame):
-    """Frame containing conversation history (messages) for LLM consumption."""
+class MessageFrame(Frame):
+    """A single chat message with role and content."""
 
-    text: str
-    messages: list[dict[str, str]]
-    language: str | None = None
+    role: Literal["system", "user", "assistant"]
+    content: str
 
     @classmethod
     def new(
         cls,
         *,
-        text: str,
-        messages: list[dict[str, str]],
-        language: str | None = None,
-    ) -> MessagesFrame:
+        role: Literal["system", "user", "assistant"],
+        content: str,
+    ) -> MessageFrame:
         return cls(
             pts=time.time_ns(),
             id=obj_id(),
-            text=text,
-            messages=messages,
-            language=language,
+            role=role,
+            content=content,
         )
 
 

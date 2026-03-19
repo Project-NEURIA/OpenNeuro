@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import (
     CameraParamsFrame,
     DepthFrame,
@@ -19,7 +19,7 @@ from src.core.utils import auto_device, auto_dtype, resize_and_crop
 
 
 class MonocularDepthEstimatorConfig(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"configOptions": {"model": {}}})
+    model_config = ConfigDict(json_schema_extra={"options": {"model": {}}})
 
     process_res: int = 504
     output_width: int = 504
@@ -39,7 +39,7 @@ class MonocularDepthEstimatorOutputs(NamedTuple):
 
 
 class MonocularDepthEstimator(
-    PrimitiveComponent[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
+    ThreadedComponent[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
 ):
     description = "Estimates depth from monocular video frames"
 
@@ -49,7 +49,7 @@ class MonocularDepthEstimator(
     and emits DepthFrames plus the resized/cropped VideoFrame.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
+    tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: MonocularDepthEstimatorConfig) -> None:
         super().__init__()
@@ -59,21 +59,21 @@ class MonocularDepthEstimator(
         self._dtype = auto_dtype(self._device)
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        if field != "config.model":
-            return None
-        return [
-            {
-                "value": "depth-anything/DA3METRIC-LARGE",
-                "label": "DA3 Metric Large (Recommended)",
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "config": {
+                "model": [
+                    {
+                        "value": "depth-anything/DA3METRIC-LARGE",
+                        "label": "DA3 Metric Large (Recommended)",
+                    },
+                    {
+                        "value": "depth-anything/DA3NESTED-GIANT-LARGE",
+                        "label": "DA3 Nested Giant-Large",
+                    },
+                ],
             },
-            {
-                "value": "depth-anything/DA3NESTED-GIANT-LARGE",
-                "label": "DA3 Nested Giant-Large",
-            },
-        ]
+        }
 
     def setup(self) -> None:
         import os

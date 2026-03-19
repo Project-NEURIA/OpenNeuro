@@ -6,12 +6,11 @@ from typing import NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
-from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
+from src.core.component import ThreadedComponent, Tag
+from src.core.frames import InterruptFrame, MessageFrame, TextFrame
 
 
 class AgentStateConfig(BaseModel):
-    system_prompt: str = "You are a helpful AI assistant."
     user_name: str = "User"
     chatbot_name: str = "Assistant"
 
@@ -19,47 +18,37 @@ class AgentStateConfig(BaseModel):
 class AgentStateInputs(NamedTuple):
     asr: Receiver[TextFrame]
     feedback: Receiver[TextFrame]
+    initial_msgs: Receiver[list[MessageFrame]] | None = None
     interrupt: Receiver[InterruptFrame] | None = None
     memory_prefix: Receiver[TextFrame] | None = None
     observation: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
-    messages: Sender[MessagesFrame]
-    messages_for_memory: Sender[MessagesFrame] | None = None
+    messages: Sender[list[MessageFrame]]
+    messages_for_memory: Sender[list[MessageFrame]] | None = None
 
 
-class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
+class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
+    """Manages conversation history, optionally enriched by memory and character card."""
+
     description = "Tracks and manages agent conversation state"
-
-    """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
-
-    _tags = Tag(io={"conduit"}, functionality={"llm"})
+    tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
         self.config = config
         self._history: list[tuple[str, str]] = []
+        self._system_prompt: str = "You are a helpful AI assistant."
+        self._initial_msgs: list[MessageFrame] = []
         self._latest_observation: str = ""
         self._lock = threading.Lock()
 
-    def _build_context(self, memory_prefix: str = "", observation: str = "") -> str:
-        with self._lock:
-            lines = [self.config.system_prompt]
-            if memory_prefix:
-                lines += ["", memory_prefix]
-            if observation:
-                lines += ["", f"[Current Vision Observation]\n{observation}"]
-            lines.append("***")
-            lines += [f"{n}: {t}" for n, t in self._history]
-            lines.append(f"{self.config.chatbot_name}:")
-            return "\n".join(lines)
-
     def _build_messages(
         self, memory_prefix: str = "", observation: str = ""
-    ) -> list[dict[str, str]]:
+    ) -> list[MessageFrame]:
         with self._lock:
-            system = self.config.system_prompt
+            system = self._system_prompt
             if memory_prefix or observation:
                 parts = [system]
                 if memory_prefix:
@@ -67,11 +56,14 @@ class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
                 if observation:
                     parts.append(f"[Current Vision Observation]\n{observation}")
                 system = "\n\n".join(parts)
-            messages = [{"role": "system", "content": system}]
+            msgs: list[MessageFrame] = self._initial_msgs.copy()
+            msgs.append(MessageFrame.new(role="system", content=system))
             for name, text in self._history:
-                role = "user" if name == self.config.user_name else "assistant"
-                messages.append({"role": role, "content": text})
-            return messages
+                if name == self.config.user_name:
+                    msgs.append(MessageFrame.new(role="user", content=text))
+                else:
+                    msgs.append(MessageFrame.new(role="assistant", content=text))
+            return msgs
 
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
@@ -86,6 +78,13 @@ class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
             f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}"
         )
 
+        # Read initial prompts once (constant component, e.g. CharacterCard)
+        if inputs.initial_msgs is not None:
+            frame = next(inputs.initial_msgs(self))
+            if frame is not None:
+                self._initial_msgs = frame
+                print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
+
         def process_observation() -> None:
             if inputs.observation is None:
                 return
@@ -98,6 +97,7 @@ class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
 
         def process_asr() -> None:
             for text_frame in inputs.asr(self):
+                print(text_frame)
                 if text_frame is None:
                     break
 
@@ -113,26 +113,15 @@ class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
                 # Memory retrieval (optional)
                 mem_text = ""
                 if has_memory and memory_sender is not None and memory_gen is not None:
-                    memory_sender.send(
-                        MessagesFrame.new(
-                            text=self._build_context(observation=current_obs),
-                            messages=self._build_messages(observation=current_obs),
-                        )
-                    )
-                    # Block until Mem0 returns the memory prefix
+                    memory_sender.send(self._build_messages(observation=current_obs))
                     prefix_frame = next(memory_gen)
                     if prefix_frame is not None and prefix_frame.text:
                         mem_text = prefix_frame.text
                         print(f"[AgentState] Memory prefix injected {mem_text}")
 
                 outputs.messages.send(
-                    MessagesFrame.new(
-                        text=self._build_context(
-                            memory_prefix=mem_text, observation=current_obs
-                        ),
-                        messages=self._build_messages(
-                            memory_prefix=mem_text, observation=current_obs
-                        ),
+                    self._build_messages(
+                        memory_prefix=mem_text, observation=current_obs
                     )
                 )
 
@@ -146,7 +135,6 @@ class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
                     continue
 
                 with self._lock:
-                    # Append or start new assistant message
                     if (
                         self._history
                         and self._history[-1][0] == self.config.chatbot_name

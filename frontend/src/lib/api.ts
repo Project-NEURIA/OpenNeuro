@@ -56,6 +56,23 @@ export async function updateNode(id: string, data: { x?: number; y?: number }) {
   if (!res.ok) throw new Error(`Update node failed: ${res.status}`);
 }
 
+export async function updateNodeInitArgs(id: string, initArgs: Record<string, unknown>) {
+  const res = await fetch(`/graph/nodes/${id}/init-args`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ init_args: initArgs }),
+  });
+  if (!res.ok) throw new Error(`Update node init args failed: ${res.status}`);
+  return res.json() as Promise<{
+    id: string;
+    type: string;
+    status: string;
+    x: number;
+    y: number;
+    init_args: Record<string, unknown>;
+  }>;
+}
+
 export async function deleteNode(id: string) {
   const res = await fetch(`/graph/nodes/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Delete node failed: ${res.status}`);
@@ -97,6 +114,7 @@ export interface NodeResponse {
   status: string;
   x: number;
   y: number;
+  init_args?: Record<string, unknown>;
   inputs?: Record<string, string> | null;
   outputs?: Record<string, string> | null;
   sub_graph?: { nodes: Record<string, unknown>; edges: unknown[] } | null;
@@ -191,22 +209,21 @@ export async function saveGraph() {
 
 // --- Config Options API ---
 
-export interface ConfigOption {
+export interface Option {
   value: string;
   label: string;
 }
 
-export async function fetchConfigOptions(
+export async function fetchOptions(
   componentName: string,
-  fieldName: string,
   values?: Record<string, unknown>,
-): Promise<ConfigOption[]> {
+): Promise<Record<string, unknown>> {
   const res = await fetch(
-    `/component/${encodeURIComponent(componentName)}/options/${encodeURIComponent(fieldName)}`,
+    `/component/${encodeURIComponent(componentName)}/options`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values ?? null),
+      body: JSON.stringify(values ?? {}),
     },
   );
   if (!res.ok) throw new Error(`Fetch config options failed: ${res.status}`);

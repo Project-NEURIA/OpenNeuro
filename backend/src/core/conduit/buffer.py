@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import EOS
 
 
@@ -15,8 +15,8 @@ class BufferOutputs[T](NamedTuple):
     batch: Sender[list[T]]
 
 
-class Buffer[T](PrimitiveComponent[BufferInputs[T], BufferOutputs[T]]):
-    _tags = Tag(io={"conduit"}, functionality={"misc"})
+class Buffer[T](ThreadedComponent[BufferInputs[T], BufferOutputs[T]]):
+    tags = Tag(io={"conduit"}, functionality={"misc"})
     description = "Buffers incoming data before forwarding"
 
     def run(self, inputs: BufferInputs[T], outputs: BufferOutputs[T]) -> None:

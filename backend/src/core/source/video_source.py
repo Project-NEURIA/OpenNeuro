@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import VideoFrame
 
 
@@ -24,12 +24,12 @@ class VideoSourceOutputs(NamedTuple):
     video: Sender[VideoFrame]
 
 
-class VideoSource(PrimitiveComponent[tuple[()], VideoSourceOutputs]):
+class VideoSource(ThreadedComponent[tuple[()], VideoSourceOutputs]):
     description = "Captures video frames from a device or file"
 
     """Abstract base for components that read video via cv2.VideoCapture."""
 
-    _tags = Tag(io={"source"}, functionality={"video"})
+    tags = Tag(io={"source"}, functionality={"video"})
 
     @abstractmethod
     def __init__(self, config: VideoSourceConfig) -> None:

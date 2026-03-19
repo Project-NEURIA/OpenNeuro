@@ -9,7 +9,7 @@ from typing import NamedTuple
 from ovd_client import Client, Pose
 from pydantic import BaseModel
 
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.channel import Receiver
 from src.core.frames import BodyPoseFrame, BonePose
 
@@ -128,7 +128,7 @@ def _send_poses(client: Client, poses: Mapping[str, Pose | None]) -> None:
 
 
 class OpenVRMovementSink(
-    PrimitiveComponent[OpenVRMovementInputs, OpenVRMovementOutputs]  # type: ignore[type-var]
+    ThreadedComponent[OpenVRMovementInputs, OpenVRMovementOutputs]  # type: ignore[type-var]
 ):
     description = "Controls OpenVR movement from pose data"
 
@@ -137,7 +137,7 @@ class OpenVRMovementSink(
     If no input channel is provided, sends a static T-pose.
     """
 
-    _tags = Tag(io={"sink"}, functionality={"movement"})
+    tags = Tag(io={"sink"}, functionality={"movement"})
 
     def __init__(self, config: OpenVRMovementConfig) -> None:
         super().__init__()

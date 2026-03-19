@@ -111,6 +111,17 @@ body {
   background-color: var(--background) !important;
 }
 
+/* Force native select panels to use dark theme colors */
+select {
+  color: var(--foreground);
+  background-color: var(--accent);
+}
+
+select option {
+  color: var(--foreground);
+  background-color: #14111e;
+}
+
 .react-flow__pane {
   cursor: default !important;
 }

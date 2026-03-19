@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import ThreadedComponent
 from src.core.frames import CameraParamsFrame, StereoCameraParamsFrame
 
 
@@ -18,9 +18,7 @@ class StereoCameraParamsAdapterOutputs(NamedTuple):
 
 
 class StereoCameraParamsAdapter(
-    PrimitiveComponent[
-        StereoCameraParamsAdapterInputs, StereoCameraParamsAdapterOutputs
-    ]
+    ThreadedComponent[StereoCameraParamsAdapterInputs, StereoCameraParamsAdapterOutputs]
 ):
     """Strips baseline from StereoCameraParamsFrame, emitting CameraParamsFrame."""
 

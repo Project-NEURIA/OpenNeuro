@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import threading
 from abc import ABC, abstractmethod
+from pathlib import Path
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_hints
 
@@ -34,67 +35,35 @@ class Status(Enum):
     STOPPED = "stopped"
 
 
-class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
-    ABC
-):
+# ---------------------------------------------------------------------------
+# Component — abstract base for all components
+# ---------------------------------------------------------------------------
+
+
+class Component[I, O](ABC):
+    tags: Tag = Tag(io=set(), functionality=set())
     description: str = ""
 
     def __init__(self) -> None:
         self._status = Status.STARTUP
-        self._thread: threading.Thread | None = None
-        self._stop_event = threading.Event()
 
     @property
     @abstractmethod
     def type_(self) -> str: ...
 
     @property
-    @abstractmethod
-    def tags(self) -> Tag: ...
-
-    @property
     def status(self) -> Status:
         return self._status
 
-    @property
-    def stop_event(self) -> threading.Event:
-        return self._stop_event
-
-    def setup(self) -> None:
-        """Override to perform heavy initialization (e.g. model loading) before
-        channels are wired.  Runs on the component thread before ``run()``."""
-
-    @abstractmethod
-    def run(self, inputs: I, outputs: O) -> None: ...
-
-    def _safe_run(self, inputs: I, outputs: O) -> None:
-        try:
-            self._status = Status.SETUP
-            self.setup()
-            self._status = Status.RUNNING
-            self.run(inputs, outputs)
-        finally:
-            self._status = Status.STOPPED
-
     def start(self, inputs: I, outputs: O) -> None:
-        if self.status == Status.RUNNING:
-            return
-        self._stop_event.clear()
-        self._thread = threading.Thread(
-            target=self._safe_run, args=(inputs, outputs), daemon=True
-        )
-        self._thread.start()
+        """Start the component. Subclasses override with their execution model."""
+        self._status = Status.RUNNING
 
     def stop(self) -> None:
-        """
-        Idempotent.
-        When a component instance is stopped, it will stop the running thread cooperatively by setting self._stop_event
-        and expect the run() method to return. Input streams are unregistered from input channels as streams
-        will periodically check and raise StopIteration when self._stop_event is set.
-        """
-        if self.status == Status.STOPPED:
-            return
-        self._stop_event.set()
+        """Idempotent. Signals the component to stop."""
+        self._status = Status.STOPPED
+
+    # --- Reflection / introspection ---
 
     @classmethod
     def get_init_types(cls) -> dict[str, type]:
@@ -120,10 +89,8 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         origin = get_origin(tp)
         # Parameterized generic NamedTuple, e.g. PassthroughInputs[T]
         if origin is not None and hasattr(origin, "_fields"):
-            # Build substitution map: TypeVar -> actual arg
             params = getattr(origin, "__type_params__", ())
             args = get_args(tp)
-            # Include type params in localns so get_type_hints can resolve them
             localns = dict(zip((p.__name__ for p in params), args))
             hints = get_type_hints(origin, localns=localns)
             sub = dict(zip(params, args))
@@ -189,18 +156,17 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         }
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        """Override to provide runtime options for a config field.
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Return a nested dict of field → options for all fields that have dynamic options.
 
         Args:
-            field: the config field name (e.g. "config.source")
-            values: current form values for dependent dropdowns
+            values: current form values, for dependent dropdowns where
+                    field B's options depend on field A's selection.
 
-        Returns [{\"value\": \"...\", \"label\": \"...\"}, ...] or None.
+        Top-level fields: {"path": [{"value": "...", "label": "..."}, ...]}
+        Nested config fields: {"config": {"field": [{"value": "...", "label": "..."}, ...]}}
         """
-        return None
+        return {}
 
     @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
@@ -231,7 +197,16 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
                 else:
                     kwargs[k] = model_type.model_validate(raw)
             else:
-                kwargs[k] = init_args[k]
+                raw = init_args[k]
+                # Convert string to Path if any part of the type hint is Path
+                hint_types = get_args(v) if get_origin(v) is not None else (v,)
+                is_path = any(
+                    isinstance(t, type) and issubclass(t, Path) for t in hint_types
+                )
+                if is_path and isinstance(raw, str):
+                    kwargs[k] = Path(raw)
+                else:
+                    kwargs[k] = raw
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
 
     @classmethod
@@ -241,9 +216,18 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
 
         result: dict[str, type[Component[Any, Any]]] = {}
 
+        skip = {
+            PrimitiveComponent,
+            ThreadedComponent,
+            ConstantComponent,
+            CompositeComponent,
+        }
+
         def walk(subclass: type[Component[Any, Any]]) -> None:
-            if not inspect.isabstract(subclass) and getattr(
-                subclass, "_registerable", True
+            if (
+                subclass not in skip
+                and not inspect.isabstract(subclass)
+                and getattr(subclass, "_registerable", True)
             ):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():
@@ -255,28 +239,104 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         return result
 
 
-class PrimitiveComponent[
-    I: tuple[Receiver[Any] | None, ...],
-    O: tuple[Sender[Any] | None, ...],
-](
-    Component[I, O],
-    ABC,
-):
-    """A primitive morphism: a single concrete component with a threaded run loop."""
+# ---------------------------------------------------------------------------
+# PrimitiveComponent — single component (not a subgraph)
+# ---------------------------------------------------------------------------
 
-    _tags: Tag  # set as class attribute by subclasses
+
+class PrimitiveComponent[I, O](Component[I, O], ABC):
+    """A primitive morphism: a single component, not a composite.
+
+    Not directly instantiable — use ThreadedComponent or ConstantComponent.
+    """
 
     @property
     def type_(self) -> str:
         return type(self).__name__
 
+
+# ---------------------------------------------------------------------------
+# ThreadedComponent — primitive with a threaded run loop
+# ---------------------------------------------------------------------------
+
+
+class ThreadedComponent[
+    I: tuple[Receiver[Any] | None, ...],
+    O: tuple[Sender[Any] | None, ...],
+](PrimitiveComponent[I, O], ABC):
+    """A primitive component that runs in a daemon thread."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+
     @property
-    def tags(self) -> Tag:
-        return self._tags
+    def stop_event(self) -> threading.Event:
+        return self._stop_event
+
+    @abstractmethod
+    def run(self, inputs: I, outputs: O) -> None: ...
+
+    def setup(self) -> None:
+        """Override to perform heavy initialization before run()."""
+
+    def _safe_run(self, inputs: I, outputs: O) -> None:
+        try:
+            self._status = Status.SETUP
+            self.setup()
+            self._status = Status.RUNNING
+            self.run(inputs, outputs)
+        finally:
+            self._status = Status.STOPPED
+
+    def start(self, inputs: I, outputs: O) -> None:
+        if self.status == Status.RUNNING:
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._safe_run, args=(inputs, outputs), daemon=True
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self.status == Status.STOPPED:
+            return
+        self._stop_event.set()
+
+
+# ---------------------------------------------------------------------------
+# ConstantComponent — primitive that holds fixed values (no thread)
+# ---------------------------------------------------------------------------
+
+
+class ConstantComponent[I, O](PrimitiveComponent[I, O]):
+    """A primitive component that holds constant output values.
+
+    No thread, no run loop. Outputs are fixed at construction time
+    and never change. Reading from a constant's output never blocks
+    and always returns the same value.
+    """
+
+    @abstractmethod
+    def get_values(self) -> O:
+        """Return the fixed output values as a NamedTuple."""
+        ...
+
+    def start(self, inputs: I, outputs: O) -> None:
+        self._status = Status.RUNNING
+
+    def stop(self) -> None:
+        self._status = Status.STOPPED
+
+
+# ---------------------------------------------------------------------------
+# CompositeComponent — subgraph wrapper
+# ---------------------------------------------------------------------------
 
 
 class CompositeComponent(Component[Any, Any]):
-    """A composite component that is made from a graph of components."""
+    """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
 
     _registerable = False
 
@@ -284,12 +344,12 @@ class CompositeComponent(Component[Any, Any]):
         self,
         type_: str,
         sub_graph: Graph,
-        tags: Tag | None = None,
+        tags: Tag = Tag(io={"conduit"}, functionality={"misc"}),
         description: str = "",
     ) -> None:
         super().__init__()
         self._type = type_
-        self._tags = tags or Tag(io={"conduit"}, functionality={"misc"})
+        self.tags = tags
         self.description = description
         self._sub_graph = sub_graph
         self._inner_manager: GraphManager | None = None
@@ -299,22 +359,9 @@ class CompositeComponent(Component[Any, Any]):
     def type_(self) -> str:
         return self._type
 
-    @property
-    def tags(self) -> Tag:
-        return self._tags
-
-    def run(self, inputs: Any, outputs: Any) -> None:
-        pass  # not used — start() is overridden
-
     def _compute_boundary(
         self,
     ) -> tuple[dict[str, tuple[str, str]], dict[str, tuple[str, str]]]:
-        """Find unmatched ports in the subgraph.
-
-        Returns:
-            ext_inputs: {ext_name: (node_id, slot)} for input slots with no internal source
-            ext_outputs: {ext_name: (node_id, slot)} for output slots with no internal sink
-        """
         connected_inputs: set[tuple[str, str]] = set()
         connected_outputs: set[tuple[str, str]] = set()
         for edge in self._sub_graph.edges:
@@ -337,7 +384,6 @@ class CompositeComponent(Component[Any, Any]):
         return ext_inputs, ext_outputs
 
     def get_input_types(self) -> dict[str, type]:  # type: ignore[override]
-        """Instance method override — returns types of unmatched input ports."""
         classes = Component.registered_subclasses()
         result: dict[str, type] = {}
         for ext_name, (node_id, slot) in self._ext_inputs.items():
@@ -350,7 +396,6 @@ class CompositeComponent(Component[Any, Any]):
         return result
 
     def get_output_types(self) -> dict[str, type]:  # type: ignore[override]
-        """Instance method override — returns types of unmatched output ports."""
         classes = Component.registered_subclasses()
         result: dict[str, type] = {}
         for ext_name, (node_id, slot) in self._ext_outputs.items():
@@ -363,17 +408,14 @@ class CompositeComponent(Component[Any, Any]):
         return result
 
     def start(self, inputs: Any, outputs: Any) -> None:
-        """Create inner GraphManager, patch boundary handles, and run."""
         if self.status == Status.RUNNING:
             return
-        self._stop_event.clear()
         self._status = Status.SETUP
 
         from src.core.graph import GraphManager
 
         self._inner_manager = GraphManager(self._sub_graph)
 
-        # Patch boundary: inject outer handles into inner manager's handle dicts.
         for i, (ext_name, (node_id, slot)) in enumerate(self._ext_inputs.items()):
             if hasattr(inputs, "_fields"):
                 outer_receiver = getattr(inputs, ext_name, None)

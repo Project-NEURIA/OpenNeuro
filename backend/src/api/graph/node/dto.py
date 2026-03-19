@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.graph import Graph
 
@@ -29,6 +29,11 @@ class NodeResponse(BaseModel):
     status: str
     x: float
     y: float
+    init_args: dict[str, Any] = Field(default_factory=dict)
     inputs: dict[str, str] | None = None
     outputs: dict[str, str] | None = None
     sub_graph: Graph | None = None
+
+
+class NodeInitArgsUpdateRequest(BaseModel):
+    init_args: dict[str, Any]

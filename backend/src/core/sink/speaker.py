@@ -7,7 +7,7 @@ import sounddevice as sd
 from pydantic import BaseModel
 
 from src.core.channel import Receiver
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioDataFormat, AudioFrame
 
 
@@ -20,8 +20,8 @@ class SpeakerInputs(NamedTuple):
     audio: Receiver[AudioFrame]
 
 
-class Speaker(PrimitiveComponent[SpeakerInputs, tuple[()]]):
-    _tags = Tag(io={"sink"}, functionality={"audio"})
+class Speaker(ThreadedComponent[SpeakerInputs, tuple[()]]):
+    tags = Tag(io={"sink"}, functionality={"audio"})
     description = "Plays audio through a system speaker"
 
     def __init__(self, config: SpeakerConfig) -> None:
