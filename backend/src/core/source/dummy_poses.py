@@ -32,6 +32,8 @@ _TPOSE: dict[str, BonePose] = {
 
 
 class DummyPosesConfig(BaseModel):
+    center_x: float = 0.0
+    center_z: float = 0.0
     body_frequency: float = 0.3
     body_amplitude: float = 0.5
     head_frequency: float = 0.5
@@ -77,9 +79,9 @@ class DummyPosesInput(PrimitiveComponent[tuple[()], DummyPosesOutputs]):
             for name, base in _TPOSE.items():
                 if name == "head":
                     poses[name] = BonePose(
-                        pos_x=base.pos_x,
+                        pos_x=base.pos_x + cfg.center_x,
                         pos_y=base.pos_y,
-                        pos_z=base.pos_z + body_z,
+                        pos_z=base.pos_z + body_z + cfg.center_z,
                         rot_w=head_rot_w,
                         rot_x=0.0,
                         rot_y=head_rot_y,
@@ -87,9 +89,9 @@ class DummyPosesInput(PrimitiveComponent[tuple[()], DummyPosesOutputs]):
                     )
                 else:
                     poses[name] = BonePose(
-                        pos_x=base.pos_x,
+                        pos_x=base.pos_x + cfg.center_x,
                         pos_y=base.pos_y,
-                        pos_z=base.pos_z + body_z,
+                        pos_z=base.pos_z + body_z + cfg.center_z,
                     )
 
             outputs.poses.send(BodyPoseFrame(poses=poses))

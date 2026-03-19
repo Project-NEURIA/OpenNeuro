@@ -33,3 +33,10 @@ from src.core.conduit.ffs_stereo_depth import (
 from src.core.conduit.ffs_stereo_depth import (
     StereoToMonocularVideo as StereoToMonocularVideo,
 )
+from src.core.conduit.object_locator import ObjectLocator as ObjectLocator
+from src.core.conduit.stereo_camera_params_adapter import (
+    StereoCameraParamsAdapter as StereoCameraParamsAdapter,
+)
+from src.core.conduit.object_locator_visualizer import (
+    ObjectLocatorVisualizer as ObjectLocatorVisualizer,
+)
