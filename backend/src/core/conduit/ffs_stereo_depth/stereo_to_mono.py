@@ -7,7 +7,7 @@ from typing import Any, Literal, NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import StereoVideoFrame, VideoFrame
 
 
@@ -26,11 +26,11 @@ class StereoToMonocularVideoOutputs(NamedTuple):
 
 
 class StereoToMonocularVideo(
-    PrimitiveComponent[StereoToMonocularVideoInputs, StereoToMonocularVideoOutputs]
+    ThreadedComponent[StereoToMonocularVideoInputs, StereoToMonocularVideoOutputs]
 ):
     """Extracts a single eye (left or right) from a StereoVideoFrame."""
 
-    _tags = Tag(io={"conduit"}, functionality={"video"})
+    tags = Tag(io={"conduit"}, functionality={"video"})
 
     def __init__(self, config: StereoToMonocularVideoConfig) -> None:
         super().__init__()

@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import (
     ObjectSegmentationFrame,
     TextFrame,
@@ -41,9 +41,7 @@ class ObjectSegmenterOutputs(NamedTuple):
     video: Sender[VideoFrame]
 
 
-class ObjectSegmenter(
-    PrimitiveComponent[ObjectSegmenterInputs, ObjectSegmenterOutputs]
-):
+class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOutputs]):
     description = "Segments objects in video frames"
 
     """Text-prompted instance segmenter backed by SAM3.
@@ -52,7 +50,7 @@ class ObjectSegmenter(
     ObjectSegmentationFrames (with masks) plus the processed VideoFrame.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
+    tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: ObjectSegmenterConfig) -> None:
         super().__init__()

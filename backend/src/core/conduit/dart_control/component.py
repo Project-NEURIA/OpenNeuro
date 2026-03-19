@@ -20,7 +20,7 @@ import torch
 from . import rotation_conversions as transforms
 from pydantic import BaseModel
 
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.channel import Receiver, Sender
 from src.core.frames import BodyPoseFrame, BonePose, GoalFrame, TextFrame
 
@@ -246,7 +246,7 @@ class DartControlOutputs(NamedTuple):
     motion: Sender[BodyPoseFrame]
 
 
-class DartControl(PrimitiveComponent[DartControlInputs, DartControlOutputs]):
+class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
     description = "Controls DART robot movements from pose data"
 
     """
@@ -257,7 +257,7 @@ class DartControl(PrimitiveComponent[DartControlInputs, DartControlOutputs]):
     smooth, continuous motion generation.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"movement"})
+    tags = Tag(io={"conduit"}, functionality={"movement"})
 
     def __init__(self, config: DartControlConfig) -> None:
         super().__init__()

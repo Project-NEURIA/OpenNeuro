@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 from src.core.frames import TextFrame
 
 if TYPE_CHECKING:
-    from src.core.component import Component
+    from src.core.component import ThreadedComponent
 
 
 class Channel[T]:
@@ -170,7 +170,7 @@ class Receiver[T]:
 
     def __call__(
         self,
-        subscriber: Component[Any, Any],
+        subscriber: ThreadedComponent[Any, Any],
         newest: bool = False,
         no_block: bool = False,
     ) -> ReceiverIterator[T]:

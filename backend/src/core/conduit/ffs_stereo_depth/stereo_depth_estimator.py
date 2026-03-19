@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import (
     DepthFrame,
     StereoCameraParamsFrame,
@@ -41,7 +41,7 @@ class StereoDepthEstimatorOutputs(NamedTuple):
 
 
 class StereoDepthEstimator(
-    PrimitiveComponent[StereoDepthEstimatorInputs, StereoDepthEstimatorOutputs]
+    ThreadedComponent[StereoDepthEstimatorInputs, StereoDepthEstimatorOutputs]
 ):
     """Stereo depth estimation backed by Fast-FoundationStereo.
 
@@ -50,7 +50,7 @@ class StereoDepthEstimator(
     plus the resized/cropped StereoVideoFrame.
     """
 
-    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
+    tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: StereoDepthEstimatorConfig) -> None:
         super().__init__()

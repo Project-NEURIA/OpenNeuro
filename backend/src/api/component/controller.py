@@ -49,7 +49,7 @@ def list_components() -> list[ComponentInfo]:
             ComponentInfo(
                 type_=type_,
                 description=getattr(cls, "description", ""),
-                tags=cls._tags,  # type: ignore[attr-defined]
+                tags=cls.tags,
                 init={k: TypeAdapter(v).json_schema() for k, v in init.items()},
                 inputs={k: _type_name(v) for k, v in inputs.items()},
                 outputs={k: _type_name(v) for k, v in outputs.items()},

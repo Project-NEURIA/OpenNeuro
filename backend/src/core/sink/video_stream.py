@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import VideoDataFormat, VideoFrame
 from src.core.channel import UIVideoSender
 
@@ -16,12 +16,12 @@ class VideoStreamOutputs(NamedTuple):
     ui_video: UIVideoSender
 
 
-class VideoStream(PrimitiveComponent[VideoStreamInputs, VideoStreamOutputs]):
+class VideoStream(ThreadedComponent[VideoStreamInputs, VideoStreamOutputs]):
     description = "Streams video frames to the UI"
 
     """Receives video frames and streams JPEG to the frontend via UI channel."""
 
-    _tags = Tag(io={"sink"}, functionality={"video"})
+    tags = Tag(io={"sink"}, functionality={"video"})
 
     def run(self, inputs: VideoStreamInputs, outputs: VideoStreamOutputs) -> None:
         import cv2

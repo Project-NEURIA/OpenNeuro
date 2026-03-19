@@ -11,7 +11,7 @@ from discord.sinks import PCMSink
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioDataFormat, AudioFrame, InterruptFrame
 
 # Global Discord bot instance and event loop
@@ -46,12 +46,12 @@ class DiscordOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
 
-class DiscordIO(PrimitiveComponent[DiscordInputs, DiscordOutputs]):
+class DiscordIO(ThreadedComponent[DiscordInputs, DiscordOutputs]):
     description = "Sends and receives messages via Discord"
 
     """Discord audio conduit that handles both input and output."""
 
-    _tags = Tag(io={"conduit"}, functionality={"misc"})
+    tags = Tag(io={"conduit"}, functionality={"misc"})
 
     def __init__(self, config: DiscordConfig) -> None:
         super().__init__()

@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.dep import get_manager
 from src.api.graph.node.dto import (
-    CharacterCardUpdateRequest,
     NodeInitArgsUpdateRequest,
     NodeCreateRequest,
     NodeResponse,
@@ -94,24 +93,6 @@ def update_node_init_args(
 @router.delete("/nodes/{node_id}", status_code=204)
 def delete_node(node_id: str, manager: GraphManager = Depends(get_manager)) -> None:
     service.delete_node(manager, node_id)
-
-
-@router.patch("/nodes/{node_id}/character-card")
-def set_character_card(
-    node_id: str,
-    req: CharacterCardUpdateRequest,
-    manager: GraphManager = Depends(get_manager),
-) -> dict[str, str]:
-    ok = service.set_agent_character_card(manager, node_id, req.character_card)
-    if not ok:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Failed to update character card. Ensure node exists, is AgentState, "
-                "and character_card is valid."
-            ),
-        )
-    return {"status": "ok"}
 
 
 @router.post("/subgraph", status_code=201)

@@ -35,9 +35,5 @@ class NodeResponse(BaseModel):
     sub_graph: Graph | None = None
 
 
-class CharacterCardUpdateRequest(BaseModel):
-    character_card: str
-
-
 class NodeInitArgsUpdateRequest(BaseModel):
     init_args: dict[str, Any]

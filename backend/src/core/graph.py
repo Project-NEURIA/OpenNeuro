@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import Component
-from src.core.conduit.agent_state import AgentState, CHARACTER_CARDS
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -371,24 +370,3 @@ class GraphManager:
         """Stop all components."""
         for comp in self._components.values():
             comp.stop()
-
-    def set_agent_character_card(self, node_id: str, character_card: str) -> bool:
-        """Update an AgentState node's character card at runtime."""
-        if character_card not in CHARACTER_CARDS:
-            return False
-
-        node = self._graph.nodes.get(node_id)
-        comp = self._components.get(node_id)
-        if node is None or comp is None or not isinstance(comp, AgentState):
-            return False
-
-        # Keep persisted graph config in sync.
-        config_raw = node.init_args.get("config")
-        if not isinstance(config_raw, dict):
-            config_raw = {}
-            node.init_args["config"] = config_raw
-        config_raw["character_card"] = character_card
-
-        # Apply immediately to running component.
-        comp.config.character_card = character_card
-        return True
