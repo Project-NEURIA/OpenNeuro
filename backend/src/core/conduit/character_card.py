@@ -131,7 +131,9 @@ class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
 
         return CharacterCardOutputs(
             prompts=prompts,
-            system_prompt=TextFrame.new(text=c.system_prompt) if c.system_prompt else None,
+            system_prompt=TextFrame.new(text=c.system_prompt)
+            if c.system_prompt
+            else None,
             name=TextFrame.new(text=c.name) if c.name else None,
             description=TextFrame.new(text=c.description) if c.description else None,
             personality=TextFrame.new(text=c.personality) if c.personality else None,

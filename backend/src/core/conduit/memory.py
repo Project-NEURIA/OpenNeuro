@@ -179,9 +179,7 @@ class Mem0(ThreadedComponent[Mem0Inputs, Mem0Outputs]):
     def _query_memory(self, turns: list[MessageFrame]) -> str:
         if not turns:
             return ""
-        query = "\n".join(
-            f"{m.role}: {m.content}" for m in turns if m.content
-        )
+        query = "\n".join(f"{m.role}: {m.content}" for m in turns if m.content)
         try:
             results = self._memory.search(
                 query=query,

@@ -227,6 +227,7 @@ class ConstantReceiver[T](Receiver[T]):
         def _repeat() -> Iterator[T]:
             while not subscriber.stop_event.is_set():
                 yield self._value
+
         return _repeat()
 
 

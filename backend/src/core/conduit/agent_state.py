@@ -113,9 +113,7 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
                 # Memory retrieval (optional)
                 mem_text = ""
                 if has_memory and memory_sender is not None and memory_gen is not None:
-                    memory_sender.send(
-                        self._build_messages(observation=current_obs)
-                    )
+                    memory_sender.send(self._build_messages(observation=current_obs))
                     prefix_frame = next(memory_gen)
                     if prefix_frame is not None and prefix_frame.text:
                         mem_text = prefix_frame.text
