@@ -1,0 +1,17 @@
+{
+  "edges": [
+    {"source_node": "mic", "source_slot": "audio", "target_node": "vad", "target_slot": "audio"},
+    {"source_node": "vad", "source_slot": "audio", "target_node": "asr", "target_slot": "audio"},
+    {"source_node": "asr", "source_slot": "text", "target_node": "llm", "target_slot": "text"},
+    {"source_node": "llm", "source_slot": "text", "target_node": "tts", "target_slot": "text"},
+    {"source_node": "tts", "source_slot": "audio", "target_node": "speaker", "target_slot": "audio"}
+  ],
+  "nodes": {
+    "mic": {"type": "Mic", "init_args": {"config": {}}, "x": 0, "y": 0},
+    "vad": {"type": "VAD", "init_args": {"config": {}}, "x": 250, "y": 0},
+    "asr": {"type": "ASR", "init_args": {"config": {}}, "x": 500, "y": 0},
+    "llm": {"type": "LLM", "init_args": {"config": {}}, "x": 750, "y": 0},
+    "tts": {"type": "TTS", "init_args": {"config": {}}, "x": 1000, "y": 0},
+    "speaker": {"type": "Speaker", "init_args": {"config": {}}, "x": 1250, "y": 0}
+  }
+}

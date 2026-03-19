@@ -11,7 +11,7 @@ import requests
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent, Tag
 from src.core.utils import StreamFilter
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
@@ -33,8 +33,12 @@ class TTSOutputs(NamedTuple):
     text: Sender[TextFrame]
 
 
-class TTS(Component[TTSInputs, TTSOutputs]):
+class TTS(PrimitiveComponent[TTSInputs, TTSOutputs]):
+    description = "Converts text to speech audio"
+
     """Text-to-Speech component using Inworld API."""
+
+    _tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: TTSConfig) -> None:
         super().__init__()

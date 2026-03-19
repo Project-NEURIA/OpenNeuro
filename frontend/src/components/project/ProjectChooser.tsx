@@ -72,6 +72,7 @@ export function ProjectChooser({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background text-foreground">
+      <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-[15px]" />
       {/* Header */}
       <div className="flex items-center justify-center pt-16 pb-10">
         {hadProject && (

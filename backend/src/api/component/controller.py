@@ -38,24 +38,18 @@ def _type_name(t: type) -> str:
 def list_components() -> list[ComponentInfo]:
     classes = service.list_components()
     result = []
-    for name, cls in classes.items():
+    for type_, cls in classes.items():
         init = cls.get_init_types()
         inputs = cls.get_input_types()
         outputs = cls.get_output_types()
         ui_inputs = cls.get_ui_input_types()
         ui_outputs = cls.get_ui_output_types()
 
-        if not inputs:
-            category = "source"
-        elif not outputs:
-            category = "sink"
-        else:
-            category = "conduit"
-
         result.append(
             ComponentInfo(
-                name=name,
-                category=category,
+                type_=type_,
+                description=getattr(cls, "description", ""),
+                tags=cls._tags,  # type: ignore[attr-defined]
                 init={k: TypeAdapter(v).json_schema() for k, v in init.items()},
                 inputs={k: _type_name(v) for k, v in inputs.items()},
                 outputs={k: _type_name(v) for k, v in outputs.items()},

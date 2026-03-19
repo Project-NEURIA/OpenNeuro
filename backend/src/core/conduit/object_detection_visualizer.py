@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import ObjectDetectionFrame, VideoDataFormat, VideoFrame
 
 # Fixed BGR color palette, cycled per prompt index
@@ -72,9 +72,15 @@ class ObjectDetectionVisualizerOutputs(NamedTuple):
 
 
 class ObjectDetectionVisualizer(
-    Component[ObjectDetectionVisualizerInputs, ObjectDetectionVisualizerOutputs]
+    PrimitiveComponent[
+        ObjectDetectionVisualizerInputs, ObjectDetectionVisualizerOutputs
+    ]
 ):
+    description = "Visualizes object detection bounding boxes on video frames"
+
     """Composites bounding boxes and labels onto video frames."""
+
+    _tags = Tag(io={"conduit"}, functionality={"image"})
 
     def run(
         self,

@@ -4,10 +4,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from src.core.component import Tag
+
 
 class ComponentInfo(BaseModel):
-    name: str
-    category: str
+    type_: str
+    description: str | None = None
+    tags: Tag
     init: dict[str, Any]
     inputs: dict[str, str]
     outputs: dict[str, str]

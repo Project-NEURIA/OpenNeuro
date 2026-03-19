@@ -27,8 +27,8 @@ export function MetricsDashboard({ connected, history, componentMap, onClose }: 
     return Object.keys(nodes).sort((a, b) => {
       const na = nodes[a]!;
       const nb = nodes[b]!;
-      const catA = componentMap[na.name]?.category ?? "conduit";
-      const catB = componentMap[nb.name]?.category ?? "conduit";
+      const catA = componentMap[na.name]?.tags.io[0] ?? "conduit";
+      const catB = componentMap[nb.name]?.tags.io[0] ?? "conduit";
       const orderDiff = (CATEGORY_ORDER[catA] ?? 1) - (CATEGORY_ORDER[catB] ?? 1);
       if (orderDiff !== 0) return orderDiff;
       return na.name.localeCompare(nb.name);

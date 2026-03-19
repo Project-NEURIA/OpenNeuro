@@ -42,9 +42,7 @@ def list_projects() -> list[ProjectSummary]:
             results.append(
                 ProjectSummary(
                     name=d.name,
-                    has_thumbnail=(
-                        PROJECTS_DIR / "graph.json" / "thumbnail.png"
-                    ).exists(),
+                    has_thumbnail=(d / "thumbnail.png").exists(),
                 )
             )
     return results

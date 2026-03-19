@@ -15,13 +15,29 @@ from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
 from src.core.graph import Graph
-from src.core.config import PROJECTS_DIR, AppConfig
+from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
+
+
+def _copy_presets() -> None:
+    """Copy bundled presets into the user's projects directory (skip existing)."""
+    if not PRESETS_DIR.exists():
+        return
+    for preset in PRESETS_DIR.iterdir():
+        if not preset.is_dir():
+            continue
+        dest = PROJECTS_DIR / preset.name
+        if dest.exists():
+            continue
+        import shutil
+
+        shutil.copytree(preset, dest)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+    _copy_presets()
 
     config = AppConfig.load_config()
     app.state.current_project = config.current_project
@@ -50,8 +66,28 @@ app.include_router(project_router)
 app.include_router(ui_router)
 
 
+def _start_parent_watchdog() -> None:
+    """Exit if parent process dies (e.g. Tauri/bun killed by Ctrl+C)."""
+    import os
+    import threading
+
+    ppid = os.getppid()
+
+    def watch() -> None:
+        import time
+
+        while True:
+            time.sleep(1)
+            if os.getppid() != ppid:
+                os._exit(0)
+
+    t = threading.Thread(target=watch, daemon=True)
+    t.start()
+
+
 def main() -> None:
     load_dotenv(override=True)
+    _start_parent_watchdog()
 
     import uvicorn
 

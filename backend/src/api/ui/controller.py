@@ -5,8 +5,9 @@ Inbound (text JSON):
     -> finds the Sender for (node_id, channel) and calls .send()
 
 Outbound:
-    Text channels: JSON {"type": "ui_output", "node_id": "...", "channel": "...", "payload": "..."}
-    Video channels: binary WS frame = 2-byte header length (big-endian) + JSON header + raw JPEG bytes
+    bytes channels: binary WS frame = 2-byte header length (big-endian) + JSON header + raw bytes
+    BaseModel channels: JSON {"type": "ui_output", ..., "payload": {model dict}}
+    Legacy (.get()) channels: JSON {"type": "ui_output", ..., "payload": "string"}
 """
 
 from __future__ import annotations
@@ -15,30 +16,65 @@ import asyncio
 import json
 import struct
 import threading
-from typing import Any
+from typing import Any, get_args, get_origin
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from src.core.channel import Receiver
-from src.core.frames import TextFrame
+from pydantic import BaseModel
+from src.core.channel import Receiver, UISender, UIReceiver
 from src.core.graph import GraphManager
-from src.core.channel import UIVideoSender
 
 router = APIRouter(prefix="/ui")
 
 
-def _is_video_channel(manager: GraphManager, node_id: str, slot: str) -> bool:
-    """Check if the UI output slot is a UIVideoSender."""
+def _resolve_ui_output_type(
+    manager: GraphManager, node_id: str, slot: str
+) -> type | None:
+    """Extract the inner T from UISender[T] for the given output slot."""
     comp = manager.components().get(node_id)
     if comp is None:
-        return False
-    ui_outputs = type(comp).get_ui_output_types()
-    slot_type = ui_outputs.get(slot)
+        return None
+    slot_type = type(comp).get_ui_output_types().get(slot)
     if slot_type is None:
-        return False
-    from typing import get_origin
-
+        return None
+    # slot_type is e.g. UISender[bytes], UIVideoSender (which is UISender[bytes]), etc.
+    # Try get_args on the slot_type first (for generic aliases like UISender[MyModel])
+    args = get_args(slot_type)
+    if args:
+        return args[0]
+    # For concrete subclasses like UIVideoSender, walk __orig_bases__
     origin = get_origin(slot_type) or slot_type
-    return isinstance(origin, type) and issubclass(origin, UIVideoSender)
+    if isinstance(origin, type):
+        for base in getattr(origin, "__orig_bases__", ()):
+            base_origin = get_origin(base)
+            if base_origin is not None and issubclass(base_origin, UISender):
+                base_args = get_args(base)
+                if base_args:
+                    return base_args[0]
+    return None
+
+
+def _resolve_ui_input_type(
+    manager: GraphManager, node_id: str, slot: str
+) -> type | None:
+    """Extract the inner T from UIReceiver[T] for the given input slot."""
+    comp = manager.components().get(node_id)
+    if comp is None:
+        return None
+    slot_type = type(comp).get_ui_input_types().get(slot)
+    if slot_type is None:
+        return None
+    args = get_args(slot_type)
+    if args:
+        return args[0]
+    origin = get_origin(slot_type) or slot_type
+    if isinstance(origin, type):
+        for base in getattr(origin, "__orig_bases__", ()):
+            base_origin = get_origin(base)
+            if base_origin is not None and issubclass(base_origin, UIReceiver):
+                base_args = get_args(base)
+                if base_args:
+                    return base_args[0]
+    return None
 
 
 async def _read_ui_output(
@@ -46,7 +82,7 @@ async def _read_ui_output(
     node_id: str,
     slot: str,
     receiver: Receiver[Any],
-    is_video: bool,
+    inner_type: type | None,
     stop_event: asyncio.Event,
 ) -> None:
     """Async task: reads from a blocking Receiver and sends to the WebSocket."""
@@ -62,20 +98,40 @@ async def _read_ui_output(
             if item is None:
                 break
             try:
-                if is_video:
+                if inner_type is not None and issubclass(inner_type, bytes):
+                    # Binary path (video frames, etc.)
                     header = json.dumps(
                         {"type": "ui_output", "node_id": node_id, "channel": slot}
                     ).encode()
                     prefix = struct.pack(">H", len(header))
                     await ws.send_bytes(prefix + header + item)
-                else:
-                    payload = item.get() if hasattr(item, "get") else str(item)
+                elif isinstance(item, BaseModel):
+                    # Pydantic model → JSON dict payload
                     await ws.send_json(
                         {
                             "type": "ui_output",
                             "node_id": node_id,
                             "channel": slot,
-                            "payload": payload,
+                            "payload": item.model_dump(),
+                        }
+                    )
+                elif hasattr(item, "get"):
+                    # Legacy TextFrame-style with .get()
+                    await ws.send_json(
+                        {
+                            "type": "ui_output",
+                            "node_id": node_id,
+                            "channel": slot,
+                            "payload": item.get(),
+                        }
+                    )
+                else:
+                    await ws.send_json(
+                        {
+                            "type": "ui_output",
+                            "node_id": node_id,
+                            "channel": slot,
+                            "payload": item,
                         }
                     )
             except (WebSocketDisconnect, RuntimeError):
@@ -98,9 +154,9 @@ async def _watch_ui_channels(
         for key, receiver in manager.ui_receivers().items():
             if key not in tasks:
                 node_id, slot = key
-                is_video = _is_video_channel(manager, node_id, slot)
+                inner_type = _resolve_ui_output_type(manager, node_id, slot)
                 tasks[key] = asyncio.create_task(
-                    _read_ui_output(ws, node_id, slot, receiver, is_video, stop_event)
+                    _read_ui_output(ws, node_id, slot, receiver, inner_type, stop_event)
                 )
 
         if manager._ui_version == last_version:
@@ -110,11 +166,10 @@ async def _watch_ui_channels(
             except asyncio.CancelledError:
                 return
 
-        # Cancel old tasks whose keys are gone (graph was re-run)
-        current_keys = set(manager.ui_receivers().keys())
+        # Cancel all stale tasks — even if the same keys exist, the
+        # underlying Receiver objects point to new channels after a restart.
         for key in list(tasks):
-            if key not in current_keys:
-                tasks.pop(key).cancel()
+            tasks.pop(key).cancel()
 
         last_version = manager._ui_version
 
@@ -139,7 +194,21 @@ async def ui_ws(ws: WebSocket) -> None:
                 payload = msg.get("payload", "")
                 sender = manager.ui_senders().get((node_id, channel))
                 if sender is not None:
-                    sender.send(TextFrame.new(text=payload))
+                    inner_type = _resolve_ui_input_type(manager, node_id, channel)
+                    if (
+                        inner_type is not None
+                        and issubclass(inner_type, BaseModel)
+                        and isinstance(payload, dict)
+                    ):
+                        sender.send(inner_type.model_validate(payload))
+                    elif (
+                        inner_type is not None
+                        and hasattr(inner_type, "new")
+                        and isinstance(payload, str)
+                    ):
+                        sender.send(inner_type.new(text=payload))
+                    else:
+                        sender.send(payload)
     except WebSocketDisconnect:
         pass
     finally:

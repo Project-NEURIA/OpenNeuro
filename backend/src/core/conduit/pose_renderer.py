@@ -9,7 +9,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import BodyPoseFrame, BonePose, VideoFrame, VideoDataFormat
 
 # Skeleton connectivity: (parent, child) pairs
@@ -97,8 +97,12 @@ def _project(
     return px, py
 
 
-class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
+class PoseRenderer(PrimitiveComponent[PoseRendererInputs, PoseRendererOutputs]):
+    description = "Renders 2D pose skeletons onto video frames"
+
     """Conduit that renders each BodyPoseFrame as a 2D skeleton and outputs JPEG bytes."""
+
+    _tags = Tag(io={"conduit"}, functionality={"video", "movement"})
 
     def __init__(self, config: PoseRendererConfig) -> None:
         super().__init__()
@@ -138,5 +142,7 @@ class PoseRenderer(Component[PoseRendererInputs, PoseRendererOutputs]):
         for frame in inputs.pose(self):
             if frame is None:
                 break
-            img = self._render_pose(frame.get())
+            poses = frame.get()
+
+            img = self._render_pose(poses)
             outputs.video.send(VideoFrame.new(data=img, format=VideoDataFormat.BGR))

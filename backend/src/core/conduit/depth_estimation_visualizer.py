@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import DepthFrame, VideoDataFormat, VideoFrame
 
 _ALPHA = 0.5
@@ -24,22 +24,33 @@ class DepthEstimationVisualizerOutputs(NamedTuple):
 
 
 class DepthEstimationVisualizer(
-    Component[DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs]
+    PrimitiveComponent[
+        DepthEstimationVisualizerInputs, DepthEstimationVisualizerOutputs
+    ]
 ):
+    description = "Visualizes depth estimation output as a color map"
+
     """Colorizes depth and overlays it on video frames."""
+
+    _tags = Tag(io={"conduit"}, functionality={"image"})
 
     @staticmethod
     def _colorize_depth(depth_data: np.ndarray) -> np.ndarray:
-        """Normalize depth to 0-255 using robust percentiles and apply a colormap."""
+        """Colorize metric depth via inverse-depth so close=red, far=blue."""
         valid = np.isfinite(depth_data) & (depth_data > 0)
+        inv = np.zeros_like(depth_data)
+        inv[valid] = 1.0 / depth_data[valid]
         if np.any(valid):
-            lo = float(np.percentile(depth_data[valid], 2))
-            hi = float(np.percentile(depth_data[valid], 98))
+            lo = float(inv[valid].min())
+            hi = float(inv[valid].max())
         else:
             lo, hi = 0.0, 1.0
-        norm = np.clip((depth_data - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
+        norm = np.zeros_like(depth_data)
+        norm[valid] = np.clip((inv[valid] - lo) / max(hi - lo, 1e-6), 0.0, 1.0)
         depth_u8 = (norm * 255).astype(np.uint8)
-        return cv2.applyColorMap(depth_u8, cv2.COLORMAP_INFERNO)
+        colored = cv2.applyColorMap(depth_u8, cv2.COLORMAP_TURBO)
+        colored[~valid] = 0
+        return colored
 
     @staticmethod
     def _overlay(img: np.ndarray, depth_color: np.ndarray) -> np.ndarray:

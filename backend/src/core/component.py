@@ -4,15 +4,32 @@ import inspect
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, get_args, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
 
+if TYPE_CHECKING:
+    from src.core.graph import Graph, GraphManager
+
+
+IOTag = Literal["source", "conduit", "sink"]
+FunctionalityTag = Literal[
+    "audio", "video", "llm", "image", "movement", "misc", "other"
+]
+GPUTag = Literal["cpu", "nvidia", "apple", "intel", "amd"]
+
+
+class Tag(BaseModel):
+    io: set[IOTag]
+    functionality: set[FunctionalityTag]
+    gpu: set[GPUTag] = {"cpu"}
+
 
 class Status(Enum):
     STARTUP = "startup"
+    SETUP = "setup"
     RUNNING = "running"
     STOPPED = "stopped"
 
@@ -20,11 +37,20 @@ class Status(Enum):
 class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
     ABC
 ):
+    description: str = ""
+
     def __init__(self) -> None:
-        self.name: str = type(self).__name__
         self._status = Status.STARTUP
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+
+    @property
+    @abstractmethod
+    def type_(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def tags(self) -> Tag: ...
 
     @property
     def status(self) -> Status:
@@ -34,12 +60,18 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     def stop_event(self) -> threading.Event:
         return self._stop_event
 
+    def setup(self) -> None:
+        """Override to perform heavy initialization (e.g. model loading) before
+        channels are wired.  Runs on the component thread before ``run()``."""
+
     @abstractmethod
     def run(self, inputs: I, outputs: O) -> None: ...
 
     def _safe_run(self, inputs: I, outputs: O) -> None:
-        self._status = Status.RUNNING
         try:
+            self._status = Status.SETUP
+            self.setup()
+            self._status = Status.RUNNING
             self.run(inputs, outputs)
         finally:
             self._status = Status.STOPPED
@@ -74,7 +106,8 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
     @classmethod
     def _get_type_param(cls, index: int) -> type | None:
         for base in getattr(cls, "__orig_bases__", ()):
-            if get_origin(base) is Component:
+            origin = get_origin(base)
+            if isinstance(origin, type) and issubclass(origin, Component):
                 args = get_args(base)
                 if len(args) > index:
                     return args[index]
@@ -209,7 +242,9 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
         result: dict[str, type[Component[Any, Any]]] = {}
 
         def walk(subclass: type[Component[Any, Any]]) -> None:
-            if not inspect.isabstract(subclass):
+            if not inspect.isabstract(subclass) and getattr(
+                subclass, "_registerable", True
+            ):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():
                 walk(child)
@@ -218,3 +253,147 @@ class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None
             walk(child)
 
         return result
+
+
+class PrimitiveComponent[
+    I: tuple[Receiver[Any] | None, ...],
+    O: tuple[Sender[Any] | None, ...],
+](
+    Component[I, O],
+    ABC,
+):
+    """A primitive morphism: a single concrete component with a threaded run loop."""
+
+    _tags: Tag  # set as class attribute by subclasses
+
+    @property
+    def type_(self) -> str:
+        return type(self).__name__
+
+    @property
+    def tags(self) -> Tag:
+        return self._tags
+
+
+class CompositeComponent(Component[Any, Any]):
+    """A composite component that is made from a graph of components."""
+
+    _registerable = False
+
+    def __init__(
+        self,
+        type_: str,
+        sub_graph: Graph,
+        tags: Tag | None = None,
+        description: str = "",
+    ) -> None:
+        super().__init__()
+        self._type = type_
+        self._tags = tags or Tag(io={"conduit"}, functionality={"misc"})
+        self.description = description
+        self._sub_graph = sub_graph
+        self._inner_manager: GraphManager | None = None
+        self._ext_inputs, self._ext_outputs = self._compute_boundary()
+
+    @property
+    def type_(self) -> str:
+        return self._type
+
+    @property
+    def tags(self) -> Tag:
+        return self._tags
+
+    def run(self, inputs: Any, outputs: Any) -> None:
+        pass  # not used — start() is overridden
+
+    def _compute_boundary(
+        self,
+    ) -> tuple[dict[str, tuple[str, str]], dict[str, tuple[str, str]]]:
+        """Find unmatched ports in the subgraph.
+
+        Returns:
+            ext_inputs: {ext_name: (node_id, slot)} for input slots with no internal source
+            ext_outputs: {ext_name: (node_id, slot)} for output slots with no internal sink
+        """
+        connected_inputs: set[tuple[str, str]] = set()
+        connected_outputs: set[tuple[str, str]] = set()
+        for edge in self._sub_graph.edges:
+            connected_inputs.add((edge.target_node, edge.target_slot))
+            connected_outputs.add((edge.source_node, edge.source_slot))
+
+        classes = Component.registered_subclasses()
+        ext_inputs: dict[str, tuple[str, str]] = {}
+        ext_outputs: dict[str, tuple[str, str]] = {}
+        for node_id, node in self._sub_graph.nodes.items():
+            cls = classes.get(node.type)
+            if cls is None:
+                continue
+            for slot in cls.get_input_types():
+                if (node_id, slot) not in connected_inputs:
+                    ext_inputs[f"{node_id}.{slot}"] = (node_id, slot)
+            for slot in cls.get_output_types():
+                if (node_id, slot) not in connected_outputs:
+                    ext_outputs[f"{node_id}.{slot}"] = (node_id, slot)
+        return ext_inputs, ext_outputs
+
+    def get_input_types(self) -> dict[str, type]:  # type: ignore[override]
+        """Instance method override — returns types of unmatched input ports."""
+        classes = Component.registered_subclasses()
+        result: dict[str, type] = {}
+        for ext_name, (node_id, slot) in self._ext_inputs.items():
+            node = self._sub_graph.nodes[node_id]
+            cls = classes.get(node.type)
+            if cls is not None:
+                slot_types = cls.get_input_types()
+                if slot in slot_types:
+                    result[ext_name] = slot_types[slot]
+        return result
+
+    def get_output_types(self) -> dict[str, type]:  # type: ignore[override]
+        """Instance method override — returns types of unmatched output ports."""
+        classes = Component.registered_subclasses()
+        result: dict[str, type] = {}
+        for ext_name, (node_id, slot) in self._ext_outputs.items():
+            node = self._sub_graph.nodes[node_id]
+            cls = classes.get(node.type)
+            if cls is not None:
+                slot_types = cls.get_output_types()
+                if slot in slot_types:
+                    result[ext_name] = slot_types[slot]
+        return result
+
+    def start(self, inputs: Any, outputs: Any) -> None:
+        """Create inner GraphManager, patch boundary handles, and run."""
+        if self.status == Status.RUNNING:
+            return
+        self._stop_event.clear()
+        self._status = Status.SETUP
+
+        from src.core.graph import GraphManager
+
+        self._inner_manager = GraphManager(self._sub_graph)
+
+        # Patch boundary: inject outer handles into inner manager's handle dicts.
+        for i, (ext_name, (node_id, slot)) in enumerate(self._ext_inputs.items()):
+            if hasattr(inputs, "_fields"):
+                outer_receiver = getattr(inputs, ext_name, None)
+            else:
+                outer_receiver = inputs[i] if i < len(inputs) else None
+            if outer_receiver is not None:
+                self._inner_manager._receiver_handles[(node_id, slot)] = outer_receiver
+
+        for i, (ext_name, (node_id, slot)) in enumerate(self._ext_outputs.items()):
+            if hasattr(outputs, "_fields"):
+                outer_sender = getattr(outputs, ext_name, None)
+            else:
+                outer_sender = outputs[i] if i < len(outputs) else None
+            if outer_sender is not None:
+                self._inner_manager._sender_handles[(node_id, slot)] = outer_sender
+
+        self._inner_manager.run()
+        self._status = Status.RUNNING
+
+    def stop(self) -> None:
+        super().stop()
+        if self._inner_manager is not None:
+            self._inner_manager.stop()

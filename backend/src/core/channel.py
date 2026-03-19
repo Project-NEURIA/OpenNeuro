@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from src.core.frames import TextFrame
 
@@ -99,6 +99,66 @@ class Sender[T]:
         return sum(len(ch._items) for ch in self._channels)
 
 
+class ReceiverIterator[T]:
+    """Eager-registering iterator returned by ``Receiver.__call__``.
+
+    Unlike a generator, the channel cursor is registered immediately on
+    construction so that multiple iterators created in sequence all start
+    at the same channel head — eliminating off-by-one frame lag when a
+    component consumes several inputs from the same upstream.
+    """
+
+    def __init__(
+        self,
+        receiver: Receiver[T],
+        channel: Channel[T],
+        stop_event: threading.Event,
+        sub_id: int,
+        newest: bool,
+        no_block: bool,
+    ) -> None:
+        self._receiver = receiver
+        self._channel = channel
+        self._stop_event = stop_event
+        self._sub_id = sub_id
+        self._newest = newest
+        self._no_block = no_block
+        self._done = False
+        # Register cursor EAGERLY — this is the whole point.
+        self._channel._register(sub_id)
+
+    def __iter__(self) -> Iterator[T | None]:
+        return self
+
+    def __next__(self) -> T | None:
+        if self._done:
+            raise StopIteration
+        if self._stop_event.is_set():
+            self._finish()
+            return None
+        if self._newest:
+            self._channel._fast_forward(self._sub_id)
+        if self._no_block:
+            item = self._channel._try_get(self._sub_id)
+        else:
+            item = self._channel._wait_and_get(self._sub_id, self._stop_event)
+        if item is not None:
+            self._receiver._msg_count += 1
+            self._receiver._byte_count += sys.getsizeof(item)
+        return item
+
+    def _finish(self) -> None:
+        if not self._done:
+            self._done = True
+            self._channel._unregister(self._sub_id)
+
+    def close(self) -> None:
+        self._finish()
+
+    def __del__(self) -> None:
+        self._finish()
+
+
 class Receiver[T]:
     """Handle for receiving from a channel."""
 
@@ -113,33 +173,29 @@ class Receiver[T]:
         subscriber: Component[Any, Any],
         newest: bool = False,
         no_block: bool = False,
-    ) -> Generator[T | None, None, None]:
-        """Yield items from the channel.
+    ) -> ReceiverIterator[T]:
+        """Return an iterator over items from the channel.
+
+        The channel cursor is registered immediately (not deferred to the
+        first ``next()`` call), so creating multiple iterators in sequence
+        guarantees they all start at the same channel position.
 
         newest: skip to the latest item, dropping everything in between.
         no_block: return None immediately if nothing is available.
 
-        Yields None when the component is stopping or when no_block=True and there are no more new frames.
+        Yields None when the component is stopping or when no_block=True
+        and there are no more new frames.
         """
-        stop_event = subscriber.stop_event
         sub_id = id(subscriber)
         self._sub_id = sub_id
-        self._channel._register(sub_id)
-        try:
-            while not stop_event.is_set():
-                if newest:
-                    self._channel._fast_forward(sub_id)
-                if no_block:
-                    item = self._channel._try_get(sub_id)
-                else:
-                    item = self._channel._wait_and_get(sub_id, stop_event)
-                yield item
-                if item is not None:
-                    self._msg_count += 1
-                    self._byte_count += sys.getsizeof(item)
-            yield None
-        finally:
-            self._channel._unregister(sub_id)
+        return ReceiverIterator(
+            receiver=self,
+            channel=self._channel,
+            stop_event=subscriber.stop_event,
+            sub_id=sub_id,
+            newest=newest,
+            no_block=no_block,
+        )
 
     @property
     def lag(self) -> int:

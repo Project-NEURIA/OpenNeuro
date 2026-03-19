@@ -7,7 +7,7 @@ from typing import NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import InterruptFrame, MessagesFrame, TextFrame
 
 CHARACTER_CARDS: dict[str, dict[str, str]] = {
@@ -169,8 +169,12 @@ class AgentStateOutputs(NamedTuple):
     messages_for_memory: Sender[MessagesFrame] | None = None
 
 
-class AgentState(Component[AgentStateInputs, AgentStateOutputs]):
+class AgentState(PrimitiveComponent[AgentStateInputs, AgentStateOutputs]):
+    description = "Tracks and manages agent conversation state"
+
     """Manages conversation history, optionally enriched by Mem0 memory retrieval."""
+
+    _tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()

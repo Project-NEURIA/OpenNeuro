@@ -14,7 +14,7 @@ export function useUITextOutput(
   useEffect(() => {
     if (!nodeId) return;
 
-    const unsub = subscribe(nodeId, channel, (payload) => {
+    const unsub = subscribe(nodeId, channel, (payload: unknown) => {
       if (typeof payload === "string") {
         setText(payload);
       }

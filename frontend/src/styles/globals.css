@@ -30,6 +30,7 @@
   --color-conduit: var(--conduit);
   --color-sink: var(--sink);
   --color-status-running: var(--status-running);
+  --color-status-setup: var(--status-setup);
   --color-status-startup: var(--status-startup);
   --color-status-stopped: var(--status-stopped);
   --color-glass: var(--glass);
@@ -71,6 +72,7 @@
 
   /* Status colors */
   --status-running: #4ade80;
+  --status-setup: #facc15;
   --status-startup: #facc15;
   --status-stopped: #5a5666;
 
@@ -118,4 +120,23 @@ select {
 select option {
   color: var(--foreground);
   background-color: #14111e;
+}
+
+.react-flow__pane {
+  cursor: default !important;
+}
+.react-flow__pane.dragging {
+  cursor: grabbing !important;
+}
+.react-flow__pane.selection {
+  cursor: crosshair !important;
+}
+
+.react-flow__nodesselection-rect {
+  display: none !important;
+}
+
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
 }

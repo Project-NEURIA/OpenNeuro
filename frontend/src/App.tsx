@@ -13,6 +13,7 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import { Home } from "lucide-react";
+import { SplashScreen } from "@/components/SplashScreen";
 import { GraphCanvas } from "@/components/graph/GraphCanvas";
 import { NodeSidebar } from "@/components/graph/NodeSidebar";
 import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
@@ -32,13 +33,18 @@ import {
   deleteNode as apiDeleteNode,
   createEdge as apiCreateEdge,
   deleteEdge as apiDeleteEdge,
+  createSubgraph as apiCreateSubgraph,
+  ungroupNode as apiUngroupNode,
   fetchCurrentProject,
   fetchIsType,
+  fetchProjects,
   startProject as apiStartProject,
   closeProject as apiCloseProject,
   saveGraph,
+  type NodeResponse,
+  type ProjectSummary,
 } from "@/lib/api";
-import { parseSlotType, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
+import { parseSlotType, categoryFromTags, type ComponentInfo, type Graph, type GraphEdge, type SlotType } from "@/lib/types";
 import { checkTypes, collectLeafNames, typeToString, warmSubtypeCache } from "@/lib/typecheck";
 
 function parseSlot(handleId: string | null | undefined): string {
@@ -53,6 +59,52 @@ function deleteEdgeFromReactFlow(edge: Edge) {
   apiDeleteEdge(edge.source, sourceSlot, edge.target, targetSlot).catch(console.error);
 }
 
+/** Build a ReactFlow node from a backend NodeResponse. */
+function toReactFlowNode(
+  n: NodeResponse,
+  position: { x: number; y: number },
+  componentMap: Record<string, ComponentInfo>,
+  componentTypeInfo: { inputs: Record<string, Record<string, SlotType>>; outputs: Record<string, Record<string, SlotType>> },
+): Node<GraphNodeData> {
+  const isComposite = n.is_composite;
+  const info = componentMap[n.type];
+
+  // For composite nodes, derive ports from the response; for regular, from the component registry
+  const inputs = isComposite
+    ? Object.keys(n.inputs ?? {})
+    : info ? Object.keys(info.inputs) : [];
+  const outputs = isComposite
+    ? Object.keys(n.outputs ?? {})
+    : info ? Object.keys(info.outputs) : [];
+
+  const compInputs = n.inputs ?? {};
+  const compOutputs = n.outputs ?? {};
+  const inputTypes = isComposite
+    ? Object.fromEntries(Object.entries(compInputs).map(([k, v]) => [k, parseSlotType(v)]))
+    : componentTypeInfo.inputs[n.type] ?? {};
+  const outputTypes = isComposite
+    ? Object.fromEntries(Object.entries(compOutputs).map(([k, v]) => [k, parseSlotType(v)]))
+    : componentTypeInfo.outputs[n.type] ?? {};
+
+  return {
+    id: n.id,
+    type: "graph",
+    position,
+    data: {
+      label: n.type,
+      category: isComposite ? "composite" : (info ? categoryFromTags(info.tags) : "conduit"),
+      inputs,
+      outputs,
+      inputTypes,
+      outputTypes,
+      status: n.status,
+      nodeMetrics: null,
+      ui_inputs: info?.ui_inputs ?? {},
+      ui_outputs: info?.ui_outputs ?? {},
+    } satisfies GraphNodeData,
+  };
+}
+
 function AppInner({
   projectName,
   onGoHome,
@@ -65,6 +117,23 @@ function AppInner({
 
   const [metricsOpen, setMetricsOpen] = useState(false);
   const history = useMetricsHistory(metrics);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeIds: string[];
+    isComposite: boolean;
+    naming: boolean;
+  } | null>(null);
+  const [subgraphName, setSubgraphName] = useState("Subgraph");
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+
+  // Fetch projects for sidebar
+  useEffect(() => {
+    fetchProjects().then(setProjects).catch(console.error);
+  }, []);
 
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>([] as Node[]);
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>([] as Edge[]);
@@ -82,10 +151,10 @@ function AppInner({
     const inputs: Record<string, Record<string, SlotType>> = {};
     const outputs: Record<string, Record<string, SlotType>> = {};
     for (const c of components) {
-      inputs[c.name] = Object.fromEntries(
+      inputs[c.type_] = Object.fromEntries(
         Object.entries(c.inputs).map(([k, v]) => [k, parseSlotType(v)]),
       );
-      outputs[c.name] = Object.fromEntries(
+      outputs[c.type_] = Object.fromEntries(
         Object.entries(c.outputs).map(([k, v]) => [k, parseSlotType(v)]),
       );
     }
@@ -445,6 +514,7 @@ function AppInner({
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
   }, []);
 
@@ -454,7 +524,7 @@ function AppInner({
       position: { x: number; y: number },
       initArgs?: Record<string, unknown>,
     ) => {
-      apiCreateNode(item.name, initArgs)
+      apiCreateNode(item.type_, initArgs)
         .then((res) => {
           const newNode: Node<GraphNodeData> = {
             id: res.id,
@@ -476,10 +546,30 @@ function AppInner({
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const raw = e.dataTransfer.getData("application/graph-node");
+
+      const raw = e.dataTransfer.getData("application/openneuro") || e.dataTransfer.getData("text/plain");
       if (!raw) return;
 
-      const item = JSON.parse(raw) as ComponentInfo;
+      let parsed: Record<string, unknown>;
+      try { parsed = JSON.parse(raw); } catch { return; }
+
+      // Handle project drops
+      if (parsed.kind === "project") {
+        const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        apiCreateNode(parsed.name as string)
+          .then((res) => {
+            const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
+            setNodes((nds) => [...nds, newNode]);
+            runTypeCheck();
+            triggerSave();
+          })
+          .catch(console.error);
+        return;
+      }
+
+      if (parsed.kind !== "component") return;
+
+      const item = parsed as unknown as ComponentInfo;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
       const hasConfig = Object.values(item.init).some((schema) => {
@@ -521,6 +611,88 @@ function AppInner({
     [screenToFlowPosition, setNodes, createGraphNode],
   );
 
+  /** Re-fetch full graph state from backend and rebuild ReactFlow nodes/edges. */
+  const refreshGraph = useCallback(async () => {
+    const [backendNodes, backendEdges] = await Promise.all([
+      apiFetchNodes(),
+      apiFetchEdges(),
+    ]);
+    setNodes(
+      backendNodes.map((n) =>
+        toReactFlowNode(n, { x: n.x, y: n.y }, componentMap, componentTypeInfo),
+      ),
+    );
+    setEdges(
+      backendEdges.map((e) => ({
+        id: `${e.source_node}:${e.source_slot}->${e.target_node}:${e.target_slot}`,
+        source: e.source_node,
+        sourceHandle: `out-${e.source_slot}`,
+        target: e.target_node,
+        targetHandle: `in-${e.target_slot}`,
+        type: "graph",
+        data: {},
+      })),
+    );
+    runTypeCheck();
+  }, [componentMap, componentTypeInfo, setNodes, setEdges, runTypeCheck]);
+
+  const onSelectionChange = useCallback(
+    ({ nodes: sel }: { nodes: Node[] }) => {
+      setSelectedNodeIds(sel.filter((n) => n.type === "graph").map((n) => n.id));
+    },
+    [],
+  );
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      const data = node.data as GraphNodeData;
+      const isComposite = data.category === "composite";
+      // If node is part of selection, use full selection; otherwise just this node
+      const ids = selectedNodeIds.includes(node.id) ? selectedNodeIds : [node.id];
+      setContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        nodeIds: ids,
+        isComposite,
+        naming: false,
+      });
+    },
+    [selectedNodeIds],
+  );
+
+  const handleGroupClick = useCallback(() => {
+    if (!contextMenu || contextMenu.nodeIds.length < 2) return;
+    setSubgraphName("Subgraph");
+    setContextMenu({ ...contextMenu, naming: true });
+  }, [contextMenu]);
+
+  const handleGroupConfirm = useCallback(async () => {
+    if (!contextMenu) return;
+    const name = subgraphName.trim() || "Subgraph";
+    const ids = contextMenu.nodeIds;
+    setContextMenu(null);
+    try {
+      await apiCreateSubgraph(ids, name);
+      await refreshGraph();
+      triggerSave();
+    } catch (err) {
+      console.error("[graph] Group failed:", err);
+    }
+  }, [contextMenu, subgraphName, refreshGraph, triggerSave]);
+
+  const handleUngroup = useCallback(async () => {
+    if (!contextMenu || contextMenu.nodeIds.length !== 1) return;
+    setContextMenu(null);
+    try {
+      await apiUngroupNode(contextMenu.nodeIds[0]!);
+      await refreshGraph();
+      triggerSave();
+    } catch (err) {
+      console.error("[graph] Ungroup failed:", err);
+    }
+  }, [contextMenu, refreshGraph, triggerSave]);
+
   const handleGoHome = useCallback(async () => {
     await apiCloseProject();
     onGoHome();
@@ -537,8 +709,68 @@ function AppInner({
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeDragStop={onNodeDragStop}
+        onSelectionChange={onSelectionChange}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneClick={() => setContextMenu(null)}
       />
-      <NodeSidebar components={components} />
+      <NodeSidebar components={components} projects={projects} currentProject={projectName} />
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 rounded-lg border border-white/10 bg-[var(--glass)] backdrop-blur-xl shadow-lg py-1 min-w-[200px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          {contextMenu.isComposite && contextMenu.nodeIds.length === 1 && (
+            <button
+              onClick={handleUngroup}
+              className="w-full px-4 py-2 text-left text-sm text-[var(--foreground)] hover:bg-white/[0.06] transition-colors"
+            >
+              Ungroup subgraph
+            </button>
+          )}
+          {!contextMenu.isComposite && contextMenu.nodeIds.length >= 2 && !contextMenu.naming && (
+            <button
+              onClick={handleGroupClick}
+              className="w-full px-4 py-2 text-left text-sm text-[var(--foreground)] hover:bg-white/[0.06] transition-colors"
+            >
+              Group into subgraph
+            </button>
+          )}
+          {!contextMenu.isComposite && contextMenu.nodeIds.length >= 2 && contextMenu.naming && (
+            <div className="px-3 py-2 flex flex-col gap-2">
+              <label className="text-[11px] font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                Name
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={subgraphName}
+                onChange={(e) => setSubgraphName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleGroupConfirm();
+                  if (e.key === "Escape") setContextMenu(null);
+                }}
+                className="rounded-md bg-black/40 border border-white/10 px-2.5 py-1.5 text-sm text-[var(--foreground)] font-mono focus:outline-none focus:border-white/25"
+              />
+              <button
+                onClick={handleGroupConfirm}
+                className="rounded-md bg-white/[0.08] border border-white/10 px-3 py-1.5 text-sm text-[var(--foreground)] hover:bg-white/[0.12] transition-colors"
+              >
+                Create
+              </button>
+            </div>
+          )}
+          {contextMenu.nodeIds.length < 2 && !contextMenu.isComposite && (
+            <div className="px-4 py-2 text-sm text-[var(--muted-foreground)]">
+              Select 2+ nodes to group
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Window drag region */}
+      <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-[15px] z-50" />
 
       {/* Home button */}
       <button
@@ -573,31 +805,40 @@ export default function App() {
     string | null | undefined
   >(undefined);
   const [showChooser, setShowChooser] = useState(false);
+  const [splashStatus, setSplashStatus] = useState("Connecting to backend...");
 
   useEffect(() => {
-    fetchCurrentProject()
-      .then(async ({ current_project }) => {
-        if (current_project) {
-          await apiStartProject(current_project);
-          setCurrentProject(current_project);
-        } else {
-          setCurrentProject(null);
-          setShowChooser(true);
+    let cancelled = false;
+
+    async function pollBackend() {
+      // Poll until backend is ready
+      while (!cancelled) {
+        try {
+          const { current_project } = await fetchCurrentProject();
+          if (cancelled) return;
+          if (current_project) {
+            setSplashStatus("Loading project...");
+            await apiStartProject(current_project);
+            setCurrentProject(current_project);
+          } else {
+            setCurrentProject(null);
+            setShowChooser(true);
+          }
+          return;
+        } catch {
+          // Backend not ready yet, retry
+          await new Promise((r) => setTimeout(r, 500));
         }
-      })
-      .catch(() => {
-        setCurrentProject(null);
-        setShowChooser(true);
-      });
+      }
+    }
+
+    pollBackend();
+    return () => { cancelled = true; };
   }, []);
 
-  // Loading
+  // Splash screen while waiting for backend
   if (currentProject === undefined && !showChooser) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[var(--background)]">
-        <span className="text-[var(--muted-foreground)]">Loading...</span>
-      </div>
-    );
+    return <SplashScreen status={splashStatus} />;
   }
 
   // Project chooser

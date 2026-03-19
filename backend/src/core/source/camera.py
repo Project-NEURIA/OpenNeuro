@@ -16,6 +16,8 @@ class CameraConfig(VideoSourceConfig):
 
 
 class Camera(VideoSource):
+    description = "Captures video from a system camera"
+
     """Captures live video from a webcam or camera device."""
 
     def __init__(self, config: CameraConfig = CameraConfig()) -> None:

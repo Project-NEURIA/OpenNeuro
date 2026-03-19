@@ -4,10 +4,17 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.core.graph import Graph
+
 
 class NodeCreateRequest(BaseModel):
     type: str
     init_args: dict[str, Any] = {}
+
+
+class SubgraphCreateRequest(BaseModel):
+    node_ids: list[str]
+    name: str = "Subgraph"
 
 
 class NodeUpdateRequest(BaseModel):
@@ -18,10 +25,14 @@ class NodeUpdateRequest(BaseModel):
 class NodeResponse(BaseModel):
     id: str
     type: str
+    is_composite: bool = False
     status: str
     x: float
     y: float
     init_args: dict[str, Any] = Field(default_factory=dict)
+    inputs: dict[str, str] | None = None
+    outputs: dict[str, str] | None = None
+    sub_graph: Graph | None = None
 
 
 class CharacterCardUpdateRequest(BaseModel):

@@ -5,7 +5,7 @@ import type { ComponentInfo, MetricsSnapshot, NodeMetrics, SlotType } from "@/li
 export interface GraphNodeData extends Record<string, unknown> {
   id?: string;
   label: string;
-  category: "source" | "conduit" | "sink";
+  category: "source" | "conduit" | "sink" | "composite";
   initArgs?: Record<string, unknown>;
   onEditConfig?: () => void;
   inputs: string[];
@@ -25,7 +25,7 @@ export function useGraphData(components: ComponentInfo[]) {
 
   const componentMap = useMemo(() => {
     const map: Record<string, ComponentInfo> = {};
-    for (const c of components) map[c.name] = c;
+    for (const c of components) map[c.type_] = c;
     return map;
   }, [components]);
 
