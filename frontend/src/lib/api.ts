@@ -209,22 +209,21 @@ export async function saveGraph() {
 
 // --- Config Options API ---
 
-export interface ConfigOption {
+export interface Option {
   value: string;
   label: string;
 }
 
-export async function fetchConfigOptions(
+export async function fetchOptions(
   componentName: string,
-  fieldName: string,
   values?: Record<string, unknown>,
-): Promise<ConfigOption[]> {
+): Promise<Record<string, unknown>> {
   const res = await fetch(
-    `/component/${encodeURIComponent(componentName)}/options/${encodeURIComponent(fieldName)}`,
+    `/component/${encodeURIComponent(componentName)}/options`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values ?? null),
+      body: JSON.stringify(values ?? {}),
     },
   );
   if (!res.ok) throw new Error(`Fetch config options failed: ${res.status}`);

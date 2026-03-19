@@ -531,7 +531,7 @@ function AppInner({
             type: "graph",
             position,
             data: {
-              ...buildGraphNodeData(res.id, item.name, "startup", initArgs ?? {}),
+              ...buildGraphNodeData(res.id, item.type_, "startup", initArgs ?? {}),
             },
           };
           setNodes((nds) => [...nds, newNode]);

@@ -12,7 +12,7 @@ from src.core.frames import StereoVideoFrame, VideoFrame
 
 
 class StereoToMonocularVideoConfig(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"configOptions": {"eye": {}}})
+    model_config = ConfigDict(json_schema_extra={"options": {"eye": {}}})
 
     eye: Literal["left", "right"] = "left"
 
@@ -37,15 +37,15 @@ class StereoToMonocularVideo(
         self.config = config
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        if field != "config.eye":
-            return None
-        return [
-            {"value": "left", "label": "Left Eye"},
-            {"value": "right", "label": "Right Eye"},
-        ]
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "config": {
+                "eye": [
+                    {"value": "left", "label": "Left Eye"},
+                    {"value": "right", "label": "Right Eye"},
+                ],
+            },
+        }
 
     def run(
         self,

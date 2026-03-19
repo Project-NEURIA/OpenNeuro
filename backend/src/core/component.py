@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import threading
 from abc import ABC, abstractmethod
+from pathlib import Path
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_hints
 
@@ -155,10 +156,17 @@ class Component[I, O](ABC):
         }
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        return None
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Return a nested dict of field → options for all fields that have dynamic options.
+
+        Args:
+            values: current form values, for dependent dropdowns where
+                    field B's options depend on field A's selection.
+
+        Top-level fields: {"path": [{"value": "...", "label": "..."}, ...]}
+        Nested config fields: {"config": {"field": [{"value": "...", "label": "..."}, ...]}}
+        """
+        return {}
 
     @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
@@ -189,7 +197,16 @@ class Component[I, O](ABC):
                 else:
                     kwargs[k] = model_type.model_validate(raw)
             else:
-                kwargs[k] = init_args[k]
+                raw = init_args[k]
+                # Convert string to Path if any part of the type hint is Path
+                hint_types = get_args(v) if get_origin(v) is not None else (v,)
+                is_path = any(
+                    isinstance(t, type) and issubclass(t, Path) for t in hint_types
+                )
+                if is_path and isinstance(raw, str):
+                    kwargs[k] = Path(raw)
+                else:
+                    kwargs[k] = raw
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
 
     @classmethod
@@ -199,9 +216,18 @@ class Component[I, O](ABC):
 
         result: dict[str, type[Component[Any, Any]]] = {}
 
+        skip = {
+            PrimitiveComponent,
+            ThreadedComponent,
+            ConstantComponent,
+            CompositeComponent,
+        }
+
         def walk(subclass: type[Component[Any, Any]]) -> None:
-            if not inspect.isabstract(subclass) and getattr(
-                subclass, "_registerable", True
+            if (
+                subclass not in skip
+                and not inspect.isabstract(subclass)
+                and getattr(subclass, "_registerable", True)
             ):
                 result[subclass.__name__] = subclass
             for child in subclass.__subclasses__():
@@ -219,9 +245,10 @@ class Component[I, O](ABC):
 
 
 class PrimitiveComponent[I, O](Component[I, O], ABC):
-    """A primitive morphism: a single component, not a composite."""
+    """A primitive morphism: a single component, not a composite.
 
-    _registerable = False
+    Not directly instantiable — use ThreadedComponent or ConstantComponent.
+    """
 
     @property
     def type_(self) -> str:
@@ -238,8 +265,6 @@ class ThreadedComponent[
     O: tuple[Sender[Any] | None, ...],
 ](PrimitiveComponent[I, O], ABC):
     """A primitive component that runs in a daemon thread."""
-
-    _registerable = False
 
     def __init__(self) -> None:
         super().__init__()
@@ -292,8 +317,6 @@ class ConstantComponent[I, O](PrimitiveComponent[I, O]):
     and never change. Reading from a constant's output never blocks
     and always returns the same value.
     """
-
-    _registerable = False
 
     @abstractmethod
     def get_values(self) -> O:

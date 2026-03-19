@@ -9,7 +9,7 @@ from src.core.source.video_source import VideoSource, VideoSourceConfig
 
 
 class CameraConfig(VideoSourceConfig):
-    model_config = ConfigDict(json_schema_extra={"configOptions": {"source": {}}})
+    model_config = ConfigDict(json_schema_extra={"options": {"source": {}}})
     # For the frontend to know which fields are dynamic
 
     source: str = "0"
@@ -24,12 +24,7 @@ class Camera(VideoSource):
         super().__init__(config)
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        if field != "config.source":
-            return None
-
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
         results: list[dict[str, str]] = []
         try:
             from cv2_enumerate_cameras import enumerate_cameras
@@ -45,4 +40,4 @@ class Camera(VideoSource):
                     results.append({"value": str(i), "label": f"Camera {i}"})
                     cap.release()
 
-        return results
+        return {"config": {"source": results}}

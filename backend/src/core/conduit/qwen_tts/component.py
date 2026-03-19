@@ -19,7 +19,7 @@ _AUDIO_EXTENSIONS = (".wav", ".mp3", ".flac", ".ogg", ".m4a")
 
 
 class QwenTTSConfig(BaseModel):
-    model_config = ConfigDict(json_schema_extra={"configOptions": {"voice_id": {}}})
+    model_config = ConfigDict(json_schema_extra={"options": {"voice_id": {}}})
 
     model_id: str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
     device: str = "auto"
@@ -56,12 +56,8 @@ class QwenTTS(ThreadedComponent[QwenTTSInputs, QwenTTSOutputs]):
         self._voice_paths: dict[str, Path] = {}
 
     @classmethod
-    def get_config_options(
-        cls, field: str, values: dict[str, Any] | None = None
-    ) -> list[dict[str, str]] | None:
-        if field != "config.voice_id":
-            return None
-        ref_dir = Path((values or {}).get("ref_samples_dir", str(_ASSETS_DIR)))
+    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        ref_dir = Path(values.get("ref_samples_dir", str(_ASSETS_DIR)))
         options: list[dict[str, str]] = []
         if ref_dir.is_dir():
             for p in sorted(ref_dir.iterdir()):
@@ -69,7 +65,9 @@ class QwenTTS(ThreadedComponent[QwenTTSInputs, QwenTTSOutputs]):
                     txt = ref_dir / f"{p.stem}.txt"
                     if txt.is_file():
                         options.append({"value": p.stem, "label": p.stem})
-        return options or None
+        if not options:
+            return {}
+        return {"config": {"voice_id": options}}
 
     def _load_model(self) -> None:
         from src.core.conduit.qwen_tts.model import SimpleStreamingTTS

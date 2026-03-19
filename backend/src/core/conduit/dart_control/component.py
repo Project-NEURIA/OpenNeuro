@@ -13,7 +13,7 @@ import pickle
 import queue
 import threading
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 import torch
@@ -203,8 +203,8 @@ class DartControlConfig(BaseModel):
     stand_path: str = "assets/dart_control/stand.pkl"
     """Path to the standing pose pickle file for history initialization."""
 
-    device: str = "cuda"
-    """Device for inference (cuda or cpu)."""
+    device: Literal["cuda", "cpu", "mps"]
+    """Device for inference."""
 
     respacing: str = ""
     """DDIM respacing (e.g. 'ddim10'). Empty string for full diffusion sampling."""

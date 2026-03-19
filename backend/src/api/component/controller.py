@@ -80,20 +80,16 @@ def is_subtype(sub: str = Query(), sup: str = Query()) -> bool:
         return False
 
 
-@router.post("/{component_name}/options/{field_name}")
-def get_config_options(
+@router.post("/{component_name}/options")
+def get_options(
     component_name: str,
-    field_name: str,
-    values: dict[str, Any] | None = None,
-) -> list[dict[str, str]]:
-    """Return runtime options for a dynamic config field."""
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    """Return all dynamic config options for a component."""
     classes = service.list_components()
     cls = classes.get(component_name)
     if cls is None:
         raise HTTPException(
             status_code=404, detail=f"Component not found: {component_name}"
         )
-    result = cls.get_config_options(field_name, values)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Field not dynamic: {field_name}")
-    return result
+    return cls.get_options(values)
