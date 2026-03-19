@@ -4,11 +4,11 @@ from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import MessagesFrame, TextFrame
+from src.core.frames import MessageFrame, TextFrame
 
 
 class MessagesToTextInputs(NamedTuple):
-    messages: Receiver[MessagesFrame]
+    messages: Receiver[list[MessageFrame]]
 
 
 class MessagesToTextOutputs(NamedTuple):
@@ -18,7 +18,7 @@ class MessagesToTextOutputs(NamedTuple):
 class MessagesToText(ThreadedComponent[MessagesToTextInputs, MessagesToTextOutputs]):
     description = "Converts message objects to plain text"
 
-    """Converts MessagesFrame to TextFrame for display purposes."""
+    """Converts list[MessageFrame] to TextFrame for display purposes."""
 
     tags = Tag(io={"conduit"}, functionality={"misc"})
 
@@ -26,5 +26,5 @@ class MessagesToText(ThreadedComponent[MessagesToTextInputs, MessagesToTextOutpu
         for frame in inputs.messages(self):
             if frame is None:
                 break
-            # Use the pre-built text representation from MessagesFrame
-            outputs.text.send(TextFrame.new(text=frame.text))
+            text = "\n".join(f"{m.role}: {m.content}" for m in frame)
+            outputs.text.send(TextFrame.new(text=text))

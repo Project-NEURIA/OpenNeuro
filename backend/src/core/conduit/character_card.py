@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 
 from src.core.component import ConstantComponent, Tag
-from src.core.frames import TextFrame
+from src.core.frames import MessageFrame, TextFrame
 
 
 class CharacterCardConfig(BaseModel):
@@ -20,21 +20,23 @@ class CharacterCardConfig(BaseModel):
     first_message: str
     example_messages: str
     system_prompt: str
+    post_history_instructions: str = ""
 
 
 class CharacterCardOutputs(NamedTuple):
-    prompt: TextFrame
+    prompts: list[MessageFrame] | None = None
+    system_prompt: TextFrame | None = None
     name: TextFrame | None = None
     description: TextFrame | None = None
     personality: TextFrame | None = None
     scenario: TextFrame | None = None
     first_message: TextFrame | None = None
     example_messages: TextFrame | None = None
-    system_prompt: TextFrame | None = None
+    post_history_instructions: TextFrame | None = None
 
 
 class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
-    """A constant component holding a character card (persona definition).
+    """A constant component holding a character card (V2 spec conformant).
 
     Initialize with either a path to a SillyTavern PNG character card,
     or a manual CharacterCardConfig. One of the two must be provided.
@@ -80,15 +82,18 @@ class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
                 text = chunk_data[sep + 1 :].decode("latin-1")
                 if keyword in ("chara", "ccv3"):
                     card_json = json.loads(base64.b64decode(text))
-                    card_data = card_json.get("data", card_json)
+                    d = card_json.get("data", card_json)
                     return CharacterCardConfig(
-                        name=card_data.get("name", ""),
-                        description=card_data.get("description", ""),
-                        personality=card_data.get("personality", ""),
-                        scenario=card_data.get("scenario", ""),
-                        first_message=card_data.get("first_mes", ""),
-                        example_messages=card_data.get("mes_example", ""),
-                        system_prompt=card_data.get("system_prompt", ""),
+                        name=d.get("name", ""),
+                        description=d.get("description", ""),
+                        personality=d.get("personality", ""),
+                        scenario=d.get("scenario", ""),
+                        first_message=d.get("first_mes", ""),
+                        example_messages=d.get("mes_example", ""),
+                        system_prompt=d.get("system_prompt", ""),
+                        post_history_instructions=d.get(
+                            "post_history_instructions", ""
+                        ),
                     )
 
             if chunk_type == b"IEND":
@@ -109,24 +114,24 @@ class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
         else:
             raise ValueError("CharacterCard requires either path or config")
 
-    def _build_prompt(self) -> str:
-        parts: list[str] = []
-        if self.config.system_prompt:
-            parts.append(self.config.system_prompt)
-        if self.config.description:
-            parts.append(f"Description: {self.config.description}")
-        if self.config.personality:
-            parts.append(f"Personality: {self.config.personality}")
-        if self.config.scenario:
-            parts.append(f"Scenario: {self.config.scenario}")
-        if self.config.example_messages:
-            parts.append(f"Example dialogue:\n{self.config.example_messages}")
-        return "\n\n".join(parts)
-
     def get_values(self) -> CharacterCardOutputs:
         c = self.config
+        # Build prompts list matching SillyTavern message ordering
+        prompts: list[MessageFrame] = []
+        if c.description:
+            prompts.append(MessageFrame.new(role="system", content=c.description))
+        if c.personality:
+            prompts.append(MessageFrame.new(role="system", content=c.personality))
+        if c.scenario:
+            prompts.append(MessageFrame.new(role="system", content=c.scenario))
+        if c.example_messages:
+            prompts.append(MessageFrame.new(role="system", content=c.example_messages))
+        if c.system_prompt:
+            prompts.append(MessageFrame.new(role="system", content=c.system_prompt))
+
         return CharacterCardOutputs(
-            prompt=TextFrame.new(text=self._build_prompt()),
+            prompts=prompts,
+            system_prompt=TextFrame.new(text=c.system_prompt) if c.system_prompt else None,
             name=TextFrame.new(text=c.name) if c.name else None,
             description=TextFrame.new(text=c.description) if c.description else None,
             personality=TextFrame.new(text=c.personality) if c.personality else None,
@@ -137,7 +142,7 @@ class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
             example_messages=TextFrame.new(text=c.example_messages)
             if c.example_messages
             else None,
-            system_prompt=TextFrame.new(text=c.system_prompt)
-            if c.system_prompt
+            post_history_instructions=TextFrame.new(text=c.post_history_instructions)
+            if c.post_history_instructions
             else None,
         )
