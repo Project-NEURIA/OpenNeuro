@@ -2,29 +2,28 @@ import { useEffect, useState } from "react";
 import { useUIChannel } from "@/contexts/UIChannelContext";
 
 /**
- * Subscribes to a UITextSender channel and returns the latest text payload.
+ * Generic hook that subscribes to a UI output channel and returns the latest payload.
+ * Works with any payload type — text strings, JSON objects (BaseModel), or ArrayBuffer (binary).
  */
-export function useUITextOutput(
+export function useUIOutput<T = unknown>(
   nodeId: string | null,
   channel: string,
-): string | null {
+): T | null {
   const { subscribe } = useUIChannel();
-  const [text, setText] = useState<string | null>(null);
+  const [value, setValue] = useState<T | null>(null);
 
   useEffect(() => {
     if (!nodeId) return;
 
     const unsub = subscribe(nodeId, channel, (payload: unknown) => {
-      if (typeof payload === "string") {
-        setText(payload);
-      }
+      setValue(payload as T);
     });
 
     return () => {
       unsub();
-      setText(null);
+      setValue(null);
     };
   }, [nodeId, channel, subscribe]);
 
-  return text;
+  return value;
 }

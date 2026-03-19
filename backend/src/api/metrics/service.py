@@ -59,7 +59,7 @@ class MetricsCollector:
         nodes: dict[str, NodeSnapshot] = {}
         for node_id, comp in components.items():
             nodes[node_id] = NodeSnapshot(
-                name=comp.name,
+                name=comp.type_,
                 status=comp.status.value,
                 senders=senders_by_node.get(node_id, {}),
                 receivers=receivers_by_node.get(node_id, {}),

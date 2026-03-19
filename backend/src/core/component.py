@@ -4,14 +4,27 @@ import inspect
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Any, get_args, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
 
 if TYPE_CHECKING:
-    from src.core.graph import Graph
+    from src.core.graph import Graph, GraphManager
+
+
+IOTag = Literal["source", "conduit", "sink"]
+FunctionalityTag = Literal[
+    "audio", "video", "llm", "image", "movement", "misc", "other"
+]
+GPUTag = Literal["cpu", "nvidia", "apple", "intel", "amd"]
+
+
+class Tag(BaseModel):
+    io: set[IOTag]
+    functionality: set[FunctionalityTag]
+    gpu: set[GPUTag] = {"cpu"}
 
 
 class Status(Enum):
@@ -24,11 +37,20 @@ class Status(Enum):
 class Component[I: tuple[Receiver[Any] | None, ...], O: tuple[Sender[Any] | None, ...]](
     ABC
 ):
+    description: str = ""
+
     def __init__(self) -> None:
-        self.name: str = type(self).__name__
         self._status = Status.STARTUP
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+
+    @property
+    @abstractmethod
+    def type_(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def tags(self) -> Tag: ...
 
     @property
     def status(self) -> Status:
@@ -242,17 +264,44 @@ class PrimitiveComponent[
 ):
     """A primitive morphism: a single concrete component with a threaded run loop."""
 
+    _tags: Tag  # set as class attribute by subclasses
+
+    @property
+    def type_(self) -> str:
+        return type(self).__name__
+
+    @property
+    def tags(self) -> Tag:
+        return self._tags
+
 
 class CompositeComponent(Component[Any, Any]):
-    """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
+    """A composite component that is made from a graph of components."""
 
     _registerable = False
 
-    def __init__(self, sub_graph: Graph) -> None:
+    def __init__(
+        self,
+        type_: str,
+        sub_graph: Graph,
+        tags: Tag | None = None,
+        description: str = "",
+    ) -> None:
         super().__init__()
+        self._type = type_
+        self._tags = tags or Tag(io={"conduit"}, functionality={"misc"})
+        self.description = description
         self._sub_graph = sub_graph
-        self._inner_manager: Any = None
+        self._inner_manager: GraphManager | None = None
         self._ext_inputs, self._ext_outputs = self._compute_boundary()
+
+    @property
+    def type_(self) -> str:
+        return self._type
+
+    @property
+    def tags(self) -> Tag:
+        return self._tags
 
     def run(self, inputs: Any, outputs: Any) -> None:
         pass  # not used — start() is overridden

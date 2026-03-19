@@ -14,7 +14,7 @@ from PIL import Image
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat
 
 
@@ -49,11 +49,17 @@ class StreamingVLMOutputs(NamedTuple):
 
 
 class StreamingVLM(PrimitiveComponent[StreamingVLMInputs, StreamingVLMOutputs]):
+    description = "Streams visual language model inference on video frames"
+
     """Streaming VLM component that generates captions from video frames.
 
     Single-threaded main loop consumes frames into a rolling buffer and
     submits VLM calls to a thread pool, polling for results each iteration.
     """
+
+    _tags = Tag(
+        io={"conduit"}, functionality={"video", "llm"}, gpu={"cpu", "nvidia", "apple"}
+    )
 
     def __init__(self, config: StreamingVLMConfig) -> None:
         super().__init__()

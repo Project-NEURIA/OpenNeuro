@@ -22,7 +22,7 @@ export function useGraphData(components: ComponentInfo[]) {
 
   const componentMap = useMemo(() => {
     const map: Record<string, ComponentInfo> = {};
-    for (const c of components) map[c.name] = c;
+    for (const c of components) map[c.type_] = c;
     return map;
   }, [components]);
 

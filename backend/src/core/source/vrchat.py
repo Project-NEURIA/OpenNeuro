@@ -8,7 +8,7 @@ from typing import NamedTuple
 import numpy as np
 
 from src.core.channel import Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import (
     StereoCameraParamsFrame,
     StereoVideoFrame,
@@ -22,10 +22,14 @@ class VRChatVideoOutputs(NamedTuple):
 
 
 class VRChatVideo(PrimitiveComponent[tuple[()], VRChatVideoOutputs]):
+    description = "Captures stereo video from VRChat"
+
     """Captures stereo video frames from VRChat via the OpenVR virtual driver.
 
     Streams synchronized left+right eye pairs at the configured FPS.
     """
+
+    _tags = Tag(io={"source"}, functionality={"video"})
 
     def __init__(
         self,

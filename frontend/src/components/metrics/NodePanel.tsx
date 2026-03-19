@@ -43,7 +43,7 @@ const statusDot: Record<string, string> = {
 
 export function NodePanel({ nodeId, metrics, history, dt, duration, componentMap, allNodes }: NodePanelProps) {
   const info = componentMap[metrics.name];
-  const category = info?.category ?? "conduit";
+  const category = info ? (info.tags.io[0] ?? "conduit") : "conduit";
   const colors = categoryColors[category] ?? categoryColors.conduit!;
   const dot = statusDot[metrics.status] ?? "bg-status-stopped";
 

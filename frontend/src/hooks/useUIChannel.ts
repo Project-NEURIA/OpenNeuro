@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type UIOutputCallback = (payload: string | ArrayBuffer) => void;
+export type UIOutputCallback = (payload: unknown) => void;
 
 export interface UIChannelManager {
   /** Send text input from frontend to a component's UIReceiver */
-  sendUIInput: (nodeId: string, channel: string, payload: string) => void;
+  sendUIInput: (nodeId: string, channel: string, payload: unknown) => void;
   /** Subscribe to output from a component's UISender */
   subscribe: (
     nodeId: string,
@@ -80,7 +80,7 @@ export function useUIChannelManager(): UIChannelManager {
   }, []);
 
   const sendUIInput = useCallback(
-    (nodeId: string, channel: string, payload: string) => {
+    (nodeId: string, channel: string, payload: unknown) => {
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(

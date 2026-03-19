@@ -12,7 +12,7 @@ import torch
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import BodyPoseFrame, BonePose, VideoFrame, VideoDataFormat
 
 
@@ -112,10 +112,14 @@ class PoseRenderer3DOutputs(NamedTuple):
 
 
 class PoseRenderer3D(PrimitiveComponent[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
+    description = "Renders 3D pose skeletons onto video frames"
+
     """Renders BodyPoseFrame as a 3D SMPL body mesh.
 
     Uses pyrender with EGL on Linux, matplotlib software renderer on macOS.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"video", "movement"})
 
     def __init__(self, config: PoseRenderer3DConfig) -> None:
         super().__init__()

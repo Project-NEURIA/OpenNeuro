@@ -1,8 +1,22 @@
-export type NodeCategory = "source" | "conduit" | "sink";
+export type IOTag = "source" | "conduit" | "sink";
+export type FunctionalityTag = "audio" | "video" | "llm" | "image" | "movement" | "misc" | "other";
+export type GPUTag = "cpu" | "nvidia" | "apple" | "intel" | "amd";
+
+export interface Tag {
+  io: IOTag[];
+  functionality: FunctionalityTag[];
+  gpu: GPUTag[];
+}
+
+export type NodeCategory = IOTag | "composite";
+
+export function categoryFromTags(tags: Tag): IOTag {
+  return tags.io[0] ?? "conduit";
+}
 
 export interface ComponentInfo {
-  name: string;
-  category: NodeCategory;
+  type_: string;
+  tags: Tag;
   init: Record<string, unknown>;
   inputs: Record<string, string>;
   outputs: Record<string, string>;

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 
 
 class DoNothingInputs[T](NamedTuple):
@@ -11,6 +11,9 @@ class DoNothingInputs[T](NamedTuple):
 
 
 class DoNothing[T](PrimitiveComponent[DoNothingInputs[T], tuple[()]]):
+    _tags = Tag(io={"sink"}, functionality={"misc"})
+    description = "Consumes input and discards it"
+
     def run(self, inputs: DoNothingInputs[T], outputs: tuple[()]) -> None:
         for _ in inputs.input(self):
             pass

@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import ObjectSegmentationFrame, VideoDataFormat, VideoFrame
 
 # Fixed BGR color palette, cycled per prompt
@@ -91,7 +91,11 @@ class ObjectSegmentationVisualizer(
         ObjectSegmentationVisualizerInputs, ObjectSegmentationVisualizerOutputs
     ]
 ):
+    description = "Visualizes object segmentation masks on video frames"
+
     """Composites instance masks, bounding boxes, and labels onto video frames."""
+
+    _tags = Tag(io={"conduit"}, functionality={"image"})
 
     def run(
         self,

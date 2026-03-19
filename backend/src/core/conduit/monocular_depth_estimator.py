@@ -8,7 +8,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import (
     CameraParamsFrame,
     DepthFrame,
@@ -41,11 +41,15 @@ class MonocularDepthEstimatorOutputs(NamedTuple):
 class MonocularDepthEstimator(
     PrimitiveComponent[MonocularDepthEstimatorInputs, MonocularDepthEstimatorOutputs]
 ):
+    description = "Estimates depth from monocular video frames"
+
     """Monocular depth estimation backed by Depth Anything 3.
 
     Consumes VideoFrames and CameraParamsFrames, runs DA3 inference,
     and emits DepthFrames plus the resized/cropped VideoFrame.
     """
+
+    _tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: MonocularDepthEstimatorConfig) -> None:
         super().__init__()

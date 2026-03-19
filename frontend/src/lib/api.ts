@@ -94,7 +94,6 @@ export interface NodeResponse {
   id: string;
   type: string;
   is_composite: boolean;
-  label?: string | null;
   status: string;
   x: number;
   y: number;
