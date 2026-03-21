@@ -1,32 +1,31 @@
 from __future__ import annotations
 
-import threading
 from typing import NamedTuple
 
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import InterruptFrame, MessageFrame, TextFrame
+from src.core.frames import MessageFrame, RequestFrame, TextFrame
+from src.core.utils import drain
 
 
 class AgentStateConfig(BaseModel):
-    user_name: str = "User"
-    chatbot_name: str = "Assistant"
+    system_prompt: str = "You are a helpful AI assistant."
 
 
 class AgentStateInputs(NamedTuple):
-    asr: Receiver[TextFrame]
-    feedback: Receiver[TextFrame]
+    request: Receiver[RequestFrame]
     initial_msgs: Receiver[list[MessageFrame]] | None = None
-    interrupt: Receiver[InterruptFrame] | None = None
-    memory_prefix: Receiver[TextFrame] | None = None
-    observation: Receiver[TextFrame] | None = None
+    speech: Receiver[TextFrame] | None = None
+    feedback: Receiver[TextFrame] | None = None
+    vision: Receiver[TextFrame] | None = None
+    memory: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
     messages: Sender[list[MessageFrame]]
-    messages_for_memory: Sender[list[MessageFrame]] | None = None
+    # messages_for_memory: Sender[list[MessageFrame]] | None = None
 
 
 class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
@@ -38,129 +37,45 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
         self.config = config
-        self._history: list[tuple[str, str]] = []
-        self._system_prompt: str = "You are a helpful AI assistant."
-        self._initial_msgs: list[MessageFrame] = []
-        self._latest_observation: str = ""
-        self._lock = threading.Lock()
-
-    def _build_messages(
-        self, memory_prefix: str = "", observation: str = ""
-    ) -> list[MessageFrame]:
-        with self._lock:
-            system = self._system_prompt
-            if memory_prefix or observation:
-                parts = [system]
-                if memory_prefix:
-                    parts.append(memory_prefix)
-                if observation:
-                    parts.append(f"[Current Vision Observation]\n{observation}")
-                system = "\n\n".join(parts)
-            msgs: list[MessageFrame] = self._initial_msgs.copy()
-            msgs.append(MessageFrame.new(role="system", content=system))
-            for name, text in self._history:
-                if name == self.config.user_name:
-                    msgs.append(MessageFrame.new(role="user", content=text))
-                else:
-                    msgs.append(MessageFrame.new(role="assistant", content=text))
-            return msgs
+        self._history: list[MessageFrame] = [
+            MessageFrame.new(role="system", content=config.system_prompt)
+        ]
 
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
-
-        memory_prefix_receiver = inputs.memory_prefix
-        memory_sender = outputs.messages_for_memory
-        has_memory = memory_prefix_receiver is not None and memory_sender is not None
-        memory_gen = (
-            memory_prefix_receiver(self) if memory_prefix_receiver is not None else None
-        )
-        print(
-            f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}"
-        )
 
         # Read initial prompts once (constant component, e.g. CharacterCard)
         if inputs.initial_msgs is not None:
             frame = next(inputs.initial_msgs(self))
             if frame is not None:
-                self._initial_msgs = frame
+                self._history = frame + self._history
                 print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
 
-        def process_observation() -> None:
-            if inputs.observation is None:
-                return
-            for obs_frame in inputs.observation(self):
-                if obs_frame is None:
-                    break
-                with self._lock:
-                    self._latest_observation = obs_frame.text
-                print(f"[AgentState] Observation updated: {obs_frame.text}")
+        # Block on request, drain others on each trigger
+        for req in inputs.request(self):
+            if req is None:
+                break
 
-        def process_asr() -> None:
-            for text_frame in inputs.asr(self):
-                print(text_frame)
-                if text_frame is None:
-                    break
-
-                text = text_frame.text.strip()
-                if not text:
-                    continue
-
-                with self._lock:
-                    self._history.append((self.config.user_name, text))
-                    current_obs = self._latest_observation
-                print(f"[AgentState] User: {text}")
-
-                # Memory retrieval (optional)
-                mem_text = ""
-                if has_memory and memory_sender is not None and memory_gen is not None:
-                    memory_sender.send(self._build_messages(observation=current_obs))
-                    prefix_frame = next(memory_gen)
-                    if prefix_frame is not None and prefix_frame.text:
-                        mem_text = prefix_frame.text
-                        print(f"[AgentState] Memory prefix injected {mem_text}")
-
-                outputs.messages.send(
-                    self._build_messages(
-                        memory_prefix=mem_text, observation=current_obs
+            for speech, feedback, vision, memory in drain(
+                self, inputs.speech, inputs.feedback, inputs.vision, inputs.memory
+            ):
+                if speech is not None:
+                    self._history.append(
+                        MessageFrame.new(role="user", content=speech.text)
                     )
-                )
+                if feedback is not None:
+                    self._history.append(
+                        MessageFrame.new(role="assistant", content=feedback.text)
+                    )
+                if vision is not None:
+                    self._history.append(
+                        MessageFrame.new(role="system", content=vision.text)
+                    )
+                if memory is not None:
+                    self._history.append(
+                        MessageFrame.new(role="system", content=memory.text)
+                    )
 
-        def process_feedback() -> None:
-            for text_frame in inputs.feedback(self):
-                if text_frame is None:
-                    break
-
-                chunk = text_frame.text
-                if not chunk:
-                    continue
-
-                with self._lock:
-                    if (
-                        self._history
-                        and self._history[-1][0] == self.config.chatbot_name
-                    ):
-                        name, text = self._history[-1]
-                        self._history[-1] = (name, text + chunk)
-                    else:
-                        self._history.append((self.config.chatbot_name, chunk))
-
-        def process_interrupts() -> None:
-            if inputs.interrupt is None:
-                return
-            for frame in inputs.interrupt(self):
-                if frame is None:
-                    break
-                print(f"[AgentState] Interrupt received: {frame.reason}")
-
-        threads = [
-            threading.Thread(target=process_observation, daemon=True),
-            threading.Thread(target=process_asr, daemon=True),
-            threading.Thread(target=process_feedback, daemon=True),
-            threading.Thread(target=process_interrupts, daemon=True),
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+            outputs.messages.send(self._history.copy())
 
         print("[AgentState] Agent State management stopped")

@@ -5,7 +5,12 @@ import itertools
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import TYPE_CHECKING, Callable, Iterator
+
+if TYPE_CHECKING:
+    from src.core.channel import Receiver
+    from src.core.component import ThreadedComponent
+    from src.core.frames import Frame
 
 import numpy as np
 
@@ -38,6 +43,35 @@ def obj_count(obj) -> int:
     """
     with _COUNTS_LOCK:
         return next(_COUNTS[obj.__class__.__name__])
+
+
+def drain[F: Frame](
+    subscriber: ThreadedComponent, *receivers: Receiver[F] | None
+) -> Iterator[tuple[F | None, ...]]:
+    """Drain receivers (no_block) and yield one frame at a time, ordered by pts.
+
+    Each yielded tuple has exactly one non-None value at the index of
+    its source receiver, so callers can match frames to inputs.
+    None receivers are treated as unconnected (skipped).
+    """
+    n = len(receivers)
+    pending: list[tuple[int, F]] = []
+    for i, recv in enumerate(receivers):
+        if recv is None:
+            continue
+        for frame in recv(subscriber, no_block=True):
+            if frame is None:
+                break
+            pending.append((i, frame))
+
+    if not pending:
+        return
+
+    pending.sort(key=lambda x: x[1].pts)
+    for idx, frame in pending:
+        row: list[F | None] = [None] * n
+        row[idx] = frame
+        yield tuple(row)
 
 
 def to_numpy(t: object) -> np.ndarray:

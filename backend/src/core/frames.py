@@ -213,6 +213,15 @@ class InterruptFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
+class RequestFrame(Frame):
+    """Frame that triggers a response from the agent."""
+
+    @classmethod
+    def new(cls) -> RequestFrame:
+        return cls(pts=time.time_ns(), id=obj_id())
+
+
+@dataclass(frozen=True, slots=True)
 class MessageFrame(Frame):
     """A single chat message with role and content."""
 
