@@ -5,7 +5,7 @@ import itertools
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator, overload
 
 if TYPE_CHECKING:
     from src.core.channel import Receiver
@@ -45,9 +45,60 @@ def obj_count(obj) -> int:
         return next(_COUNTS[obj.__class__.__name__])
 
 
-def drain[F: Frame](
-    subscriber: ThreadedComponent, *receivers: Receiver[F] | None
-) -> Iterator[tuple[F | None, ...]]:
+@overload
+def drain[F1: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    /,
+) -> Iterator[tuple[F1 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    r2: Receiver[F2] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    r2: Receiver[F2] | None,
+    r3: Receiver[F3] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    r2: Receiver[F2] | None,
+    r3: Receiver[F3] | None,
+    r4: Receiver[F4] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame, F5: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    r2: Receiver[F2] | None,
+    r3: Receiver[F3] | None,
+    r4: Receiver[F4] | None,
+    r5: Receiver[F5] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame, F5: Frame, F6: Frame](
+    subscriber: ThreadedComponent,
+    r1: Receiver[F1] | None,
+    r2: Receiver[F2] | None,
+    r3: Receiver[F3] | None,
+    r4: Receiver[F4] | None,
+    r5: Receiver[F5] | None,
+    r6: Receiver[F6] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None, F6 | None]]: ...
+def drain(
+    subscriber: ThreadedComponent, /, *receivers: Receiver[Any] | None
+) -> Iterator[tuple[Any, ...]]:
     """Drain receivers (no_block) and yield one frame at a time, ordered by pts.
 
     Each yielded tuple has exactly one non-None value at the index of
@@ -55,7 +106,7 @@ def drain[F: Frame](
     None receivers are treated as unconnected (skipped).
     """
     n = len(receivers)
-    pending: list[tuple[int, F]] = []
+    pending: list[tuple[int, Any]] = []
     for i, recv in enumerate(receivers):
         if recv is None:
             continue
@@ -69,7 +120,7 @@ def drain[F: Frame](
 
     pending.sort(key=lambda x: x[1].pts)
     for idx, frame in pending:
-        row: list[F | None] = [None] * n
+        row: list[Any] = [None] * n
         row[idx] = frame
         yield tuple(row)
 
