@@ -8,7 +8,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component
+from src.core.component import Component, EmitOnStart
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -350,6 +350,8 @@ class GraphManager:
             inputs = self._build_tuple(input_type, input_handles)
             outputs = self._build_tuple(output_type, output_handles)
 
+            if isinstance(comp, EmitOnStart):
+                comp.emit(outputs)
             comp.start(inputs, outputs)
 
         # Notify WS listeners that UI channels are ready

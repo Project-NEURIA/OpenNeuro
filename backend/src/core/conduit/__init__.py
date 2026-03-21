@@ -41,3 +41,4 @@ from src.core.conduit.stereo_camera_params_adapter import (
 from src.core.conduit.object_locator_visualizer import (
     ObjectLocatorVisualizer as ObjectLocatorVisualizer,
 )
+from src.core.conduit.do_nothing_tool import DoNothingTool as DoNothingTool

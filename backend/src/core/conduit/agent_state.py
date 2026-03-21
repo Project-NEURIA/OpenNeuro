@@ -100,7 +100,11 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
                 self._history = frame + self._history
                 print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
 
-        # Newest-only iterator for objects (high frequency, only latest matters)
+        # Upfront iterators (cursors persist across drains)
+        speech_it = inputs.speech(self, no_block=True) if inputs.speech else None
+        feedback_it = inputs.feedback(self, no_block=True) if inputs.feedback else None
+        vision_it = inputs.vision(self, no_block=True) if inputs.vision else None
+        memory_it = inputs.memory(self, no_block=True) if inputs.memory else None
         objects_it = (
             inputs.objects(self, newest=True)
             if inputs.objects is not None
@@ -113,7 +117,7 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
                 break
 
             for speech, feedback, vision, memory in drain(
-                self, inputs.speech, inputs.feedback, inputs.vision, inputs.memory
+                speech_it, feedback_it, vision_it, memory_it
             ):
                 if speech is not None:
                     self._history.append(

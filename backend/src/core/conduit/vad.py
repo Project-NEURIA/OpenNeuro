@@ -33,7 +33,7 @@ class VADInputs(NamedTuple):
 
 class VADOutputs(NamedTuple):
     audio: Sender[AudioFrame]
-    interrupt: Sender[InterruptFrame]
+    interrupt: Sender[InterruptFrame] | None = None
 
 
 class VAD(ThreadedComponent[VADInputs, VADOutputs]):
@@ -194,7 +194,8 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
         self._speaking = True
         self._silence_start = None
 
-        outputs.interrupt.send(InterruptFrame.new(reason="speech_detected"))
+        if outputs.interrupt is not None:
+            outputs.interrupt.send(InterruptFrame.new(reason="speech_detected"))
 
         self._current_segment = list(self._pre_buffer)
         self._pre_buffer = []

@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import ConstantComponent, Tag
+from src.core.component import EmitOnStart, PrimitiveComponent, Tag
 from src.core.frames import MessageFrame, TextFrame
 
 
@@ -36,7 +36,7 @@ class CharacterCardOutputs(NamedTuple):
     post_history_instructions: Sender[TextFrame] | None = None
 
 
-class CharacterCard(ConstantComponent[CharacterCardOutputs]):
+class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnStart[CharacterCardOutputs]):
     """A constant component holding a character card (V2 spec conformant).
 
     Initialize with either a path to a SillyTavern PNG character card,

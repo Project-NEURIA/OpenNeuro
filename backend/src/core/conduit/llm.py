@@ -23,7 +23,7 @@ class LLMConfig(BaseModel):
 
 class LLMInputs(NamedTuple):
     messages: Receiver[list[MessageFrame]]
-    tools: Receiver[list[ToolDef]] | None = None
+    tools: Receiver[ToolDef] | None = None
     interrupt: Receiver[InterruptFrame] | None = None
 
 
@@ -57,21 +57,40 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
             else None
         )
 
+        # Collect tool definitions (drain once, tools are registered at start)
+        tool_defs: list[dict[str, Any]] = []
+        if inputs.tools is not None:
+            for td in inputs.tools(self, no_block=True):
+                if td is None:
+                    break
+                tool_defs.append({
+                    "type": "function",
+                    "function": {
+                        "name": td.name,
+                        "description": td.description,
+                        "parameters": td.parameters,
+                        **({"strict": td.strict} if td.strict is not None else {}),
+                    },
+                })
         for messages in inputs.messages(self):
+            print(messages)
             if messages is None:
                 break
 
             msgs: list[Any] = [
                 {"role": m.role, "content": m.content} for m in messages
             ]
-            stream: Stream[ChatCompletionChunk] = self._client.chat.completions.create(
-                model=self.config.model_id,
-                messages=msgs,
-                stream=True,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens,
-            )
+            kwargs: dict[str, Any] = {
+                "model": self.config.model_id,
+                "messages": msgs,
+                "stream": True,
+                "top_p": self.config.top_p,
+                "temperature": self.config.temperature,
+                "max_tokens": self.config.max_tokens,
+            }
+            if tool_defs:
+                kwargs["tools"] = tool_defs
+            stream: Stream[ChatCompletionChunk] = self._client.chat.completions.create(**kwargs)
 
             tool_call_acc: dict[int, dict[str, str]] = {}
             full_text = ""

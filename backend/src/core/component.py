@@ -222,7 +222,7 @@ class Component[
         skip = {
             PrimitiveComponent,
             ThreadedComponent,
-            ConstantComponent,
+            EmitOnStart,
             CompositeComponent,
         }
 
@@ -253,7 +253,7 @@ class PrimitiveComponent[
 ](Component[I, O], ABC):
     """A primitive morphism: a single component, not a composite.
 
-    Not directly instantiable — use ThreadedComponent or ConstantComponent.
+    Not directly instantiable — use ThreadedComponent.
     """
 
     @property
@@ -312,28 +312,20 @@ class ThreadedComponent[
 
 
 # ---------------------------------------------------------------------------
-# ConstantComponent — primitive that holds fixed values (no thread)
+# EmitOnStart — mixin for components that send values synchronously on start
 # ---------------------------------------------------------------------------
 
 
-class ConstantComponent[
-    O: tuple[Sender[Any] | None, ...],
-](PrimitiveComponent[tuple[()], O]):
-    """A primitive component that sends fixed values once on start.
+class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
+    """Mixin for components that need to send values before threads start.
 
-    No thread, no run loop. Subclasses implement emit() to send
-    values into output Senders.
+    GraphManager calls emit(outputs) synchronously during run(),
+    before start() is called. This guarantees values are in channels
+    before any downstream component's thread reads them.
     """
 
     @abstractmethod
-    def emit(self, outputs: O) -> None: ...
-
-    def start(self, inputs: tuple[()], outputs: O) -> None:
-        self._status = Status.RUNNING
-        self.emit(outputs)
-
-    def stop(self) -> None:
-        self._status = Status.STOPPED
+    def emit(self, outputs: E) -> None: ...
 
 
 # ---------------------------------------------------------------------------
