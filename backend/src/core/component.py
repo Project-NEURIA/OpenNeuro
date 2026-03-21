@@ -40,7 +40,10 @@ class Status(Enum):
 # ---------------------------------------------------------------------------
 
 
-class Component[I, O](ABC):
+class Component[
+    I: tuple[Receiver[Any] | None, ...],
+    O: tuple[Sender[Any] | None, ...],
+](ABC):
     tags: Tag = Tag(io=set(), functionality=set())
     description: str = ""
 
@@ -244,7 +247,10 @@ class Component[I, O](ABC):
 # ---------------------------------------------------------------------------
 
 
-class PrimitiveComponent[I, O](Component[I, O], ABC):
+class PrimitiveComponent[
+    I: tuple[Receiver[Any] | None, ...],
+    O: tuple[Sender[Any] | None, ...],
+](Component[I, O], ABC):
     """A primitive morphism: a single component, not a composite.
 
     Not directly instantiable — use ThreadedComponent or ConstantComponent.
@@ -310,21 +316,21 @@ class ThreadedComponent[
 # ---------------------------------------------------------------------------
 
 
-class ConstantComponent[I, O](PrimitiveComponent[I, O]):
-    """A primitive component that holds constant output values.
+class ConstantComponent[
+    O: tuple[Sender[Any] | None, ...],
+](PrimitiveComponent[tuple[()], O]):
+    """A primitive component that sends fixed values once on start.
 
-    No thread, no run loop. Outputs are fixed at construction time
-    and never change. Reading from a constant's output never blocks
-    and always returns the same value.
+    No thread, no run loop. Subclasses implement emit() to send
+    values into output Senders.
     """
 
     @abstractmethod
-    def get_values(self) -> O:
-        """Return the fixed output values as a NamedTuple."""
-        ...
+    def emit(self, outputs: O) -> None: ...
 
-    def start(self, inputs: I, outputs: O) -> None:
+    def start(self, inputs: tuple[()], outputs: O) -> None:
         self._status = Status.RUNNING
+        self.emit(outputs)
 
     def stop(self) -> None:
         self._status = Status.STOPPED

@@ -211,25 +211,6 @@ class Receiver[T]:
             return head - cursor
 
 
-class ConstantReceiver[T](Receiver[T]):
-    """Receiver that yields a fixed value infinitely. No channel needed."""
-
-    def __init__(self, value: T) -> None:
-        super().__init__(Channel())  # dummy, never used
-        self._value = value
-
-    def __call__(
-        self,
-        subscriber: ThreadedComponent[Any, Any],
-        newest: bool = False,
-        no_block: bool = False,
-    ) -> Iterator[T]:
-        def _repeat() -> Iterator[T]:
-            while not subscriber.stop_event.is_set():
-                yield self._value
-
-        return _repeat()
-
 
 # -- UI channel markers --
 
