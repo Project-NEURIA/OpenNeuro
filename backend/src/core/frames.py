@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Literal, overload, NamedTuple
+from typing import Any, ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
@@ -231,6 +231,53 @@ class MessageFrame(Frame):
             id=obj_id(),
             role=role,
             content=content,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolDef(Frame):
+    """Definition of a tool that an LLM can call (matches OpenAI FunctionDefinition)."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    strict: bool | None = None
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        name: str,
+        description: str,
+        parameters: dict[str, Any],
+        strict: bool | None = None,
+    ) -> ToolDef:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            name=name,
+            description=description,
+            parameters=parameters,
+            strict=strict,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCall(Frame):
+    """A tool call emitted by an LLM (matches OpenAI ChatCompletionMessageToolCall)."""
+
+    call_id: str
+    name: str
+    arguments: str
+
+    @classmethod
+    def new(cls, *, call_id: str, name: str, arguments: str) -> ToolCall:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            call_id=call_id,
+            name=name,
+            arguments=arguments,
         )
 
 

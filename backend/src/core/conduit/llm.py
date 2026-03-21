@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import EOS, InterruptFrame, MessageFrame, TextFrame
+from src.core.frames import EOS, InterruptFrame, MessageFrame, TextFrame, ToolCall, ToolDef
 
 
 class LLMConfig(BaseModel):
@@ -25,11 +25,13 @@ class LLMConfig(BaseModel):
 
 class LLMInputs(NamedTuple):
     messages: Receiver[list[MessageFrame]]
+    tools: Receiver[list[ToolDef]] | None = None
     interrupt: Receiver[InterruptFrame] | None = None
 
 
 class LLMOutputs(NamedTuple):
     text: Sender[TextFrame | EOS]
+    tool_calls: Sender[ToolCall] | None = None
 
 
 class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
