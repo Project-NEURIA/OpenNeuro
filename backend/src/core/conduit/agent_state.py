@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import MessageFrame, RequestFrame, TextFrame
+from src.core.frames import MessageFrame, RequestFrame, TextFrame, ToolCall, ToolResult
 from src.core.utils import drain
 
 
@@ -19,6 +19,8 @@ class AgentStateInputs(NamedTuple):
     initial_msgs: Receiver[list[MessageFrame]] | None = None
     speech: Receiver[TextFrame] | None = None
     feedback: Receiver[TextFrame] | None = None
+    tool_call: Receiver[ToolCall] | None = None
+    tool_result: Receiver[ToolResult] | None = None
     vision: Receiver[TextFrame] | None = None
     memory: Receiver[TextFrame] | None = None
 

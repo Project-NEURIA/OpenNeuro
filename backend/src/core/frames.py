@@ -7,6 +7,8 @@ from typing import Any, ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
+from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
+
 from src.core.utils import obj_id
 
 
@@ -223,23 +225,29 @@ class RequestFrame(Frame):
 
 @dataclass(frozen=True, slots=True)
 class MessageFrame(Frame):
-    """A single chat message with role and content."""
+    """A single chat message (OpenAI-compatible)."""
 
-    role: Literal["system", "user", "assistant"]
-    content: str
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str | None = None
+    tool_calls: list[ChatCompletionMessageToolCall] | None = None
+    tool_call_id: str | None = None
 
     @classmethod
     def new(
         cls,
         *,
-        role: Literal["system", "user", "assistant"],
-        content: str,
+        role: Literal["system", "user", "assistant", "tool"],
+        content: str | None = None,
+        tool_calls: list[ChatCompletionMessageToolCall] | None = None,
+        tool_call_id: str | None = None,
     ) -> MessageFrame:
         return cls(
             pts=time.time_ns(),
             id=obj_id(),
             role=role,
             content=content,
+            tool_calls=tool_calls,
+            tool_call_id=tool_call_id,
         )
 
 
@@ -287,6 +295,23 @@ class ToolCall(Frame):
             call_id=call_id,
             name=name,
             arguments=arguments,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolResult(Frame):
+    """Result of a tool execution (matches OpenAI ChatCompletionToolMessageParam)."""
+
+    call_id: str
+    content: str
+
+    @classmethod
+    def new(cls, *, call_id: str, content: str) -> ToolResult:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            call_id=call_id,
+            content=content,
         )
 
 
