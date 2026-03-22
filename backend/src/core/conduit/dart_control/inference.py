@@ -145,9 +145,67 @@ class MVAEArgs:
 
 
 def _load_tyro_yaml(path: Path, cls: type):
-    """Load a tyro-formatted YAML config file into the given dataclass type."""
+    """Load a tyro-formatted YAML config file.
+
+    Handles the tyro format where the file is a YAML-encoded string with
+    !dataclass tags. Strips tags and parses into a plain dict, then
+    manually constructs the dataclass.
+    """
+    import re
     with open(path, "r") as f:
-        return tyro.extras.from_yaml(cls, yaml.safe_load(f))
+        text = f.read()
+    # Strip all YAML tags (!dataclass:X, !!python/tuple, etc.)
+    cleaned = re.sub(r"![!a-zA-Z_:/]+", "", text)
+    raw = yaml.safe_load(cleaned) or {}
+    # If result is a string, it was double-encoded — parse again
+    if isinstance(raw, str):
+        cleaned = re.sub(r"![!a-zA-Z_:/]+", "", raw)
+        raw = yaml.safe_load(cleaned) or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    # For MLDArgs: extract denoiser_args sub-dict
+    if cls is MLDArgs and "denoiser_args" in raw:
+        da = raw["denoiser_args"]
+        model_args_data = da.get("model_args", {})
+        diff_args_data = da.get("diffusion_args", {})
+        # Convert tuple fields
+        for k in ("history_shape", "noise_shape"):
+            if k in model_args_data and isinstance(model_args_data[k], list):
+                model_args_data[k] = tuple(model_args_data[k])
+        model_type = da.get("model_type", "mlp")
+        if "transformer" in model_type.lower():
+            model_args = DenoiserTransformerArgs(**{
+                k: v for k, v in model_args_data.items()
+                if k in DenoiserTransformerArgs.__dataclass_fields__
+            })
+        else:
+            model_args = DenoiserMLPArgs(**{
+                k: v for k, v in model_args_data.items()
+                if k in DenoiserMLPArgs.__dataclass_fields__
+            })
+        diff_args = DiffusionArgs(**{
+            k: v for k, v in diff_args_data.items()
+            if k in DiffusionArgs.__dataclass_fields__
+        })
+        denoiser_args = DenoiserArgs(
+            model_type=model_type,
+            model_args=model_args,
+            diffusion_args=diff_args,
+            mvae_path=da.get("mvae_path", ""),
+            rescale_latent=da.get("rescale_latent", 1),
+        )
+        return MLDArgs(denoiser_args=denoiser_args)
+    # For MVAEArgs: extract model_args sub-dict
+    if cls is MVAEArgs and "model_args" in raw:
+        ma = raw["model_args"]
+        if "latent_dim" in ma and isinstance(ma["latent_dim"], list):
+            ma["latent_dim"] = tuple(ma["latent_dim"])
+        vae_args = VAEArgs(**{
+            k: v for k, v in ma.items()
+            if k in VAEArgs.__dataclass_fields__
+        })
+        return MVAEArgs(model_args=vae_args)
+    return cls()
 
 
 def _create_diffusion(

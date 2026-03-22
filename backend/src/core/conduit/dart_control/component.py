@@ -206,8 +206,8 @@ class DartControlConfig(BaseModel):
     device: Literal["cuda", "cpu", "mps"]
     """Device for inference."""
 
-    respacing: str = ""
-    """DDIM respacing (e.g. 'ddim10'). Empty string for full diffusion sampling."""
+    respacing: str = "ddim10"
+    """DDIM respacing (e.g. 'ddim10'). Must match what the policy was trained with."""
 
     clip_version: str = "ViT-B/32"
     """OpenAI CLIP model version for text encoding."""
@@ -444,7 +444,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
 
         # Canonicalize + recompute features
         _, new_feature_dict = putil.get_blended_feature(
-            feature_dict, use_predicted_joints=False
+            feature_dict, use_predicted_joints=True
         )
 
         # Update accumulators

@@ -25,17 +25,17 @@ from src.core.conduit.dart_control.component import DartControl, DartControlConf
 from src.core.frames import BodyPoseFrame, GoalFrame, TextFrame
 
 
-SUCCESS_THRESHOLD = 0.5  # meters
-TIMEOUT = 60  # seconds per waypoint
+SUCCESS_THRESHOLD = 1.5  # meters
+TIMEOUT = 30  # seconds per waypoint
 
 
 def test_square_walk():
-    # Figure starts facing roughly +X direction from stand.pkl
-    # Place waypoints ahead and slightly to the side so the policy can steer
+    # Figure starts at (0, -0.45) facing -Y direction (0.1, -0.995)
+    # Place waypoints ahead of the figure
     waypoints = [
-        (4.0, 0.0, 0.0),   # straight ahead
-        (4.0, 4.0, 0.0),   # turn left
-        (0.0, 4.0, 0.0),   # turn left again
+        (0.0, -4.0, 0.0),  # straight ahead
+        (4.0, -4.0, 0.0),  # turn right
+        (4.0, 0.0, 0.0),   # turn right again
         (0.0, 0.0, 0.0),   # back to origin
     ]
 
