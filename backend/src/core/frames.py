@@ -7,8 +7,6 @@ from typing import Any, ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
-from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
-
 from src.core.utils import obj_id
 
 
@@ -229,7 +227,7 @@ class MessageFrame(Frame):
 
     role: Literal["system", "user", "assistant", "tool"]
     content: str | None = None
-    tool_calls: list[ChatCompletionMessageToolCall] | None = None
+    tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
 
     @classmethod
@@ -238,7 +236,7 @@ class MessageFrame(Frame):
         *,
         role: Literal["system", "user", "assistant", "tool"],
         content: str | None = None,
-        tool_calls: list[ChatCompletionMessageToolCall] | None = None,
+        tool_calls: list[ToolCall] | None = None,
         tool_call_id: str | None = None,
     ) -> MessageFrame:
         return cls(

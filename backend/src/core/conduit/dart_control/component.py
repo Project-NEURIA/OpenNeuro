@@ -570,6 +570,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         # Floor height relative to first-frame pelvis
         floor_height = -global_joints[:, 0, 0, 2]  # [B]
 
+        print(f"[OBS] pelvis=({global_pelvis[0,0]:.2f}, {global_pelvis[0,1]:.2f}, {global_pelvis[0,2]:.2f}), "
+              f"goal=({goal[0,0]:.2f}, {goal[0,1]:.2f}, {goal[0,2]:.2f}), "
+              f"dist={goal_dist[0,0]:.2f}, local_dir=({local_goal_dir[0,0]:.2f}, {local_goal_dir[0,1]:.2f}, {local_goal_dir[0,2]:.2f})")
+
         # Concatenate: goal_dir(3), goal_dist(1), text(512), motion(H*276), scene(1)
         observation = torch.cat(
             [

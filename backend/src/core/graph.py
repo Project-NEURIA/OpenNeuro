@@ -294,7 +294,7 @@ class GraphManager:
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
-
+        start_queue: list[tuple[Component[Any, Any], Any, Any]] = []
         for node_id in self._graph.nodes:
             comp = self._components[node_id]
             cls = type(comp)
@@ -352,6 +352,10 @@ class GraphManager:
 
             if isinstance(comp, EmitOnStart):
                 comp.emit(outputs)
+            start_queue.append((comp, inputs, outputs))
+
+        # Start all components after all emits are done
+        for comp, inputs, outputs in start_queue:
             comp.start(inputs, outputs)
 
         # Notify WS listeners that UI channels are ready

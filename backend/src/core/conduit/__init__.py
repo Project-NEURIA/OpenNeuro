@@ -42,3 +42,4 @@ from src.core.conduit.object_locator_visualizer import (
     ObjectLocatorVisualizer as ObjectLocatorVisualizer,
 )
 from src.core.conduit.do_nothing_tool import DoNothingTool as DoNothingTool
+from src.core.conduit.movement_tool import MovementTool as MovementTool

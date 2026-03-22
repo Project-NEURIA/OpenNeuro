@@ -11,7 +11,6 @@ from src.core.frames import (
     BodyPoseFrame,
     MessageFrame,
     ObjectLocationFrame,
-    RequestFrame,
     TextFrame,
     ToolCall,
     ToolResult,
@@ -20,11 +19,11 @@ from src.core.utils import drain
 
 
 class AgentStateConfig(BaseModel):
-    system_prompt: str = "You are a helpful AI assistant."
+    system_prompt: str
 
 
-class AgentStateInputs(NamedTuple):
-    request: Receiver[RequestFrame]
+class AgentStateInputs[T](NamedTuple):
+    request: Receiver[T]
     initial_msgs: Receiver[list[MessageFrame]] | None = None
     speech: Receiver[TextFrame] | None = None
     feedback: Receiver[TextFrame] | None = None
@@ -41,7 +40,7 @@ class AgentStateOutputs(NamedTuple):
     # messages_for_memory: Sender[list[MessageFrame]] | None = None
 
 
-class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
+class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
     """Manages conversation history, optionally enriched by memory and character card."""
 
     description = "Tracks and manages agent conversation state"
@@ -55,6 +54,7 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
         ]
         # Object tracking: object_id -> (label, position)
         self._visible: dict[int, tuple[str, np.ndarray]] = {}
+        self._latest_position: tuple[float, float, float] | None = None
 
     def _diff_objects(self, frame: ObjectLocationFrame) -> None:
         """Diff incoming objects against currently visible. Disappeared objects
@@ -95,7 +95,7 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
 
         # Read initial prompts once (constant component, e.g. CharacterCard)
         if inputs.initial_msgs is not None:
-            frame = next(inputs.initial_msgs(self))
+            frame = next(inputs.initial_msgs(self, latest=False))
             if frame is not None:
                 self._history = frame + self._history
                 print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
@@ -105,9 +105,16 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
         feedback_it = inputs.feedback(self, no_block=True) if inputs.feedback else None
         vision_it = inputs.vision(self, no_block=True) if inputs.vision else None
         memory_it = inputs.memory(self, no_block=True) if inputs.memory else None
+        tool_call_it = inputs.tool_call(self, no_block=True) if inputs.tool_call else None
+        tool_result_it = inputs.tool_result(self, no_block=True) if inputs.tool_result else None
         objects_it = (
-            inputs.objects(self, newest=True)
+            inputs.objects(self, newest=True, no_block=True)
             if inputs.objects is not None
+            else None
+        )
+        pose_it = (
+            inputs.pose(self, newest=True, no_block=True)
+            if inputs.pose is not None
             else None
         )
 
@@ -136,18 +143,69 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
                         MessageFrame.new(role="system", content=memory.text)
                     )
 
+            # Drain tool calls
+            if tool_call_it is not None:
+                for tc in tool_call_it:
+                    if tc is None:
+                        break
+                    self._history.append(
+                        MessageFrame.new(
+                            role="assistant",
+                            tool_calls=[tc],
+                        )
+                    )
+
+            # Drain tool results
+            if tool_result_it is not None:
+                for tr in tool_result_it:
+                    if tr is None:
+                        break
+                    self._history.append(
+                        MessageFrame.new(
+                            role="tool",
+                            content=tr.content,
+                            tool_call_id=tr.call_id,
+                        )
+                    )
+
             # Diff objects against previous state
             if objects_it is not None:
                 obj_frame = next(objects_it)
                 if obj_frame is not None:
                     self._diff_objects(obj_frame)
 
-            # Build final messages: history + live visible objects at the end
+            # Read latest pose
+            if pose_it is not None:
+                pose_frame = next(pose_it)
+                if pose_frame is not None:
+                    poses = pose_frame.get()
+                    waist = poses.get("waist")
+                    if waist is not None:
+                        self._latest_position = (waist.pos_x, waist.pos_y, waist.pos_z)
+
+            # Build final messages: history + live state at the end
             msgs = self._history.copy()
             visible_msg = self._build_visible_message()
             if visible_msg is not None:
                 msgs.append(visible_msg)
+            if self._latest_position is not None:
+                x, y, z = self._latest_position
+                msgs.append(
+                    MessageFrame.new(
+                        role="system",
+                        content=f"[Your current position: ({x:.2f}, {y:.2f}, {z:.2f})]",
+                    )
+                )
 
+            print("-------------------------------------------")
+            for m in msgs:
+                preview = m.content[:80] if m.content else "(no content)"
+                extra = ""
+                if m.tool_calls:
+                    extra += f" tool_calls={[tc.name for tc in m.tool_calls]}"
+                if m.tool_call_id:
+                    extra += f" tool_call_id={m.tool_call_id}"
+                print(f"  [{m.role}] {preview}{extra}")
             outputs.messages.send(msgs)
 
         print("[AgentState] Agent State management stopped")

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import os
 from typing import Any, NamedTuple
 
-from openai import OpenAI, Stream
-from openai.types.chat import ChatCompletionChunk
+import litellm
+from litellm import completion
+
+litellm.drop_params = True
+from litellm.types.utils import ModelResponseStream
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
@@ -13,12 +15,10 @@ from src.core.frames import EOS, InterruptFrame, MessageFrame, TextFrame, ToolCa
 
 
 class LLMConfig(BaseModel):
-    base_url: str = "https://api.groq.com/openai/v1"
-    model_id: str = "llama-3.3-70b-versatile"
-    api_key_env_var: str = "GROQ_API_KEY"
-    top_p: float = 0.97
-    temperature: float = 1.08
-    max_tokens: int = 350
+    model: str = "groq/llama-3.3-70b-versatile"
+    top_p: float | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
 
 
 class LLMInputs(NamedTuple):
@@ -36,17 +36,13 @@ class LLMOutputs(NamedTuple):
 class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
     description = "Generates text responses using a large language model"
 
-    """LLM text generation component using OpenAI-compatible API."""
+    """LLM text generation component using litellm."""
 
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: LLMConfig) -> None:
         super().__init__()
         self.config = config
-        self._client = OpenAI(
-            base_url=config.base_url,
-            api_key=os.getenv(config.api_key_env_var) or "",
-        )
 
     def run(self, inputs: LLMInputs, outputs: LLMOutputs) -> None:
         print("[LLM] Starting LLM generation")
@@ -60,7 +56,7 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
         # Collect tool definitions (drain once, tools are registered at start)
         tool_defs: list[dict[str, Any]] = []
         if inputs.tools is not None:
-            for td in inputs.tools(self, no_block=True):
+            for td in inputs.tools(self, no_block=True, latest=False):
                 if td is None:
                     break
                 tool_defs.append({
@@ -72,30 +68,51 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                         **({"strict": td.strict} if td.strict is not None else {}),
                     },
                 })
+        print(f"[LLM] Tools: {[td['function']['name'] for td in tool_defs]}" if tool_defs else "[LLM] No tools")
+
         for messages in inputs.messages(self):
-            print(messages)
             if messages is None:
                 break
 
-            msgs: list[Any] = [
-                {"role": m.role, "content": m.content} for m in messages
-            ]
+            msgs: list[Any] = []
+            for m in messages:
+                msg: dict[str, Any] = {"role": m.role, "content": m.content}
+                if m.tool_calls:
+                    msg["tool_calls"] = [
+                        {
+                            "id": tc.call_id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": tc.arguments,
+                            },
+                        }
+                        for tc in m.tool_calls
+                    ]
+                if m.tool_call_id:
+                    msg["tool_call_id"] = m.tool_call_id
+                msgs.append(msg)
             kwargs: dict[str, Any] = {
-                "model": self.config.model_id,
+                "model": self.config.model,
                 "messages": msgs,
                 "stream": True,
-                "top_p": self.config.top_p,
-                "temperature": self.config.temperature,
-                "max_tokens": self.config.max_tokens,
+                **({"top_p": self.config.top_p} if self.config.top_p is not None else {}),
+                **({"temperature": self.config.temperature} if self.config.temperature is not None else {}),
+                **({"max_tokens": self.config.max_tokens} if self.config.max_tokens is not None else {}),
             }
             if tool_defs:
                 kwargs["tools"] = tool_defs
-            stream: Stream[ChatCompletionChunk] = self._client.chat.completions.create(**kwargs)
+                kwargs["tool_choice"] = "auto"
+
+            stream = completion(**kwargs)
 
             tool_call_acc: dict[int, dict[str, str]] = {}
             full_text = ""
 
             for chunk in stream:
+                if not isinstance(chunk, ModelResponseStream):
+                    continue
+
                 if interrupt_it is not None:
                     irq = next(interrupt_it)
                     if irq is not None:
@@ -109,7 +126,7 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                 if choice is None:
                     continue
 
-                delta = choice.delta
+                delta = getattr(choice, "delta", None)
                 if delta and delta.tool_calls:
                     for tc in delta.tool_calls:
                         acc = tool_call_acc.setdefault(
@@ -138,7 +155,11 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                     outputs.token.send(EOS.END)
                     break
 
-                text = delta.content or "" if delta else ""
+                text = (delta.content or "") if delta else ""
                 if text:
                     full_text += text
                     outputs.token.send(TextFrame.new(text=text))
+
+            print(f"[LLM] Generation done, text length: {len(full_text)}")
+
+        print("[LLM] LLM generation stopped")

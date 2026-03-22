@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import time
 from typing import NamedTuple
 
 from pydantic import BaseModel
 
 from src.core.channel import Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import RequestFrame
+from src.core.frames import Frame
 
 
 class PulseConfig(BaseModel):
@@ -15,11 +14,11 @@ class PulseConfig(BaseModel):
 
 
 class PulseOutputs(NamedTuple):
-    request: Sender[RequestFrame]
+    pulse: Sender[Frame]
 
 
 class Pulse(ThreadedComponent[tuple[()], PulseOutputs]):
-    description = "Emits a request frame at a fixed interval"
+    description = "Emits a frame at a fixed interval"
     tags = Tag(io={"source"}, functionality={"misc"})
 
     def __init__(self, config: PulseConfig) -> None:
@@ -28,5 +27,5 @@ class Pulse(ThreadedComponent[tuple[()], PulseOutputs]):
 
     def run(self, inputs: tuple[()], outputs: PulseOutputs) -> None:
         while not self.stop_event.is_set():
-            outputs.request.send(RequestFrame.new())
+            outputs.pulse.send(Frame(pts=0, id=0))
             self.stop_event.wait(self.config.interval)
