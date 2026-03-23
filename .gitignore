@@ -11,3 +11,7 @@ node_modules/
 .DS_Store
 
 dev-ignore
+
+# YOLO model files
+backend/src/core/conduit/yolo/*.ts
+backend/src/core/conduit/yolo/*.pt
