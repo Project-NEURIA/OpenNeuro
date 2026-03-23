@@ -267,6 +267,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
 
         # Autoregressive state (set by _init_from_stand before use)
         self._history: torch.Tensor = torch.empty(0)
+        self._world_history: torch.Tensor = torch.empty(0)
         self._transf_rotmat: torch.Tensor = torch.empty(0)
         self._transf_transl: torch.Tensor = torch.empty(0)
         self._pelvis_delta: torch.Tensor = torch.empty(0)
@@ -369,8 +370,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         feature_dict = putil.calc_features(primitive_dict)
 
         # Convert to tensor [B, T, 276] — note: calc_features produces T-1 frames for delta fields
-        # We need to pad delta features to match T frames
-        # The last frame's delta is just repeated from the second-to-last
+        # Pad by repeating the last delta frame to match T frames
         feature_dict["transl_delta"] = torch.cat(
             [
                 feature_dict["transl_delta"],
@@ -397,6 +397,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         # Take last h_len frames
         history_tensor = history_tensor[:, -h_len:, :]  # [B, H, 276]
 
+        # Store world-space history (init is already world-space with identity transf)
+        self._world_history = history_tensor.clone()
+
         # Normalize
         self._history = engine.normalize(history_tensor)
         self._transf_rotmat = primitive_dict["transf_rotmat"]
@@ -411,45 +414,56 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         self,
         engine: DartControlInference,
         putil: PrimitiveUtility,
-        history_normalized: torch.Tensor,
-        future_normalized: torch.Tensor,
+        world_features: torch.Tensor,
     ) -> None:
-        """Update history using DART's canonicalization pipeline.
+        """Update history from world-space features, matching the demo.
 
-        1. Denormalize [history + future]
-        2. Take last history_len frames
-        3. Convert to feature dict, attach metadata
-        4. get_blended_feature (canonicalize + SMPL FK + recompute deltas)
-        5. dict_to_tensor → normalize → store as new history
-        6. Update transf_rotmat/transf_transl accumulators
+        The demo accumulates a world-space motion_tensor and slices the last H
+        frames each step. We do the same: take world-space features, slice last H,
+        then canonicalize from identity transform.
+
+        Args:
+            world_features: [B, F, 276] denormalized world-space features
+                            (output of _get_world_features)
         """
         h_len = engine.history_shape[0]
-        combined = torch.cat(
-            [history_normalized, future_normalized], dim=1
-        )  # [B, H+F, 276]
-        combined_denorm = engine.denormalize(combined)  # [B, H+F, 276]
-        raw_history = combined_denorm[:, -h_len:, :]  # [B, H, 276]
+        device = world_features.device
+        B = world_features.shape[0]
+
+        # Concatenate previous world history with new world future, take last H
+        # This mirrors demo line 200: motion_tensor = cat([motion_tensor, future_tensor])
+        # then line 147: history = motion_tensor[:, -H:, :]
+        self._world_history = torch.cat(
+            [self._world_history, world_features], dim=1
+        )  # [B, accumulated, 276]
+        raw_history = self._world_history[:, -h_len:, :]  # [B, H, 276]
+        # Keep only what we need to avoid unbounded growth
+        self._world_history = raw_history
 
         # Convert to feature dict
         feature_dict = putil.tensor_to_dict(raw_history)
 
-        # Attach metadata needed by get_blended_feature
+        # Attach metadata — identity transform (like demo lines 150-151)
         feature_dict["gender"] = self.config.gender
         feature_dict["betas"] = self._betas.unsqueeze(1).expand(
             -1, h_len, -1
         )  # [B, H, 10]
-        feature_dict["transf_rotmat"] = self._transf_rotmat  # [B, 3, 3]
-        feature_dict["transf_transl"] = self._transf_transl  # [B, 1, 3]
+        feature_dict["transf_rotmat"] = torch.eye(
+            3, device=device, dtype=torch.float32
+        ).unsqueeze(0).expand(B, -1, -1)  # [B, 3, 3]
+        feature_dict["transf_transl"] = torch.zeros(
+            B, 1, 3, device=device, dtype=torch.float32
+        )  # [B, 1, 3]
         feature_dict["pelvis_delta"] = self._pelvis_delta  # [B, 3]
 
-        # Canonicalize + recompute features
-        _, new_feature_dict = putil.get_blended_feature(
+        # Canonicalize + recompute features (like demo line 159-162)
+        canonicalized_dict, new_feature_dict = putil.get_blended_feature(
             feature_dict, use_predicted_joints=True
         )
 
-        # Update accumulators
-        self._transf_rotmat = new_feature_dict["transf_rotmat"]
-        self._transf_transl = new_feature_dict["transf_transl"]
+        # Store transf for next step's world-space conversion
+        self._transf_rotmat = canonicalized_dict["transf_rotmat"]
+        self._transf_transl = canonicalized_dict["transf_transl"]
 
         # Convert back to tensor and normalize
         new_history = putil.dict_to_tensor(new_feature_dict)  # [B, H, 276]
@@ -706,8 +720,8 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                     engine, putil, future_normalized
                 )  # [B, F, 276]
 
-                # Update history with canonicalization pipeline (before emitting, uses old transf)
-                self._update_history(engine, putil, self._history, future_normalized)
+                # Update history from world-space features (like demo's motion_tensor accumulation)
+                self._update_history(engine, putil, world_features.to(self.config.device))
 
                 # Emit world-space frames
                 batch = world_features[0]  # [F, 276]

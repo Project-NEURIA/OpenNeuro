@@ -146,6 +146,14 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             if req is None:
                 break
 
+            # If request itself carries text (e.g. TextInput wired directly),
+            # treat it as the user message so it doesn't need a separate speech wire.
+            if hasattr(req, "text") and req.text:
+                ts = datetime.fromtimestamp(req.pts / 1e9).strftime("%H:%M:%S")
+                self._history.append(
+                    MessageFrame.new(role="user", content=f"[{ts}] {req.text}")
+                )
+
             for speech, feedback, vision, memory, tc, tr in drain(
                 speech_it, feedback_it, vision_it, memory_it, tool_call_it, tool_result_it
             ):

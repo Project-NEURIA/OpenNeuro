@@ -103,7 +103,9 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         if self._initialized:
             return
 
-        os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+        import sys
+        if sys.platform == "linux":
+            os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 
         import pyrender
         import trimesh
