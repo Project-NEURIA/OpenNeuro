@@ -1,0 +1,272 @@
+{
+  "edges": [
+    {
+      "source_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "source_slot": "tool_calls",
+      "target_node": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "target_slot": "tool_call"
+    },
+    {
+      "source_node": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "source_slot": "tool_def",
+      "target_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "target_slot": "tools"
+    },
+    {
+      "source_node": "860ae347-074e-449e-bcc4-549f463134fc",
+      "source_slot": "prompts",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "initial_msgs"
+    },
+    {
+      "source_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "source_slot": "messages",
+      "target_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "target_slot": "messages"
+    },
+    {
+      "source_node": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "source_slot": "tool_result",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "tool_result"
+    },
+    {
+      "source_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "source_slot": "tool_calls",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "tool_call"
+    },
+    {
+      "source_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "source_slot": "token",
+      "target_node": "85e8f063-15f1-4786-8ed7-d6d2e01f81e0",
+      "target_slot": "text"
+    },
+    {
+      "source_node": "85e8f063-15f1-4786-8ed7-d6d2e01f81e0",
+      "source_slot": "audio",
+      "target_node": "3d531c02-6f7c-4df3-881b-58e6efdc777b",
+      "target_slot": "audio"
+    },
+    {
+      "source_node": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "source_slot": "text",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "feedback"
+    },
+    {
+      "source_node": "bb689b74-9814-4c92-8a78-b81893d6b450",
+      "source_slot": "text",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "speech"
+    },
+    {
+      "source_node": "f6b9b7d5-8340-4579-8720-a1adadca4048",
+      "source_slot": "request",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "request"
+    },
+    {
+      "source_node": "85e8f063-15f1-4786-8ed7-d6d2e01f81e0",
+      "source_slot": "text",
+      "target_node": "c7b437c4-0961-4703-8bb8-09658b09ef6e",
+      "target_slot": "text"
+    },
+    {
+      "source_node": "51812752-63fa-4a15-bbae-b53f77988603",
+      "source_slot": "video",
+      "target_node": "33ab9e18-5e7f-44f8-83ef-e743ca793e79",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "bb689b74-9814-4c92-8a78-b81893d6b450",
+      "source_slot": "text",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "request"
+    },
+    {
+      "source_node": "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87",
+      "source_slot": "motion",
+      "target_node": "51812752-63fa-4a15-bbae-b53f77988603",
+      "target_slot": "pose"
+    },
+    {
+      "source_node": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "source_slot": "goal",
+      "target_node": "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87",
+      "target_slot": "goal"
+    },
+    {
+      "source_node": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "source_slot": "instruction",
+      "target_node": "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87",
+      "target_slot": "instruction"
+    },
+    {
+      "source_node": "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87",
+      "source_slot": "motion",
+      "target_node": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "target_slot": "pose"
+    }
+  ],
+  "nodes": {
+    "860ae347-074e-449e-bcc4-549f463134fc": {
+      "id_": "860ae347-074e-449e-bcc4-549f463134fc",
+      "type": "CharacterCard",
+      "init_args": {
+        "path": "/Users/kevin/PycharmProjects/OpenNeuro/backend/assets/character_cards/energetic_girl.png",
+        "config": {
+          "name": "",
+          "description": "",
+          "personality": "",
+          "scenario": "",
+          "first_message": "",
+          "example_messages": "",
+          "system_prompt": "",
+          "post_history_instructions": ""
+        }
+      },
+      "x": -502.2520117585128,
+      "y": 850.9094372775957,
+      "sub_graph": null
+    },
+    "2d2477b3-0048-4e67-983a-095cf400d048": {
+      "id_": "2d2477b3-0048-4e67-983a-095cf400d048",
+      "type": "LLM",
+      "init_args": {
+        "config": {
+          "model": "groq/llama-3.3-70b-versatile",
+          "top_p": 0.97,
+          "temperature": 1.08,
+          "max_tokens": 350
+        }
+      },
+      "x": 596.5363106073538,
+      "y": 510.4963486689161,
+      "sub_graph": null
+    },
+    "ef3f9c27-340a-4375-a227-b3e191ec6ef3": {
+      "id_": "ef3f9c27-340a-4375-a227-b3e191ec6ef3",
+      "type": "MovementTool",
+      "init_args": {},
+      "x": 652.809309885523,
+      "y": 945.0567921196139,
+      "sub_graph": null
+    },
+    "0ed4d535-435a-4497-b846-6624ebe1ee7c": {
+      "id_": "0ed4d535-435a-4497-b846-6624ebe1ee7c",
+      "type": "AgentState",
+      "init_args": {
+        "config": {
+          "system_prompt": ""
+        }
+      },
+      "x": 101.48998950266812,
+      "y": 477.30093838360347,
+      "sub_graph": null
+    },
+    "85e8f063-15f1-4786-8ed7-d6d2e01f81e0": {
+      "id_": "85e8f063-15f1-4786-8ed7-d6d2e01f81e0",
+      "type": "TTS",
+      "init_args": {
+        "config": {
+          "api_key_env_var": "INWORLD_API_KEY",
+          "url": "https://api.inworld.ai/tts/v1/voice:stream",
+          "voice_id": "Ashley",
+          "model_id": "inworld-tts-1.5-max"
+        }
+      },
+      "x": 1238.2484113127289,
+      "y": 334.7973232411764,
+      "sub_graph": null
+    },
+    "c7b437c4-0961-4703-8bb8-09658b09ef6e": {
+      "id_": "c7b437c4-0961-4703-8bb8-09658b09ef6e",
+      "type": "TextDisplay",
+      "init_args": {},
+      "x": 1339.7457266378487,
+      "y": 714.2435095767859,
+      "sub_graph": null
+    },
+    "3d531c02-6f7c-4df3-881b-58e6efdc777b": {
+      "id_": "3d531c02-6f7c-4df3-881b-58e6efdc777b",
+      "type": "Speaker",
+      "init_args": {
+        "config": {
+          "sample_rate": 24000,
+          "channels": 1
+        }
+      },
+      "x": 1710.7691191388858,
+      "y": 385.5026819844963,
+      "sub_graph": null
+    },
+    "bb689b74-9814-4c92-8a78-b81893d6b450": {
+      "id_": "bb689b74-9814-4c92-8a78-b81893d6b450",
+      "type": "TextInput",
+      "init_args": {},
+      "x": -564.0703593294945,
+      "y": 520.0736529308841,
+      "sub_graph": null
+    },
+    "f6b9b7d5-8340-4579-8720-a1adadca4048": {
+      "id_": "f6b9b7d5-8340-4579-8720-a1adadca4048",
+      "type": "Pulse",
+      "init_args": {
+        "config": {
+          "interval": 1
+        }
+      },
+      "x": -533.1331925958295,
+      "y": 126.72967588857172,
+      "sub_graph": null
+    },
+    "51812752-63fa-4a15-bbae-b53f77988603": {
+      "id_": "51812752-63fa-4a15-bbae-b53f77988603",
+      "type": "PoseRenderer",
+      "init_args": {
+        "config": {
+          "width": 640,
+          "height": 480
+        }
+      },
+      "x": 1471.18491526607,
+      "y": 1299.037392839347,
+      "sub_graph": null
+    },
+    "33ab9e18-5e7f-44f8-83ef-e743ca793e79": {
+      "id_": "33ab9e18-5e7f-44f8-83ef-e743ca793e79",
+      "type": "VideoStream",
+      "init_args": {},
+      "x": 21.06943331169839,
+      "y": 1149.6671685535537,
+      "sub_graph": null
+    },
+    "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87": {
+      "id_": "a9f0f2de-dd6d-41f4-96bc-1e9d3702ce87",
+      "type": "DartControl",
+      "init_args": {
+        "config": {
+          "denoiser_checkpoint": "assets/dart_control/mld/checkpoint_300000.pt",
+          "vae_checkpoint": "assets/dart_control/mvae/checkpoint_200000.pt",
+          "mean_std_path": "assets/dart_control/mean_std_h2_f8.pkl",
+          "stand_path": "assets/dart_control/stand.pkl",
+          "device": "cpu",
+          "respacing": "ddim10",
+          "clip_version": "ViT-B/32",
+          "guidance_scale": 5,
+          "future_length": 8,
+          "batch_size": 1,
+          "gender": "male",
+          "fps": 30,
+          "policy_checkpoint": "assets/dart_control/iter_2000.pth",
+          "obs_goal_angle_clip": 60,
+          "obs_goal_dist_clip": 5
+        }
+      },
+      "x": 1103.3452940384584,
+      "y": 1050.44456632513,
+      "sub_graph": null
+    }
+  }
+}
