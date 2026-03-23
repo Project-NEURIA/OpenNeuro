@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import math
 import pickle
-import queue
-import threading
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -636,35 +634,37 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         print(f"[DartControl] RL policy loaded from {ckpt_path}")
         return policy
 
-    def _generation_loop(
-        self,
-        engine: DartControlInference,
-        putil: PrimitiveUtility,
-        frame_queue: queue.Queue[dict[str, BonePose | None]],
-        policy: PolicyReachLocationMLP | None,
-        goal_receiver: Receiver[GoalFrame] | None,
-        instruction_receiver: Receiver[TextFrame] | None,
-    ) -> None:
-        """Background thread: generates motion primitives and fills the queue."""
+    def run(self, inputs: DartControlInputs, outputs: DartControlOutputs) -> None:
+        print("[DartControl] Starting DartControl component, loading models...")
+        engine = self._ensure_engine()
+        putil = self._ensure_primitive_util()
+        print("[DartControl] Models loaded, initializing from stand pose...")
+
+        # Initialize history from stand.pkl
+        self._init_from_stand(engine, putil)
+
+        # Load RL policy if configured
+        policy = self._load_policy(engine)
+        print("[DartControl] Streaming motion")
+
         instruction: str | None = None
         text_embedding: torch.Tensor | None = None
-
-        # Current goal (None means no goal → random noise)
         current_goal: torch.Tensor | None = None
 
         # Set up non-blocking generators for input channels
         goal_gen = (
-            goal_receiver(self, newest=True, no_block=True)
-            if goal_receiver is not None
+            inputs.goal(self, newest=True, no_block=True)
+            if inputs.goal is not None
             else None
         )
         instruction_gen = (
-            instruction_receiver(self, newest=True, no_block=True)
-            if instruction_receiver is not None
+            inputs.instruction(self, newest=True, no_block=True)
+            if inputs.instruction is not None
             else None
         )
 
         print("[DartControl] Idle, waiting for instruction...")
+        frame_interval = 1.0 / self.config.fps
 
         while not self.stop_event.is_set():
             try:
@@ -675,7 +675,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                         new_instruction = instr_frame.get()
                         if new_instruction and new_instruction != instruction:
                             instruction = new_instruction
-                            current_goal = None  # clear until a new goal arrives
+                            current_goal = None
                             print(f"[DartControl] Instruction updated: '{instruction}'")
                             text_embedding = engine.encode_text([instruction])
                             text_embedding = text_embedding.expand(
@@ -691,8 +691,6 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                 if goal_gen is not None:
                     goal_frame = next(goal_gen)
                     if goal_frame is not None and isinstance(goal_frame, GoalFrame):
-                        # Convert Y-up (x, y, z) → Z-up (-x, -z, y) for DART
-                        # X negated because DART +X = figure's left, our +X = figure's right
                         current_goal = torch.tensor(
                             [[-goal_frame.x, -goal_frame.z, goal_frame.y]],
                             device=self.config.device,
@@ -703,10 +701,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                 noise: torch.Tensor | None = None
                 if policy is not None and current_goal is not None:
                     obs = self._compute_observation(putil, current_goal, text_embedding)
-                    action = policy.get_action_mean(obs)  # [B, action_dim]
+                    action = policy.get_action_mean(obs)
                     noise = action.view(self.config.batch_size, *engine.noise_shape)
 
-                # Generate future frames (normalized)
+                # Generate one primitive
                 future_normalized = engine.generate_step(
                     text_embedding=text_embedding,
                     history_motion=self._history,
@@ -715,21 +713,21 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                     noise=noise,
                 )  # [B, F, 276] normalized
 
-                # Transform to world space for output
+                # Transform to world space
                 world_features = self._get_world_features(
                     engine, putil, future_normalized
                 )  # [B, F, 276]
 
-                # Update history from world-space features (like demo's motion_tensor accumulation)
+                # Update history
                 self._update_history(engine, putil, world_features.to(self.config.device))
 
-                # Emit world-space frames
+                # Emit frames immediately, one at a time
                 batch = world_features[0]  # [F, 276]
                 for f in range(batch.shape[0]):
                     if self.stop_event.is_set():
                         break
                     pose = _features_to_body_pose(batch[f])
-                    # Floor clamp: if lowest foot is below ground, shift entire skeleton up
+                    # Floor clamp
                     foot_ys = [
                         bp.pos_y
                         for k in ("left_foot", "right_foot")
@@ -754,44 +752,13 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                                 )
                                 for name, bp in pose.items()
                             }
-                    frame_queue.put(pose)
+                    outputs.motion.send(BodyPoseFrame(poses=pose))
+                    self.stop_event.wait(frame_interval)
 
             except Exception as e:
                 print(f"[DartControl] Generation error: {e}")
                 import traceback
-
                 traceback.print_exc()
                 continue
-
-    def run(self, inputs: DartControlInputs, outputs: DartControlOutputs) -> None:
-        print("[DartControl] Starting DartControl component, loading models...")
-        engine = self._ensure_engine()
-        putil = self._ensure_primitive_util()
-        print("[DartControl] Models loaded, initializing from stand pose...")
-
-        # Initialize history from stand.pkl
-        self._init_from_stand(engine, putil)
-
-        # Load RL policy if configured
-        policy = self._load_policy(engine)
-        print("[DartControl] Streaming motion")
-
-        frame_queue: queue.Queue[dict[str, BonePose | None]] = queue.Queue(maxsize=64)
-
-        gen_thread = threading.Thread(
-            target=self._generation_loop,
-            args=(engine, putil, frame_queue, policy, inputs.goal, inputs.instruction),
-            daemon=True,
-        )
-        gen_thread.start()
-
-        frame_interval = 1.0 / self.config.fps
-        while not self.stop_event.is_set():
-            try:
-                body_poses = frame_queue.get(timeout=1.0)
-            except queue.Empty:
-                continue
-            outputs.motion.send(BodyPoseFrame(poses=body_poses))
-            self.stop_event.wait(frame_interval)
 
         print("[DartControl] Component stopped")
