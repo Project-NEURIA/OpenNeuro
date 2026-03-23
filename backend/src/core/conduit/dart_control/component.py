@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 import pickle
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -446,9 +447,11 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         feature_dict["betas"] = self._betas.unsqueeze(1).expand(
             -1, h_len, -1
         )  # [B, H, 10]
-        feature_dict["transf_rotmat"] = torch.eye(
-            3, device=device, dtype=torch.float32
-        ).unsqueeze(0).expand(B, -1, -1)  # [B, 3, 3]
+        feature_dict["transf_rotmat"] = (
+            torch.eye(3, device=device, dtype=torch.float32)
+            .unsqueeze(0)
+            .expand(B, -1, -1)
+        )  # [B, 3, 3]
         feature_dict["transf_transl"] = torch.zeros(
             B, 1, 3, device=device, dtype=torch.float32
         )  # [B, 1, 3]
@@ -582,9 +585,11 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         # Floor height relative to first-frame pelvis
         floor_height = -global_joints[:, 0, 0, 2]  # [B]
 
-        print(f"[OBS] pelvis=({global_pelvis[0,0]:.2f}, {global_pelvis[0,1]:.2f}, {global_pelvis[0,2]:.2f}), "
-              f"goal=({goal[0,0]:.2f}, {goal[0,1]:.2f}, {goal[0,2]:.2f}), "
-              f"dist={goal_dist[0,0]:.2f}, local_dir=({local_goal_dir[0,0]:.2f}, {local_goal_dir[0,1]:.2f}, {local_goal_dir[0,2]:.2f})")
+        print(
+            f"[OBS] pelvis=({global_pelvis[0, 0]:.2f}, {global_pelvis[0, 1]:.2f}, {global_pelvis[0, 2]:.2f}), "
+            f"goal=({goal[0, 0]:.2f}, {goal[0, 1]:.2f}, {goal[0, 2]:.2f}), "
+            f"dist={goal_dist[0, 0]:.2f}, local_dir=({local_goal_dir[0, 0]:.2f}, {local_goal_dir[0, 1]:.2f}, {local_goal_dir[0, 2]:.2f})"
+        )
 
         # Concatenate: goal_dir(3), goal_dist(1), text(512), motion(H*276), scene(1)
         observation = torch.cat(
@@ -634,10 +639,96 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         print(f"[DartControl] RL policy loaded from {ckpt_path}")
         return policy
 
+    def _generate_primitive(
+        self,
+        engine: DartControlInference,
+        putil: PrimitiveUtility,
+        text_embedding: torch.Tensor,
+        policy: PolicyReachLocationMLP | None,
+        current_goal: torch.Tensor | None,
+    ) -> torch.Tensor:
+        """Generate one motion primitive and update autoregressive state.
+
+        Returns: [B, F, 276] world-space features (on CPU).
+        """
+        # Compute noise from policy if available
+        noise: torch.Tensor | None = None
+        if policy is not None and current_goal is not None:
+            obs = self._compute_observation(putil, current_goal, text_embedding)
+            action = policy.get_action_mean(obs)
+            noise = action.view(self.config.batch_size, *engine.noise_shape)
+
+        # Generate one primitive
+        future_normalized = engine.generate_step(
+            text_embedding=text_embedding,
+            history_motion=self._history,
+            guidance_scale=self.config.guidance_scale,
+            future_length=self.config.future_length,
+            noise=noise,
+        )  # [B, F, 276] normalized
+
+        # Transform to world space
+        world_features = self._get_world_features(
+            engine, putil, future_normalized
+        )  # [B, F, 276]
+
+        # Update history (must complete before next generation)
+        self._update_history(engine, putil, world_features.to(self.config.device))
+
+        return world_features
+
+    @staticmethod
+    def _prepare_frames(
+        world_features: torch.Tensor,
+    ) -> list[dict[str, BonePose | None]]:
+        """Convert world features to a list of pose dicts with floor clamping.
+
+        Args:
+            world_features: [B, F, 276] world-space features.
+
+        Returns:
+            List of pose dicts, one per frame.
+        """
+        batch = world_features[0]  # [F, 276]
+        frames: list[dict[str, BonePose | None]] = []
+        for f in range(batch.shape[0]):
+            pose = _features_to_body_pose(batch[f])
+            # Floor clamp
+            foot_ys = [
+                bp.pos_y
+                for k in ("left_foot", "right_foot")
+                if (bp := pose.get(k)) is not None
+            ]
+            if foot_ys:
+                min_y = min(foot_ys)
+                if min_y < 0:
+                    pose = {
+                        name: (
+                            BonePose(
+                                pos_x=bp.pos_x,
+                                pos_y=bp.pos_y - min_y,
+                                pos_z=bp.pos_z,
+                                rot_w=bp.rot_w,
+                                rot_x=bp.rot_x,
+                                rot_y=bp.rot_y,
+                                rot_z=bp.rot_z,
+                            )
+                            if bp is not None
+                            else None
+                        )
+                        for name, bp in pose.items()
+                    }
+            frames.append(pose)
+        return frames
+
     def run(self, inputs: DartControlInputs, outputs: DartControlOutputs) -> None:
         print("[DartControl] Starting DartControl component, loading models...")
         engine = self._ensure_engine()
         putil = self._ensure_primitive_util()
+        cuda_available = torch.cuda.is_available()
+        print(
+            f"[DartControl] Device: {self.config.device} (CUDA available: {cuda_available}, CUDA device: {torch.cuda.get_device_name(0) if cuda_available else 'N/A'})"
+        )
         print("[DartControl] Models loaded, initializing from stand pose...")
 
         # Initialize history from stand.pkl
@@ -666,6 +757,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         print("[DartControl] Idle, waiting for instruction...")
         frame_interval = 1.0 / self.config.fps
 
+        # Pipeline: generate next batch while emitting current batch
+        gen_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dart-gen")
+        pending_future: Future[torch.Tensor] | None = None
+
         while not self.stop_event.is_set():
             try:
                 # Poll instruction channel (non-blocking)
@@ -681,6 +776,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                             text_embedding = text_embedding.expand(
                                 self.config.batch_size, -1
                             )
+                            # Cancel any in-flight generation since instruction changed
+                            if pending_future is not None:
+                                pending_future.cancel()
+                                pending_future = None
 
                 # Stay idle until an instruction is received
                 if text_embedding is None:
@@ -697,68 +796,43 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                             dtype=torch.float32,
                         ).expand(self.config.batch_size, -1)
 
-                # Compute noise from policy if available
-                noise: torch.Tensor | None = None
-                if policy is not None and current_goal is not None:
-                    obs = self._compute_observation(putil, current_goal, text_embedding)
-                    action = policy.get_action_mean(obs)
-                    noise = action.view(self.config.batch_size, *engine.noise_shape)
+                # Get world features — either from a pre-submitted future or generate now
+                if pending_future is not None:
+                    world_features = pending_future.result()
+                    pending_future = None
+                else:
+                    world_features = self._generate_primitive(
+                        engine, putil, text_embedding, policy, current_goal
+                    )
 
-                # Generate one primitive
-                future_normalized = engine.generate_step(
-                    text_embedding=text_embedding,
-                    history_motion=self._history,
-                    guidance_scale=self.config.guidance_scale,
-                    future_length=self.config.future_length,
-                    noise=noise,
-                )  # [B, F, 276] normalized
+                # Pre-compute pose dicts (cheap CPU work) before submitting next generation
+                frames = self._prepare_frames(world_features)
 
-                # Transform to world space
-                world_features = self._get_world_features(
-                    engine, putil, future_normalized
-                )  # [B, F, 276]
+                # Submit next generation to run in background while we emit frames.
+                # Capture current text_embedding/goal by value via default args.
+                pending_future = gen_executor.submit(
+                    self._generate_primitive,
+                    engine,
+                    putil,
+                    text_embedding,
+                    policy,
+                    current_goal,
+                )
 
-                # Update history
-                self._update_history(engine, putil, world_features.to(self.config.device))
-
-                # Emit frames immediately, one at a time
-                batch = world_features[0]  # [F, 276]
-                for f in range(batch.shape[0]):
+                # Emit frames while next batch generates in parallel
+                for pose in frames:
                     if self.stop_event.is_set():
                         break
-                    pose = _features_to_body_pose(batch[f])
-                    # Floor clamp
-                    foot_ys = [
-                        bp.pos_y
-                        for k in ("left_foot", "right_foot")
-                        if (bp := pose.get(k)) is not None
-                    ]
-                    if foot_ys:
-                        min_y = min(foot_ys)
-                        if min_y < 0:
-                            pose = {
-                                name: (
-                                    BonePose(
-                                        pos_x=bp.pos_x,
-                                        pos_y=bp.pos_y - min_y,
-                                        pos_z=bp.pos_z,
-                                        rot_w=bp.rot_w,
-                                        rot_x=bp.rot_x,
-                                        rot_y=bp.rot_y,
-                                        rot_z=bp.rot_z,
-                                    )
-                                    if bp is not None
-                                    else None
-                                )
-                                for name, bp in pose.items()
-                            }
                     outputs.motion.send(BodyPoseFrame(poses=pose))
                     self.stop_event.wait(frame_interval)
 
             except Exception as e:
                 print(f"[DartControl] Generation error: {e}")
                 import traceback
+
                 traceback.print_exc()
+                pending_future = None
                 continue
 
+        gen_executor.shutdown(wait=False)
         print("[DartControl] Component stopped")
