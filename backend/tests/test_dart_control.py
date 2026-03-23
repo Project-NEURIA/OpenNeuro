@@ -25,18 +25,18 @@ from src.core.conduit.dart_control.component import DartControl, DartControlConf
 from src.core.frames import BodyPoseFrame, GoalFrame, TextFrame
 
 
-SUCCESS_THRESHOLD = 1.5  # meters
+SUCCESS_THRESHOLD = 0.3  # meters
 TIMEOUT = 30  # seconds per waypoint
 
 
 def test_square_walk():
-    # Figure starts at (0, -0.45) facing -Y direction (0.1, -0.995)
-    # Place waypoints ahead of the figure
+    # Figure starts facing +Z in Y-up space, +X = figure's right
+    # Goals are Y-up: (x=right, y=height, z=forward)
     waypoints = [
-        (0.0, -4.0, 0.0),  # straight ahead
-        (4.0, -4.0, 0.0),  # turn right
-        (4.0, 0.0, 0.0),   # turn right again
-        (0.0, 0.0, 0.0),   # back to origin
+        (0.0, 0.0, 4.0),    # straight ahead
+        (-4.0, 0.0, 4.0),   # turn left
+        (-4.0, 0.0, 0.0),   # turn left again
+        (0.0, 0.0, 0.0),    # back to origin
     ]
 
     # Create channels
@@ -96,17 +96,16 @@ def test_square_walk():
             if waist is None:
                 continue
 
-            # Y-up output: pos_x = DART_x, pos_z = -DART_y
-            dart_x = waist.pos_x
-            dart_y = -waist.pos_z
+            # Y-up: ground plane is (x, z), y is height
+            px, pz = waist.pos_x, waist.pos_z
 
-            dist = np.sqrt((dart_x - gx) ** 2 + (dart_y - gy) ** 2)
+            dist = np.sqrt((px - gx) ** 2 + (pz - gz) ** 2)
 
             step += 1
             if step % 30 == 0:  # print every ~1 second at 30fps
                 print(
-                    f"  DART pos=({dart_x:.2f}, {dart_y:.2f}), "
-                    f"goal=({gx:.2f}, {gy:.2f}), dist={dist:.2f}"
+                    f"  pos=({px:.2f}, {pz:.2f}), "
+                    f"goal=({gx:.2f}, {gz:.2f}), dist={dist:.2f}"
                 )
 
             if dist < SUCCESS_THRESHOLD:

@@ -179,7 +179,7 @@ def _features_to_body_pose(features: torch.Tensor) -> dict[str, BonePose | None]
         # Convert to Y-up
         q_yup = _quat_multiply(_Q_ZUP_TO_YUP, q_zup)
         poses[part_name] = BonePose(
-            pos_x=pos[0].item(),
+            pos_x=-pos[0].item(),  # negate so +X = figure's right
             pos_y=pos[2].item(),
             pos_z=-pos[1].item(),
             rot_w=q_yup[0],
@@ -661,6 +661,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                         new_instruction = instr_frame.get()
                         if new_instruction and new_instruction != instruction:
                             instruction = new_instruction
+                            current_goal = None  # clear until a new goal arrives
                             print(f"[DartControl] Instruction updated: '{instruction}'")
                             text_embedding = engine.encode_text([instruction])
                             text_embedding = text_embedding.expand(
@@ -676,8 +677,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                 if goal_gen is not None:
                     goal_frame = next(goal_gen)
                     if goal_frame is not None and isinstance(goal_frame, GoalFrame):
+                        # Convert Y-up (x, y, z) → Z-up (-x, -z, y) for DART
+                        # X negated because DART +X = figure's left, our +X = figure's right
                         current_goal = torch.tensor(
-                            [[goal_frame.x, goal_frame.y, goal_frame.z]],
+                            [[-goal_frame.x, -goal_frame.z, goal_frame.y]],
                             device=self.config.device,
                             dtype=torch.float32,
                         ).expand(self.config.batch_size, -1)

@@ -31,13 +31,13 @@ class MovementTool(
             ToolDef.new(
                 name="move",
                 description="You are an embodied agent with a physical body. Use this tool to perform motions. "
-                            "Provide both x and y when you want to move to a specific location. "
+                            "YOU MUST Provide *BOTH* x and y when you want to move to a specific location. "
                             "Omit x and y for in-place motions like dancing or waving.",
                 parameters={
                     "type": "object",
                     "properties": {
                         "x": {"type": "number", "description": "Target x position in meters"},
-                        "y": {"type": "number", "description": "Target y position in meters"},
+                        "z": {"type": "number", "description": "Target z position in meters"},
                         "instruction": {
                             "type": "string",
                             "description": "Any motion, e.g. 'walk', 'run', 'sit', 'wave', 'dance'",
@@ -63,16 +63,15 @@ class MovementTool(
             args = json.loads(call.arguments)
             instruction = args["instruction"]
             x = args.get("x")
-            y = args.get("y")
-            z = args.get("z", 0.0)
+            z = args.get("z")
 
             outputs.instruction.send(TextFrame.new(text=instruction))
-            if x is not None and y is not None:
-                outputs.goal.send(GoalFrame.new(x=x, y=y, z=z))
+            if x is not None and z is not None:
+                outputs.goal.send(GoalFrame.new(x=float(x), y=0.0, z=float(z)))
 
             result = f"Executing '{instruction}'"
-            if x is not None and y is not None:
-                result += f" toward ({x}, {y}, {z})"
+            if x is not None and z is not None:
+                result += f" toward ({x}, {z})"
             outputs.tool_result.send(
                 ToolResult.new(call_id=call.call_id, content=result)
             )
