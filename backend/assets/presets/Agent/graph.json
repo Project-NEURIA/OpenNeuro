@@ -114,7 +114,7 @@
       "id_": "860ae347-074e-449e-bcc4-549f463134fc",
       "type": "CharacterCard",
       "init_args": {
-        "path": "/Users/kevin/PycharmProjects/OpenNeuro/backend/assets/character_cards/energetic_girl.png",
+        "path": "/home/admin113322/OpenNeuro/backend/assets/character_cards/energetic_girl.png",
         "config": {
           "name": "",
           "description": "",

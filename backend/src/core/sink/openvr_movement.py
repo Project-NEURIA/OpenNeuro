@@ -71,17 +71,17 @@ class OpenVRMovementOutputs(NamedTuple):
 
 
 def _to_ovd_pose(bone: BonePose | None) -> Pose | None:
-    """Convert a BonePose to an ovd_client Pose."""
+    """Convert a BonePose (left-handed, +Z=forward) to OpenVR Pose (right-handed, +Z=backward)."""
     if bone is None:
         return None
     return Pose(
         pos_x=bone.pos_x,
         pos_y=bone.pos_y,
-        pos_z=bone.pos_z,
+        pos_z=-bone.pos_z,
         rot_w=bone.rot_w,
-        rot_x=bone.rot_x,
+        rot_x=-bone.rot_x,
         rot_y=bone.rot_y,
-        rot_z=bone.rot_z,
+        rot_z=-bone.rot_z,
     )
 
 

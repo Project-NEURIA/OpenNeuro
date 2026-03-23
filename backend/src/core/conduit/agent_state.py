@@ -138,6 +138,9 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             else None
         )
 
+        # Buffer tool_calls until their matching tool_result arrives
+        pending_tool_calls: dict[str, ToolCall] = {}
+
         # Block on request, drain others on each trigger
         for req in inputs.request(self):
             if req is None:
@@ -167,15 +170,17 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                         MessageFrame.new(role="system", content=f"[{ts}] {memory.text}")
                     )
                 if tc is not None:
-                    ts = datetime.fromtimestamp(tc.pts / 1e9).strftime("%H:%M:%S")
+                    pending_tool_calls[tc.call_id] = tc
+                if tr is not None and tr.call_id in pending_tool_calls:
+                    ptc = pending_tool_calls.pop(tr.call_id)
+                    ts = datetime.fromtimestamp(ptc.pts / 1e9).strftime("%H:%M:%S")
                     self._history.append(
                         MessageFrame.new(
                             role="assistant",
                             content=f"[{ts}]",
-                            tool_calls=[tc],
+                            tool_calls=[ptc],
                         )
                     )
-                if tr is not None:
                     ts = datetime.fromtimestamp(tr.pts / 1e9).strftime("%H:%M:%S")
                     self._history.append(
                         MessageFrame.new(
