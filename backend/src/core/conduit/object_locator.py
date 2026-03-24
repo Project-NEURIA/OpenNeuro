@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import ThreadedComponent
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import (
     CameraParamsFrame,
     DepthFrame,
@@ -28,6 +28,9 @@ class ObjectLocatorOutputs(NamedTuple):
 
 
 class ObjectLocator(ThreadedComponent[ObjectLocatorInputs, ObjectLocatorOutputs]):
+    description = "Computes 3D world positions for segmented objects"
+    tags = Tag(io={"conduit"}, functionality={"image"})
+
     """Computes 3D world positions for segmented objects using depth deprojection.
 
     For each segmentation mask, applies it to the depth map, deprojects

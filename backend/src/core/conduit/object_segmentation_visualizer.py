@@ -31,7 +31,9 @@ class ObjectSegmentationVisualizerConfig(BaseModel):
     score_threshold: float = 0.0
 
 
-def _draw_segmentations(img: np.ndarray, seg: ObjectSegmentationFrame, score_threshold: float) -> None:
+def _draw_segmentations(
+    img: np.ndarray, seg: ObjectSegmentationFrame, score_threshold: float
+) -> None:
     """Draw instance masks, bounding boxes, and labels onto *img* in-place."""
     h, w = img.shape[:2]
 
@@ -101,7 +103,10 @@ class ObjectSegmentationVisualizer(
 
     tags = Tag(io={"conduit"}, functionality={"image"})
 
-    def __init__(self, config: ObjectSegmentationVisualizerConfig = ObjectSegmentationVisualizerConfig()) -> None:
+    def __init__(
+        self,
+        config: ObjectSegmentationVisualizerConfig = ObjectSegmentationVisualizerConfig(),
+    ) -> None:
         super().__init__()
         self.config = config
 

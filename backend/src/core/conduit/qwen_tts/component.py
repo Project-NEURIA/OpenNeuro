@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,7 +22,7 @@ class QwenTTSConfig(BaseModel):
     model_config = ConfigDict(json_schema_extra={"options": {"voice_id": {}}})
 
     model_id: str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-    device: str = "auto"
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto"
     voice_id: str = ""
     ref_samples_dir: str = str(_ASSETS_DIR)
     language: str = "English"

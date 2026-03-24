@@ -13,6 +13,34 @@ fn kill_backend() {
     }
 }
 
+/// Detect GPU vendor and return the uv extra name.
+/// Returns Some("cu126") for NVIDIA, Some("rocm") for AMD, None for other/Mac.
+fn detect_gpu_extra() -> Option<&'static str> {
+    if cfg!(target_os = "macos") {
+        return None; // Mac uses default PyPI torch (MPS)
+    }
+
+    match gfxinfo::active_gpu() {
+        Ok(gpu) => {
+            let vendor = gpu.vendor().to_lowercase();
+            if vendor.contains("nvidia") {
+                println!("[tauri] Detected NVIDIA GPU: {}", gpu.model());
+                None // CUDA is the default group
+            } else if vendor.contains("amd") || vendor.contains("ati") {
+                println!("[tauri] Detected AMD GPU: {}", gpu.model());
+                Some("rocm")
+            } else {
+                println!("[tauri] Unknown GPU vendor: {}", gpu.vendor());
+                None
+            }
+        }
+        Err(e) => {
+            eprintln!("[tauri] GPU detection failed: {e}");
+            None
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     ctrlc::set_handler(move || {
@@ -28,8 +56,34 @@ pub fn run() {
             let cwd = cwd.canonicalize().unwrap();
             let backend_dir = cwd.join("backend");
 
-            // Run python directly from venv — no uv middleman
-            // This ensures kill() actually kills the python process
+            // Detect GPU and sync dependencies
+            let extra = detect_gpu_extra();
+            let mut sync_args: Vec<&str> = vec!["sync"];
+            match extra {
+                Some("rocm") => {
+                    sync_args.extend(["--no-group", "cuda", "--group", "rocm"]);
+                }
+                _ => {} // CUDA is default-group, Mac has no group needed
+            }
+
+            println!("[tauri] Running: uv {}", sync_args.join(" "));
+            match Command::new("uv")
+                .args(&sync_args)
+                .current_dir(&backend_dir)
+                .status()
+            {
+                Ok(status) if status.success() => {
+                    println!("[tauri] uv sync completed successfully");
+                }
+                Ok(status) => {
+                    eprintln!("[tauri] uv sync failed with exit code: {status}");
+                }
+                Err(e) => {
+                    eprintln!("[tauri] failed to run uv sync: {e}");
+                }
+            }
+
+            // Run backend from venv
             let python = backend_dir.join(".venv/bin/python");
             match Command::new(&python)
                 .args(["-m", "src.main"])
@@ -39,20 +93,8 @@ pub fn run() {
                 Ok(child) => {
                     *BACKEND.lock().unwrap() = Some(child);
                 }
-                Err(_) => {
-                    // Fallback to uv if venv doesn't exist
-                    match Command::new("uv")
-                        .args(["run", "python", "-m", "src.main"])
-                        .current_dir(&backend_dir)
-                        .spawn()
-                    {
-                        Ok(child) => {
-                            *BACKEND.lock().unwrap() = Some(child);
-                        }
-                        Err(e) => {
-                            eprintln!("[tauri] failed to start backend: {e}");
-                        }
-                    }
+                Err(e) => {
+                    eprintln!("[tauri] failed to start backend: {e}");
                 }
             }
 

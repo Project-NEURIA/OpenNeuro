@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import ThreadedComponent
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import CameraParamsFrame, StereoCameraParamsFrame
 
 
@@ -20,6 +20,9 @@ class StereoCameraParamsAdapterOutputs(NamedTuple):
 class StereoCameraParamsAdapter(
     ThreadedComponent[StereoCameraParamsAdapterInputs, StereoCameraParamsAdapterOutputs]
 ):
+    description = "Converts stereo camera params to monocular camera params"
+    tags = Tag(io={"conduit"}, functionality={"image"})
+
     """Strips baseline from StereoCameraParamsFrame, emitting CameraParamsFrame."""
 
     def run(

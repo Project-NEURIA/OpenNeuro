@@ -22,9 +22,9 @@ dependencies = [
     "trimesh>=4.0.0",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
-    "torch>=2.6.0",
-    "torchaudio>=2.6.0",
-    "torchvision>=0.21.0",
+    "torch>=2.6.0 ; sys_platform == 'darwin'",
+    "torchaudio>=2.6.0 ; sys_platform == 'darwin'",
+    "torchvision>=0.21.0 ; sys_platform == 'darwin'",
     "transformers>=5.1.0",
     "types-requests>=2.32.4.20260107",
     "httpx>=0.27.0",
@@ -72,16 +72,39 @@ name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.4"
+explicit = true
+
 [tool.uv]
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
+conflicts = [
+    [{ group = "cuda" }, { group = "rocm" }],
+]
+default-groups = ["cuda"]
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu126", marker = "sys_platform != 'darwin'" }
-torchaudio = { index = "pytorch-cu126", marker = "sys_platform != 'darwin'" }
-torchvision = { index = "pytorch-cu126", marker = "sys_platform != 'darwin'" }
+torch = [
+    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
+]
+torchaudio = [
+    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
+]
+torchvision = [
+    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
+]
+pytorch-triton-rocm = [
+    { index = "pytorch-rocm", group = "rocm", marker = "sys_platform == 'linux'" },
+]
 
 [dependency-groups]
 dev = [
     "ruff>=0.15.1",
 ]
+cuda = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0"]
+rocm = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0", "pytorch-triton-rocm"]

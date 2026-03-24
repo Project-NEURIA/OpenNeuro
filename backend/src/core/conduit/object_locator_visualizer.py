@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from src.core.channel import Receiver, Sender
-from src.core.component import ThreadedComponent
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import ObjectLocationFrame, VideoDataFormat, VideoFrame
 
 # Fixed BGR colour palette, cycled per prompt.
@@ -81,6 +81,9 @@ class ObjectLocatorVisualizerOutputs(NamedTuple):
 class ObjectLocatorVisualizer(
     ThreadedComponent[ObjectLocatorVisualizerInputs, ObjectLocatorVisualizerOutputs]
 ):
+    description = "Draws 3D object locations onto video frames"
+    tags = Tag(io={"conduit"}, functionality={"video", "image"})
+
     """Draws bounding boxes with 3D world coordinate labels onto video frames."""
 
     def run(

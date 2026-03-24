@@ -15,3 +15,6 @@ dev-ignore
 # YOLO model files
 backend/src/core/conduit/yolo/*.ts
 backend/src/core/conduit/yolo/*.pt
+
+# uv lock file — generated per-machine (GPU-dependent)
+backend/uv.lock

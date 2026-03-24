@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
@@ -24,7 +24,7 @@ class MonocularDepthEstimatorConfig(BaseModel):
     process_res: int = 504
     output_width: int = 504
     output_height: int = 504
-    device: str = "auto"
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto"
     model: str = "depth-anything/DA3METRIC-LARGE"
 
 

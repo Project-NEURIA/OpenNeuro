@@ -7,7 +7,7 @@ import queue
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generator, Union
+from typing import Any, Generator, Literal, Union
 
 import librosa
 import numpy as np
@@ -263,7 +263,11 @@ class SimpleStreamingTTS:
         self._voices_dir.mkdir(exist_ok=True)
 
     @classmethod
-    def load(cls, model_id: str, device_cfg: str = "auto") -> SimpleStreamingTTS:
+    def load(
+        cls,
+        model_id: str,
+        device_cfg: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto",
+    ) -> SimpleStreamingTTS:
         """Load the Qwen3 TTS model with cross-platform device selection."""
         from src.core.utils import auto_device, auto_dtype
 

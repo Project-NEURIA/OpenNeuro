@@ -8,6 +8,7 @@ from src.core.conduit.tts import TTS as TTS
 from src.core.conduit.tts_fish import FishTTS as FishTTS
 from src.core.conduit.discord import DiscordIO as DiscordIO
 from src.core.conduit.dart_control import DartControl as DartControl
+from src.core.conduit.object_detector import ObjectDetector as ObjectDetector
 from src.core.conduit.object_detection_visualizer import (
     ObjectDetectionVisualizer as ObjectDetectionVisualizer,
 )
