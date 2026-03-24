@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 import cv2
 import numpy as np
+from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
@@ -22,12 +23,17 @@ _COLORS: list[tuple[int, int, int]] = [
 ]
 
 _ALPHA = 0.45
-_SCORE_THRESHOLD = 0.4
 _LINE_THICKNESS = 2
 _FONT_SCALE = 0.5
 
 
-def _draw_segmentations(img: np.ndarray, seg: ObjectSegmentationFrame) -> None:
+class ObjectSegmentationVisualizerConfig(BaseModel):
+    score_threshold: float = 0.0
+
+
+def _draw_segmentations(
+    img: np.ndarray, seg: ObjectSegmentationFrame, score_threshold: float
+) -> None:
     """Draw instance masks, bounding boxes, and labels onto *img* in-place."""
     h, w = img.shape[:2]
 
@@ -39,7 +45,7 @@ def _draw_segmentations(img: np.ndarray, seg: ObjectSegmentationFrame) -> None:
 
     for i in range(len(seg.labels)):
         score = float(seg.scores[i])
-        if score < _SCORE_THRESHOLD:
+        if score < score_threshold:
             continue
 
         color = prompt_color[seg.labels[i]]
@@ -97,6 +103,13 @@ class ObjectSegmentationVisualizer(
 
     tags = Tag(io={"conduit"}, functionality={"image"})
 
+    def __init__(
+        self,
+        config: ObjectSegmentationVisualizerConfig = ObjectSegmentationVisualizerConfig(),
+    ) -> None:
+        super().__init__()
+        self.config = config
+
     def run(
         self,
         inputs: ObjectSegmentationVisualizerInputs,
@@ -104,8 +117,8 @@ class ObjectSegmentationVisualizer(
     ) -> None:
         print("[ObjectSegmentationVisualizer] Starting")
 
-        video_iter = inputs.video(self)
-        for seg_frame in inputs.segmentations(self):
+        video_iter = inputs.video(self, newest=True)
+        for seg_frame in inputs.segmentations(self, newest=True):
             if seg_frame is None:
                 break
 
@@ -114,7 +127,7 @@ class ObjectSegmentationVisualizer(
                 break
 
             img = video.get(VideoDataFormat.BGR).copy()
-            _draw_segmentations(img, seg_frame)
+            _draw_segmentations(img, seg_frame, self.config.score_threshold)
             outputs.video.send(VideoFrame.new(data=img, format=VideoDataFormat.BGR))
 
         print("[ObjectSegmentationVisualizer] Stopped")

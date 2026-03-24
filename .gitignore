@@ -9,3 +9,12 @@ backend/src/core/conduit/mem0_demo.py
 
 node_modules/
 .DS_Store
+
+dev-ignore
+
+# YOLO model files
+backend/src/core/conduit/yolo/*.ts
+backend/src/core/conduit/yolo/*.pt
+
+# uv lock file — generated per-machine (GPU-dependent)
+backend/uv.lock

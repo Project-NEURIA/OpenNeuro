@@ -406,7 +406,7 @@ class ObjectSegmentationFrame(Frame):
     """(K,) float32 — detection confidence."""
 
     object_ids: np.ndarray
-    """(K,) int64 — SAM3 tracking object IDs."""
+    """(K,) int64 — tracking object IDs."""
 
     labels: tuple[str, ...]
     """(K,) — prompt label for each detection."""

@@ -5,9 +5,10 @@ import itertools
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Iterator, overload
+from typing import TYPE_CHECKING, Any, Callable, Iterator, overload, Literal
 
 if TYPE_CHECKING:
+    import torch
     from src.core.channel import Receiver
     from src.core.component import ThreadedComponent
     from src.core.frames import Frame
@@ -126,8 +127,10 @@ def to_numpy(t: object) -> np.ndarray:
     return t.detach().cpu().numpy() if torch.is_tensor(t) else np.asarray(t)
 
 
-def auto_device(device: str = "auto"):  # type: ignore[return]
-    """Select best available torch device: CUDA > MPS > CPU."""
+def auto_device(
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto",
+) -> torch.device:
+    """Resolve a device string to a torch.device. ROCm maps to cuda."""
     import torch
 
     if device == "auto":
@@ -136,6 +139,8 @@ def auto_device(device: str = "auto"):  # type: ignore[return]
         if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
             return torch.device("mps")
         return torch.device("cpu")
+    if device == "rocm":
+        return torch.device("cuda")
     return torch.device(device)
 
 

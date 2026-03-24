@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from pydantic import BaseModel
@@ -27,7 +27,7 @@ class StereoDepthEstimatorConfig(BaseModel):
     resize_height: int = 512
     valid_iters: int = 4
     max_disp: int = 192
-    device: str = "auto"
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto"
 
 
 class StereoDepthEstimatorInputs(NamedTuple):
@@ -75,6 +75,7 @@ class StereoDepthEstimator(
         self._model.args.valid_iters = self.config.valid_iters
         self._model.args.max_disp = self.config.max_disp
         self._model.to(self._device).eval()
+        torch._dynamo.config.disable = True  # Triton codegen incompatible with ROCm
         torch.set_grad_enabled(False)
         print("[StereoDepthEstimator] Model loaded")
 
@@ -130,7 +131,10 @@ class StereoDepthEstimator(
         )
         t0_pad, t1_pad = self._padder.pad(self._t0_buf, self._t1_buf)
 
-        with torch.amp.autocast("cuda", enabled=True, dtype=torch.float16):
+        with (
+            torch.no_grad(),
+            torch.amp.autocast("cuda", enabled=True, dtype=torch.float16),
+        ):
             disp = self._model.forward(
                 t0_pad,
                 t1_pad,
