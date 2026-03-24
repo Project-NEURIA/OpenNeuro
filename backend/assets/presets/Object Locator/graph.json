@@ -1,0 +1,331 @@
+{
+  "edges": [
+    {
+      "source_node": "ea1c5784-07a4-407a-935e-a07d1774fc02",
+      "source_slot": "video",
+      "target_node": "b025524c-4ab2-4b8d-8546-ab75226c1713",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "af8b34f1-43da-4fc2-9c50-cc909911c504",
+      "source_slot": "stereo_video",
+      "target_node": "2c419e9d-4675-4bd6-84c9-416f4bf248c6",
+      "target_slot": "stereo_video"
+    },
+    {
+      "source_node": "af8b34f1-43da-4fc2-9c50-cc909911c504",
+      "source_slot": "camera_params",
+      "target_node": "2c419e9d-4675-4bd6-84c9-416f4bf248c6",
+      "target_slot": "camera_params"
+    },
+    {
+      "source_node": "2c419e9d-4675-4bd6-84c9-416f4bf248c6",
+      "source_slot": "depth",
+      "target_node": "b025524c-4ab2-4b8d-8546-ab75226c1713",
+      "target_slot": "depth"
+    },
+    {
+      "source_node": "2c419e9d-4675-4bd6-84c9-416f4bf248c6",
+      "source_slot": "stereo_video",
+      "target_node": "ea1c5784-07a4-407a-935e-a07d1774fc02",
+      "target_slot": "stereo_video"
+    },
+    {
+      "source_node": "b025524c-4ab2-4b8d-8546-ab75226c1713",
+      "source_slot": "video",
+      "target_node": "01631e9a-6977-4868-be26-b02948846026",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "af8b34f1-43da-4fc2-9c50-cc909911c504",
+      "source_slot": "stereo_video",
+      "target_node": "b972ca18-3e9e-4652-a513-3289552dc4b4",
+      "target_slot": "stereo_video"
+    },
+    {
+      "source_node": "b972ca18-3e9e-4652-a513-3289552dc4b4",
+      "source_slot": "video",
+      "target_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "source_slot": "segmentations",
+      "target_node": "132ec835-f803-4d07-9709-54730f582165",
+      "target_slot": "segmentations"
+    },
+    {
+      "source_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "source_slot": "video",
+      "target_node": "132ec835-f803-4d07-9709-54730f582165",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "132ec835-f803-4d07-9709-54730f582165",
+      "source_slot": "video",
+      "target_node": "5fa1bd4d-9ab5-4276-8a77-1503f54e16f8",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "d147708d-ae9a-408d-8c32-a0c07ee1553d",
+      "source_slot": "camera_params",
+      "target_node": "6006124a-6df0-487d-b8fc-6ad081c693c6",
+      "target_slot": "camera_params"
+    },
+    {
+      "source_node": "af8b34f1-43da-4fc2-9c50-cc909911c504",
+      "source_slot": "camera_params",
+      "target_node": "d147708d-ae9a-408d-8c32-a0c07ee1553d",
+      "target_slot": "stereo_camera_params"
+    },
+    {
+      "source_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "source_slot": "segmentations",
+      "target_node": "6006124a-6df0-487d-b8fc-6ad081c693c6",
+      "target_slot": "segmentations"
+    },
+    {
+      "source_node": "2c419e9d-4675-4bd6-84c9-416f4bf248c6",
+      "source_slot": "depth",
+      "target_node": "6006124a-6df0-487d-b8fc-6ad081c693c6",
+      "target_slot": "depth"
+    },
+    {
+      "source_node": "6006124a-6df0-487d-b8fc-6ad081c693c6",
+      "source_slot": "locations",
+      "target_node": "937552f5-3eb0-4e57-b113-5f92ac26bd87",
+      "target_slot": "locations"
+    },
+    {
+      "source_node": "937552f5-3eb0-4e57-b113-5f92ac26bd87",
+      "source_slot": "video",
+      "target_node": "dd264ac5-cba3-461d-9917-54cd468e75c6",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "source_slot": "video",
+      "target_node": "937552f5-3eb0-4e57-b113-5f92ac26bd87",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "3fc04e45-13e8-4693-b2b7-0fe67b523f90",
+      "source_slot": "text",
+      "target_node": "86a56afe-a018-42a7-819d-cd72da8d3f27",
+      "target_slot": "prompts"
+    },
+    {
+      "source_node": "b972ca18-3e9e-4652-a513-3289552dc4b4",
+      "source_slot": "video",
+      "target_node": "2134313a-6b7e-4773-9c10-1a1b3cc9b504",
+      "target_slot": "video"
+    },
+    {
+      "source_node": "8046cd4e-3f05-403b-96bb-9faaec977990",
+      "source_slot": "poses",
+      "target_node": "98cf239a-b131-41bf-a4f3-47a0da130476",
+      "target_slot": "poses"
+    }
+  ],
+  "nodes": {
+    "98cf239a-b131-41bf-a4f3-47a0da130476": {
+      "type": "OpenVRMovementSink",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "host": "127.0.0.1",
+          "port": 21213
+        }
+      },
+      "x": 395.4378104740937,
+      "y": -0.33001309943703916,
+      "label": null,
+      "sub_graph": null
+    },
+    "af8b34f1-43da-4fc2-9c50-cc909911c504": {
+      "type": "VRChatVideo",
+      "is_composite": false,
+      "init_args": {},
+      "x": 8.620977372624338,
+      "y": 216.84902460551217,
+      "label": null,
+      "sub_graph": null
+    },
+    "ea1c5784-07a4-407a-935e-a07d1774fc02": {
+      "type": "StereoToMonocularVideo",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "eye": "left"
+        }
+      },
+      "x": 931.015039029768,
+      "y": 215.31674645337333,
+      "label": null,
+      "sub_graph": null
+    },
+    "b025524c-4ab2-4b8d-8546-ab75226c1713": {
+      "type": "DepthEstimationVisualizer",
+      "is_composite": false,
+      "init_args": {},
+      "x": 1350.338870020234,
+      "y": 212.3466270207342,
+      "label": null,
+      "sub_graph": null
+    },
+    "2c419e9d-4675-4bd6-84c9-416f4bf248c6": {
+      "type": "StereoDepthEstimator",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "resize_width": 512,
+          "resize_height": 512,
+          "valid_iters": 4,
+          "max_disp": 192,
+          "device": "auto"
+        }
+      },
+      "x": 399.70601678177286,
+      "y": 216.71355971229633,
+      "label": null,
+      "sub_graph": null
+    },
+    "01631e9a-6977-4868-be26-b02948846026": {
+      "type": "VideoStream",
+      "is_composite": false,
+      "init_args": {},
+      "x": 1844.6686195650368,
+      "y": -47.48597793548146,
+      "label": null,
+      "sub_graph": null
+    },
+    "b972ca18-3e9e-4652-a513-3289552dc4b4": {
+      "type": "StereoToMonocularVideo",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "eye": "left"
+        }
+      },
+      "x": 399.1972797216339,
+      "y": 542.0974278132941,
+      "label": null,
+      "sub_graph": null
+    },
+    "86a56afe-a018-42a7-819d-cd72da8d3f27": {
+      "type": "ObjectSegmenter",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "resolution": 336,
+          "det_thresh": 0.5,
+          "new_det_thresh": 0.85,
+          "max_per_prompt": 6,
+          "score_thresh": 0.4,
+          "session_ttl": 400,
+          "device": "auto"
+        }
+      },
+      "x": 867.5326562863438,
+      "y": 605.1759675782939,
+      "label": null,
+      "sub_graph": null
+    },
+    "6006124a-6df0-487d-b8fc-6ad081c693c6": {
+      "type": "ObjectLocator",
+      "is_composite": false,
+      "init_args": {},
+      "x": 873.3158735841339,
+      "y": 1021.9586626640216,
+      "label": null,
+      "sub_graph": null
+    },
+    "132ec835-f803-4d07-9709-54730f582165": {
+      "type": "ObjectSegmentationVisualizer",
+      "is_composite": false,
+      "init_args": {},
+      "x": 1315.655306193134,
+      "y": 605.1959153804645,
+      "label": null,
+      "sub_graph": null
+    },
+    "5fa1bd4d-9ab5-4276-8a77-1503f54e16f8": {
+      "type": "VideoStream",
+      "is_composite": false,
+      "init_args": {},
+      "x": 1848.5098096127813,
+      "y": 742.3169408750348,
+      "label": null,
+      "sub_graph": null
+    },
+    "d147708d-ae9a-408d-8c32-a0c07ee1553d": {
+      "type": "StereoCameraParamsAdapter",
+      "is_composite": false,
+      "init_args": {},
+      "x": 195.42600361467822,
+      "y": 1079.996120867774,
+      "label": null,
+      "sub_graph": null
+    },
+    "937552f5-3eb0-4e57-b113-5f92ac26bd87": {
+      "type": "ObjectLocatorVisualizer",
+      "is_composite": false,
+      "init_args": {},
+      "x": 1408.1587445927119,
+      "y": 1021.3729623882316,
+      "label": null,
+      "sub_graph": null
+    },
+    "dd264ac5-cba3-461d-9917-54cd468e75c6": {
+      "type": "VideoStream",
+      "is_composite": false,
+      "init_args": {},
+      "x": 2298.3704404932705,
+      "y": 732.6007079920658,
+      "label": null,
+      "sub_graph": null
+    },
+    "3fc04e45-13e8-4693-b2b7-0fe67b523f90": {
+      "type": "PromptRepeater",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "prompt": "head, chair, table",
+          "interval_seconds": 3
+        }
+      },
+      "x": 434.2233414994679,
+      "y": 768.859300180894,
+      "label": null,
+      "sub_graph": null
+    },
+    "2134313a-6b7e-4773-9c10-1a1b3cc9b504": {
+      "type": "VideoStream",
+      "is_composite": false,
+      "init_args": {},
+      "x": 2771.0430080939404,
+      "y": -46.731557094323804,
+      "label": null,
+      "sub_graph": null
+    },
+    "8046cd4e-3f05-403b-96bb-9faaec977990": {
+      "type": "DummyPosesInput",
+      "is_composite": false,
+      "init_args": {
+        "config": {
+          "center_x": 0,
+          "center_z": 0,
+          "body_frequency": 0.3,
+          "body_amplitude": 0.5,
+          "head_frequency": 0.5,
+          "head_amplitude": 0.6,
+          "fps": 60
+        }
+      },
+      "x": 5.361375013859458,
+      "y": 0.0,
+      "label": null,
+      "sub_graph": null
+    }
+  }
+}

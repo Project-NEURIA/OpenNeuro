@@ -6,3 +6,4 @@ from src.core.source.vrchat import VRChatVideo as VRChatVideo
 from src.core.source.video_player import VideoPlayer as VideoPlayer
 from src.core.source.text_input import TextInput as TextInput
 from src.core.source.openvr_player import OpenVRPlayer as OpenVRPlayer
+from src.core.source.pulse import Pulse as Pulse

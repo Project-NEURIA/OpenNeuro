@@ -17,7 +17,7 @@ from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 
 class TTSConfig(BaseModel):
-    api_key_env_var: str = "INWORLD_API_CRED"
+    api_key_env_var: str = "INWORLD_API_KEY"
     url: str = "https://api.inworld.ai/tts/v1/voice:stream"
     voice_id: str = "Ashley"
     model_id: str = "inworld-tts-1.5-max"
@@ -57,9 +57,8 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                     if gen != self._generation:
                         continue
 
-                cred = os.getenv("INWORLD_API_KEY") or os.getenv(
-                    self.config.api_key_env_var
-                )
+                cred = os.getenv(self.config.api_key_env_var)
+                print(f"[TTS] Using {self.config.api_key_env_var}: {cred[:8]}..." if cred else f"[TTS] {self.config.api_key_env_var} not set")
                 if not cred:
                     raise ValueError(
                         f"Environment variable {self.config.api_key_env_var} must be set"

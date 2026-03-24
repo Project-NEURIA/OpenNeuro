@@ -5,10 +5,13 @@ import itertools
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Iterator, overload, Literal
 
 if TYPE_CHECKING:
     import torch
+    from src.core.channel import Receiver
+    from src.core.component import ThreadedComponent
+    from src.core.frames import Frame
 
 import numpy as np
 
@@ -41,6 +44,80 @@ def obj_count(obj) -> int:
     """
     with _COUNTS_LOCK:
         return next(_COUNTS[obj.__class__.__name__])
+
+
+@overload
+def drain[F1: Frame](
+    r1: Iterator[F1 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame](
+    r1: Iterator[F1 | None] | None,
+    r2: Iterator[F2 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame](
+    r1: Iterator[F1 | None] | None,
+    r2: Iterator[F2 | None] | None,
+    r3: Iterator[F3 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame](
+    r1: Iterator[F1 | None] | None,
+    r2: Iterator[F2 | None] | None,
+    r3: Iterator[F3 | None] | None,
+    r4: Iterator[F4 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame, F5: Frame](
+    r1: Iterator[F1 | None] | None,
+    r2: Iterator[F2 | None] | None,
+    r3: Iterator[F3 | None] | None,
+    r4: Iterator[F4 | None] | None,
+    r5: Iterator[F5 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None]]: ...
+@overload
+def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame, F5: Frame, F6: Frame](
+    r1: Iterator[F1 | None] | None,
+    r2: Iterator[F2 | None] | None,
+    r3: Iterator[F3 | None] | None,
+    r4: Iterator[F4 | None] | None,
+    r5: Iterator[F5 | None] | None,
+    r6: Iterator[F6 | None] | None,
+    /,
+) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None, F6 | None]]: ...
+def drain(
+    *iters: Iterator[Any] | None,
+) -> Iterator[tuple[Any, ...]]:
+    """Drain no_block iterators and yield one frame at a time, ordered by pts.
+
+    Each yielded tuple has exactly one non-None value at the index of
+    its source iterator, so callers can match frames to inputs.
+    None iterators are treated as unconnected (skipped).
+    """
+    n = len(iters)
+    pending: list[tuple[int, Any]] = []
+    for i, it in enumerate(iters):
+        if it is None:
+            continue
+        for frame in it:
+            if frame is None:
+                break
+            pending.append((i, frame))
+
+    if not pending:
+        return
+
+    pending.sort(key=lambda x: x[1].pts)
+    for idx, frame in pending:
+        row: list[Any] = [None] * n
+        row[idx] = frame
+        yield tuple(row)
 
 
 def to_numpy(t: object) -> np.ndarray:

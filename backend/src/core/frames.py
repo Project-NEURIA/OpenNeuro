@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Literal, overload, NamedTuple
+from typing import Any, ClassVar, Literal, overload, NamedTuple
 
 import numpy as np
 
@@ -213,23 +213,102 @@ class InterruptFrame(Frame):
 
 
 @dataclass(frozen=True, slots=True)
-class MessageFrame(Frame):
-    """A single chat message with role and content."""
+class RequestFrame(Frame):
+    """Frame that triggers a response from the agent."""
 
-    role: Literal["system", "user", "assistant"]
-    content: str
+    @classmethod
+    def new(cls) -> RequestFrame:
+        return cls(pts=time.time_ns(), id=obj_id())
+
+
+@dataclass(frozen=True, slots=True)
+class MessageFrame(Frame):
+    """A single chat message (OpenAI-compatible)."""
+
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str | None = None
+    tool_calls: list[ToolCall] | None = None
+    tool_call_id: str | None = None
 
     @classmethod
     def new(
         cls,
         *,
-        role: Literal["system", "user", "assistant"],
-        content: str,
+        role: Literal["system", "user", "assistant", "tool"],
+        content: str | None = None,
+        tool_calls: list[ToolCall] | None = None,
+        tool_call_id: str | None = None,
     ) -> MessageFrame:
         return cls(
             pts=time.time_ns(),
             id=obj_id(),
             role=role,
+            content=content,
+            tool_calls=tool_calls,
+            tool_call_id=tool_call_id,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolDef(Frame):
+    """Definition of a tool that an LLM can call (matches OpenAI FunctionDefinition)."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    strict: bool | None = None
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        name: str,
+        description: str,
+        parameters: dict[str, Any],
+        strict: bool | None = None,
+    ) -> ToolDef:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            name=name,
+            description=description,
+            parameters=parameters,
+            strict=strict,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCall(Frame):
+    """A tool call emitted by an LLM (matches OpenAI ChatCompletionMessageToolCall)."""
+
+    call_id: str
+    name: str
+    arguments: str
+
+    @classmethod
+    def new(cls, *, call_id: str, name: str, arguments: str) -> ToolCall:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            call_id=call_id,
+            name=name,
+            arguments=arguments,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolResult(Frame):
+    """Result of a tool execution (matches OpenAI ChatCompletionToolMessageParam)."""
+
+    call_id: str
+    content: str
+
+    @classmethod
+    def new(cls, *, call_id: str, content: str) -> ToolResult:
+        return cls(
+            pts=time.time_ns(),
+            id=obj_id(),
+            call_id=call_id,
             content=content,
         )
 

@@ -14,6 +14,7 @@ from src.api.metrics.controller import router as metrics_router
 from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
+from src.api.env.controller import router as env_router
 from src.core.graph import Graph
 from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
@@ -64,6 +65,7 @@ app.include_router(metrics_router)
 app.include_router(component_router)
 app.include_router(project_router)
 app.include_router(ui_router)
+app.include_router(env_router)
 
 
 def _start_parent_watchdog() -> None:
@@ -86,7 +88,9 @@ def _start_parent_watchdog() -> None:
 
 
 def main() -> None:
-    load_dotenv(override=True)
+    from src.core.config import BASE_DIR
+
+    load_dotenv(BASE_DIR / ".env", override=True)
     _start_parent_watchdog()
 
     import uvicorn

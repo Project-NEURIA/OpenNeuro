@@ -207,6 +207,24 @@ export async function saveGraph() {
   if (!res.ok) throw new Error(`Save graph failed: ${res.status}`);
 }
 
+// --- Env API ---
+
+export async function fetchEnv(): Promise<string> {
+  const res = await fetch("/env");
+  if (!res.ok) throw new Error(`Fetch env failed: ${res.status}`);
+  const data = await res.json();
+  return data.content;
+}
+
+export async function putEnv(content: string): Promise<void> {
+  const res = await fetch("/env", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`Put env failed: ${res.status}`);
+}
+
 // --- Config Options API ---
 
 export interface Option {

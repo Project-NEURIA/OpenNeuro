@@ -1,4 +1,4 @@
-import { Play, Square, BarChart3 } from "lucide-react";
+import { Play, Square, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { startAll, stopAll } from "@/lib/api";
 import type { MetricsSnapshot } from "@/lib/types";
@@ -7,9 +7,10 @@ interface MetricsOverlayProps {
   connected: boolean;
   metrics: MetricsSnapshot | null;
   onOpenDashboard?: () => void;
+  onOpenEnv?: () => void;
 }
 
-export function MetricsOverlay({ connected, metrics, onOpenDashboard }: MetricsOverlayProps) {
+export function MetricsOverlay({ connected, metrics, onOpenDashboard, onOpenEnv }: MetricsOverlayProps) {
   const nodeCount = metrics ? Object.keys(metrics.nodes).length : 0;
   const runningCount = metrics
     ? Object.values(metrics.nodes).filter((n) => n.status === "running").length
@@ -78,6 +79,18 @@ export function MetricsOverlay({ connected, metrics, onOpenDashboard }: MetricsO
             title="Open metrics dashboard"
           >
             <BarChart3 className="w-3.5 h-3.5" />
+          </button>
+        </>
+      )}
+      {onOpenEnv && (
+        <>
+          <div className="w-px h-3 bg-border" />
+          <button
+            onClick={onOpenEnv}
+            className="p-1 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
+            title="Environment variables"
+          >
+            <Settings className="w-3.5 h-3.5" />
           </button>
         </>
       )}

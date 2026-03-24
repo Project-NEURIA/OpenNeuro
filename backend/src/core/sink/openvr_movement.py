@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from typing import NamedTuple
 
@@ -61,10 +60,6 @@ _TPOSE: dict[str, Pose] = {
 class OpenVRMovementConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 21213
-    offset_x: float = -2.0
-    offset_y: float = 0.0
-    offset_z: float = 0.0
-    yaw_degrees: float = -50.0
 
 
 class OpenVRMovementInputs(NamedTuple):
@@ -75,36 +70,18 @@ class OpenVRMovementOutputs(NamedTuple):
     pass
 
 
-def _to_ovd_pose(
-    bone: BonePose | None,
-    ox: float,
-    oy: float,
-    oz: float,
-    cos_yaw: float,
-    sin_yaw: float,
-    yaw_qw: float,
-    yaw_qy: float,
-) -> Pose | None:
-    """Convert a BonePose to an ovd_client Pose with offset and yaw rotation."""
+def _to_ovd_pose(bone: BonePose | None) -> Pose | None:
+    """Convert a BonePose (left-handed, +Z=forward) to OpenVR Pose (right-handed, +Z=backward)."""
     if bone is None:
         return None
-    # Rotate position around origin by yaw, then add offset
-    rx = bone.pos_x * cos_yaw - bone.pos_z * sin_yaw
-    rz = bone.pos_x * sin_yaw + bone.pos_z * cos_yaw
-    # Apply yaw quaternion: q_yaw * q_bone (yaw quat is (w,0,y,0))
-    bw, bx, by, bz = bone.rot_w, bone.rot_x, bone.rot_y, bone.rot_z
-    rw = yaw_qw * bw - yaw_qy * by
-    rrx = yaw_qw * bx + yaw_qy * bz
-    ry = yaw_qw * by + yaw_qy * bw
-    rz_q = yaw_qw * bz - yaw_qy * bx
     return Pose(
-        pos_x=rx + ox,
-        pos_y=bone.pos_y + oy,
-        pos_z=rz + oz,
-        rot_w=rw,
-        rot_x=rrx,
-        rot_y=ry,
-        rot_z=rz_q,
+        pos_x=bone.pos_x,
+        pos_y=bone.pos_y,
+        pos_z=-bone.pos_z,
+        rot_w=bone.rot_w,
+        rot_x=-bone.rot_x,
+        rot_y=bone.rot_y,
+        rot_z=-bone.rot_z,
     )
 
 
@@ -162,21 +139,9 @@ class OpenVRMovementSink(
                         break
 
                     p = frame.get()
-                    ox, oy, oz = (
-                        self.config.offset_x,
-                        self.config.offset_y,
-                        self.config.offset_z,
-                    )
-                    yaw = math.radians(self.config.yaw_degrees)
-                    cy, sy = math.cos(yaw), math.sin(yaw)
-                    qw = math.cos(yaw / 2)
-                    qy = math.sin(yaw / 2)
                     _send_poses(
                         client,
-                        {
-                            k: _to_ovd_pose(v, ox, oy, oz, cy, sy, qw, qy)
-                            for k, v in p.items()
-                        },
+                        {k: _to_ovd_pose(v) for k, v in p.items()},
                     )
         finally:
             client.disconnect()

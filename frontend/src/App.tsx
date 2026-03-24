@@ -12,7 +12,8 @@ import {
   type Edge,
   type OnNodeDrag,
 } from "@xyflow/react";
-import { Home } from "lucide-react";
+import { Home, Settings } from "lucide-react";
+import { EnvEditor } from "@/components/EnvEditor";
 import { SplashScreen } from "@/components/SplashScreen";
 import { GraphCanvas } from "@/components/graph/GraphCanvas";
 import { NodeSidebar } from "@/components/graph/NodeSidebar";
@@ -116,6 +117,7 @@ function AppInner({
   const { connected, metrics, componentMap } = useGraphData(components);
 
   const [metricsOpen, setMetricsOpen] = useState(false);
+  const [envOpen, setEnvOpen] = useState(false);
   const history = useMetricsHistory(metrics);
 
   // Context menu state
@@ -782,10 +784,13 @@ function AppInner({
         <span>{projectName}</span>
       </button>
 
+      {envOpen && <EnvEditor onClose={() => setEnvOpen(false)} />}
+
       <MetricsOverlay
         connected={connected}
         metrics={metrics}
         onOpenDashboard={() => setMetricsOpen(true)}
+        onOpenEnv={() => setEnvOpen(true)}
       />
       {metricsOpen && (
         <MetricsDashboard
@@ -818,8 +823,13 @@ export default function App() {
           if (cancelled) return;
           if (current_project) {
             setSplashStatus("Loading project...");
-            await apiStartProject(current_project);
-            setCurrentProject(current_project);
+            try {
+              await apiStartProject(current_project);
+              setCurrentProject(current_project);
+            } catch {
+              setCurrentProject(null);
+              setShowChooser(true);
+            }
           } else {
             setCurrentProject(null);
             setShowChooser(true);

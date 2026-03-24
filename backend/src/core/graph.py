@@ -7,8 +7,8 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel, Field
 
-from src.core.channel import Channel, ConstantReceiver, Receiver, Sender
-from src.core.component import Component, ConstantComponent
+from src.core.channel import Channel, Receiver, Sender
+from src.core.component import Component, EmitOnStart
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -288,29 +288,13 @@ class GraphManager:
                     new_receiver_handles[recv_key] = Receiver(channel)
         self._receiver_handles = new_receiver_handles
 
-    def _wire_constants(self) -> None:
-        """Replace receivers fed by ConstantComponent outputs with ConstantReceivers."""
-        for edge in self._graph.edges:
-            comp = self._components.get(edge.source_node)
-            if not isinstance(comp, ConstantComponent):
-                continue
-            values = comp.get_values()
-            if not hasattr(values, "_fields"):
-                continue
-            val = getattr(values, edge.source_slot, None)
-            if val is None:
-                continue
-            rkey: ReceiverKey = (edge.target_node, edge.target_slot)
-            self._receiver_handles[rkey] = ConstantReceiver(val)
-
     def run(self) -> None:
         """Stop all running components, then start each with wired handles."""
         self.stop()
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
-        self._wire_constants()
-
+        start_queue: list[tuple[Component[Any, Any], Any, Any]] = []
         for node_id in self._graph.nodes:
             comp = self._components[node_id]
             cls = type(comp)
@@ -366,6 +350,12 @@ class GraphManager:
             inputs = self._build_tuple(input_type, input_handles)
             outputs = self._build_tuple(output_type, output_handles)
 
+            if isinstance(comp, EmitOnStart):
+                comp.emit(outputs)
+            start_queue.append((comp, inputs, outputs))
+
+        # Start all components after all emits are done
+        for comp, inputs, outputs in start_queue:
             comp.start(inputs, outputs)
 
         # Notify WS listeners that UI channels are ready

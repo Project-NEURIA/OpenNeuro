@@ -20,14 +20,12 @@ class Channel[T]:
 
     def _send(self, item: T) -> None:
         with self._condition:
-            if not self._cursors:
-                return
             self._items.append(item)
             self._condition.notify_all()
 
-    def _register(self, sub_id: int) -> None:
+    def _register(self, sub_id: int, latest: bool = True) -> None:
         with self._condition:
-            self._cursors[sub_id] = self._offset + len(self._items)
+            self._cursors[sub_id] = self._offset + len(self._items) if latest else self._offset
 
     def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
         with self._condition:
@@ -116,6 +114,7 @@ class ReceiverIterator[T]:
         sub_id: int,
         newest: bool,
         no_block: bool,
+        latest: bool,
     ) -> None:
         self._receiver = receiver
         self._channel = channel
@@ -125,7 +124,7 @@ class ReceiverIterator[T]:
         self._no_block = no_block
         self._done = False
         # Register cursor EAGERLY — this is the whole point.
-        self._channel._register(sub_id)
+        self._channel._register(sub_id, latest=latest)
 
     def __iter__(self) -> Iterator[T | None]:
         return self
@@ -173,6 +172,7 @@ class Receiver[T]:
         subscriber: ThreadedComponent[Any, Any],
         newest: bool = False,
         no_block: bool = False,
+        latest: bool = True,
     ) -> Iterator[T | None]:
         """Return an iterator over items from the channel.
 
@@ -182,6 +182,8 @@ class Receiver[T]:
 
         newest: skip to the latest item, dropping everything in between.
         no_block: return None immediately if nothing is available.
+        latest: if True (default), start from the head. If False, start
+                from the oldest available item (useful for reading emitted values).
 
         Yields None when the component is stopping or when no_block=True
         and there are no more new frames.
@@ -195,6 +197,7 @@ class Receiver[T]:
             sub_id=sub_id,
             newest=newest,
             no_block=no_block,
+            latest=latest,
         )
 
     @property
@@ -210,25 +213,6 @@ class Receiver[T]:
             head = ch._offset + len(ch._items)
             return head - cursor
 
-
-class ConstantReceiver[T](Receiver[T]):
-    """Receiver that yields a fixed value infinitely. No channel needed."""
-
-    def __init__(self, value: T) -> None:
-        super().__init__(Channel())  # dummy, never used
-        self._value = value
-
-    def __call__(
-        self,
-        subscriber: ThreadedComponent[Any, Any],
-        newest: bool = False,
-        no_block: bool = False,
-    ) -> Iterator[T]:
-        def _repeat() -> Iterator[T]:
-            while not subscriber.stop_event.is_set():
-                yield self._value
-
-        return _repeat()
 
 
 # -- UI channel markers --

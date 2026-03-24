@@ -1,35 +1,48 @@
 from __future__ import annotations
 
-import threading
+import numpy as np
+import math
+from datetime import datetime
 from typing import NamedTuple
 
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import InterruptFrame, MessageFrame, TextFrame
+from src.core.frames import (
+    BodyPoseFrame,
+    MessageFrame,
+    ObjectLocationFrame,
+    TextFrame,
+    ToolCall,
+    ToolResult,
+)
+from src.core.utils import drain
 
 
 class AgentStateConfig(BaseModel):
-    user_name: str = "User"
-    chatbot_name: str = "Assistant"
+    system_prompt: str
 
 
-class AgentStateInputs(NamedTuple):
-    asr: Receiver[TextFrame]
-    feedback: Receiver[TextFrame]
+class AgentStateInputs[T](NamedTuple):
+    request: Receiver[T]
     initial_msgs: Receiver[list[MessageFrame]] | None = None
-    interrupt: Receiver[InterruptFrame] | None = None
-    memory_prefix: Receiver[TextFrame] | None = None
-    observation: Receiver[TextFrame] | None = None
+    speech: Receiver[TextFrame] | None = None
+    feedback: Receiver[TextFrame] | None = None
+    tool_call: Receiver[ToolCall] | None = None
+    tool_result: Receiver[ToolResult] | None = None
+    vision: Receiver[TextFrame] | None = None
+    pose: Receiver[BodyPoseFrame] | None = None
+    objects: Receiver[ObjectLocationFrame] | None = None
+    memory: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
     messages: Sender[list[MessageFrame]]
-    messages_for_memory: Sender[list[MessageFrame]] | None = None
+    # messages_for_memory: Sender[list[MessageFrame]] | None = None
 
 
-class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
+class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
     """Manages conversation history, optionally enriched by memory and character card."""
 
     description = "Tracks and manages agent conversation state"
@@ -38,129 +51,185 @@ class AgentState(ThreadedComponent[AgentStateInputs, AgentStateOutputs]):
     def __init__(self, config: AgentStateConfig) -> None:
         super().__init__()
         self.config = config
-        self._history: list[tuple[str, str]] = []
-        self._system_prompt: str = "You are a helpful AI assistant."
-        self._initial_msgs: list[MessageFrame] = []
-        self._latest_observation: str = ""
-        self._lock = threading.Lock()
+        self._history: list[MessageFrame] = [
+            MessageFrame.new(role="system", content=config.system_prompt)
+        ]
+        # Object tracking: object_id -> (label, position)
+        self._visible: dict[int, tuple[str, np.ndarray]] = {}
 
-    def _build_messages(
-        self, memory_prefix: str = "", observation: str = ""
-    ) -> list[MessageFrame]:
-        with self._lock:
-            system = self._system_prompt
-            if memory_prefix or observation:
-                parts = [system]
-                if memory_prefix:
-                    parts.append(memory_prefix)
-                if observation:
-                    parts.append(f"[Current Vision Observation]\n{observation}")
-                system = "\n\n".join(parts)
-            msgs: list[MessageFrame] = self._initial_msgs.copy()
-            msgs.append(MessageFrame.new(role="system", content=system))
-            for name, text in self._history:
-                if name == self.config.user_name:
-                    msgs.append(MessageFrame.new(role="user", content=text))
-                else:
-                    msgs.append(MessageFrame.new(role="assistant", content=text))
-            return msgs
+    def _diff_objects(self, frame: ObjectLocationFrame) -> None:
+        """Diff incoming objects against currently visible. Disappeared objects
+        get frozen into history, visible objects update in-place."""
+        new_visible: dict[int, tuple[str, np.ndarray]] = {}
+        for i, obj_id in enumerate(frame.object_ids):
+            oid = int(obj_id)
+            new_visible[oid] = (frame.labels[i], frame.positions[i])
+
+        # Disappeared objects -> freeze into history
+        for oid, (label, pos) in self._visible.items():
+            if oid not in new_visible:
+                x, y, z = pos
+                self._history.append(
+                    MessageFrame.new(
+                        role="system",
+                        content=f'[Object "{label}" (id={oid}) last seen at ({x:.2f}, {y:.2f}, {z:.2f})]',
+                    )
+                )
+
+        self._visible = new_visible
+
+    def _build_visible_message(self) -> MessageFrame | None:
+        """Build a live message describing currently visible objects."""
+        if not self._visible:
+            return None
+        lines = []
+        for oid, (label, pos) in self._visible.items():
+            x, y, z = pos
+            lines.append(f'  "{label}" (id={oid}) at ({x:.2f}, {y:.2f}, {z:.2f})')
+        return MessageFrame.new(
+            role="system",
+            content="[Currently visible objects]\n" + "\n".join(lines),
+        )
+
+    @staticmethod
+    def _heading_from_quat(w: float, x: float, y: float, z: float) -> float:
+        """Extract heading in degrees (clockwise from +Z) from a Y-up quaternion."""
+        fwd_x = 2 * (x * z + w * y)
+        fwd_z = 1 - 2 * (x * x + y * y)
+        return -math.degrees(math.atan2(fwd_x, fwd_z))
+
+    @staticmethod
+    def _print_messages(msgs: list[MessageFrame]) -> None:
+        print("-------------------------------------------")
+        for m in msgs:
+            preview = m.content[:80] if m.content else "(no content)"
+            extra = ""
+            if m.tool_calls:
+                extra += f" tool_calls={[tc.name for tc in m.tool_calls]}"
+            if m.tool_call_id:
+                extra += f" tool_call_id={m.tool_call_id}"
+            print(f"  [{m.role}] {preview}{extra}")
 
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
 
-        memory_prefix_receiver = inputs.memory_prefix
-        memory_sender = outputs.messages_for_memory
-        has_memory = memory_prefix_receiver is not None and memory_sender is not None
-        memory_gen = (
-            memory_prefix_receiver(self) if memory_prefix_receiver is not None else None
-        )
-        print(
-            f"[AgentState] Memory integration {'enabled' if has_memory else 'disabled'}"
-        )
-
         # Read initial prompts once (constant component, e.g. CharacterCard)
         if inputs.initial_msgs is not None:
-            frame = next(inputs.initial_msgs(self))
+            frame = next(inputs.initial_msgs(self, latest=False))
             if frame is not None:
-                self._initial_msgs = frame
+                self._history = frame + self._history
                 print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
 
-        def process_observation() -> None:
-            if inputs.observation is None:
-                return
-            for obs_frame in inputs.observation(self):
-                if obs_frame is None:
-                    break
-                with self._lock:
-                    self._latest_observation = obs_frame.text
-                print(f"[AgentState] Observation updated: {obs_frame.text}")
+        # Upfront iterators (cursors persist across drains)
+        speech_it = inputs.speech(self, no_block=True) if inputs.speech else None
+        feedback_it = inputs.feedback(self, no_block=True) if inputs.feedback else None
+        vision_it = inputs.vision(self, no_block=True) if inputs.vision else None
+        memory_it = inputs.memory(self, no_block=True) if inputs.memory else None
+        tool_call_it = inputs.tool_call(self, no_block=True) if inputs.tool_call else None
+        tool_result_it = inputs.tool_result(self, no_block=True) if inputs.tool_result else None
+        objects_it = (
+            inputs.objects(self, newest=True, no_block=True)
+            if inputs.objects is not None
+            else None
+        )
+        pose_it = (
+            inputs.pose(self, newest=True, no_block=True)
+            if inputs.pose is not None
+            else None
+        )
 
-        def process_asr() -> None:
-            for text_frame in inputs.asr(self):
-                print(text_frame)
-                if text_frame is None:
-                    break
+        # Buffer tool_calls until their matching tool_result arrives
+        pending_tool_calls: dict[str, ToolCall] = {}
 
-                text = text_frame.text.strip()
-                if not text:
-                    continue
+        # Block on request, drain others on each trigger
+        for req in inputs.request(self):
+            if req is None:
+                break
 
-                with self._lock:
-                    self._history.append((self.config.user_name, text))
-                    current_obs = self._latest_observation
-                print(f"[AgentState] User: {text}")
-
-                # Memory retrieval (optional)
-                mem_text = ""
-                if has_memory and memory_sender is not None and memory_gen is not None:
-                    memory_sender.send(self._build_messages(observation=current_obs))
-                    prefix_frame = next(memory_gen)
-                    if prefix_frame is not None and prefix_frame.text:
-                        mem_text = prefix_frame.text
-                        print(f"[AgentState] Memory prefix injected {mem_text}")
-
-                outputs.messages.send(
-                    self._build_messages(
-                        memory_prefix=mem_text, observation=current_obs
-                    )
+            # If request itself carries text (e.g. TextInput wired directly),
+            # treat it as the user message so it doesn't need a separate speech wire.
+            if hasattr(req, "text") and req.text:
+                ts = datetime.fromtimestamp(req.pts / 1e9).strftime("%H:%M:%S")
+                self._history.append(
+                    MessageFrame.new(role="user", content=f"[{ts}] {req.text}")
                 )
 
-        def process_feedback() -> None:
-            for text_frame in inputs.feedback(self):
-                if text_frame is None:
-                    break
+            for speech, feedback, vision, memory, tc, tr in drain(
+                speech_it, feedback_it, vision_it, memory_it, tool_call_it, tool_result_it
+            ):
+                if speech is not None:
+                    ts = datetime.fromtimestamp(speech.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(role="user", content=f"[{ts}] {speech.text}")
+                    )
+                if feedback is not None:
+                    ts = datetime.fromtimestamp(feedback.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(role="assistant", content=f"[{ts}] {feedback.text}")
+                    )
+                if vision is not None:
+                    ts = datetime.fromtimestamp(vision.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(role="system", content=f"[{ts}] {vision.text}")
+                    )
+                if memory is not None:
+                    ts = datetime.fromtimestamp(memory.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(role="system", content=f"[{ts}] {memory.text}")
+                    )
+                if tc is not None:
+                    pending_tool_calls[tc.call_id] = tc
+                if tr is not None and tr.call_id in pending_tool_calls:
+                    ptc = pending_tool_calls.pop(tr.call_id)
+                    ts = datetime.fromtimestamp(ptc.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(
+                            role="assistant",
+                            content=f"[{ts}]",
+                            tool_calls=[ptc],
+                        )
+                    )
+                    ts = datetime.fromtimestamp(tr.pts / 1e9).strftime("%H:%M:%S")
+                    self._history.append(
+                        MessageFrame.new(
+                            role="tool",
+                            content=f"[{ts}] {tr.content}",
+                            tool_call_id=tr.call_id,
+                        )
+                    )
 
-                chunk = text_frame.text
-                if not chunk:
-                    continue
+            # Diff objects against previous state
+            if objects_it is not None:
+                obj_frame = next(objects_it)
+                if obj_frame is not None:
+                    self._diff_objects(obj_frame)
 
-                with self._lock:
-                    if (
-                        self._history
-                        and self._history[-1][0] == self.config.chatbot_name
-                    ):
-                        name, text = self._history[-1]
-                        self._history[-1] = (name, text + chunk)
-                    else:
-                        self._history.append((self.config.chatbot_name, chunk))
+            # Build final messages: history
+            msgs = self._history.copy()
 
-        def process_interrupts() -> None:
-            if inputs.interrupt is None:
-                return
-            for frame in inputs.interrupt(self):
-                if frame is None:
-                    break
-                print(f"[AgentState] Interrupt received: {frame.reason}")
+            # visible objects
+            visible_msg = self._build_visible_message()
+            if visible_msg is not None:
+                msgs.append(visible_msg)
 
-        threads = [
-            threading.Thread(target=process_observation, daemon=True),
-            threading.Thread(target=process_asr, daemon=True),
-            threading.Thread(target=process_feedback, daemon=True),
-            threading.Thread(target=process_interrupts, daemon=True),
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+            # Read agent spatial state (position + direction)
+            if pose_it is not None:
+                pose_frame = next(pose_it)
+                if pose_frame is not None:
+                    poses = pose_frame.get()
+                    waist = poses.get("waist")
+                    if waist is not None:
+                        px, py, pz = waist.pos_x, waist.pos_y, waist.pos_z
+                        heading = self._heading_from_quat(waist.rot_w, waist.rot_x, waist.rot_y, waist.rot_z)
+                        msgs.append(
+                            MessageFrame.new(
+                                role="system",
+                                content=f"[Position (y-up): x={px:.2f}, y={py:.2f}, z={pz:.2f}]\n"
+                                        f"[Heading (from +Z clockwise): {heading:.0f}°]",
+                            )
+                        )
+
+            self._print_messages(msgs)
+            outputs.messages.send(msgs)
 
         print("[AgentState] Agent State management stopped")

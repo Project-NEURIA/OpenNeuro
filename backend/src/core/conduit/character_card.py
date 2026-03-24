@@ -8,7 +8,8 @@ from typing import Any, NamedTuple
 
 from pydantic import BaseModel
 
-from src.core.component import ConstantComponent, Tag
+from src.core.channel import Sender
+from src.core.component import EmitOnStart, PrimitiveComponent, Tag
 from src.core.frames import MessageFrame, TextFrame
 
 
@@ -24,18 +25,18 @@ class CharacterCardConfig(BaseModel):
 
 
 class CharacterCardOutputs(NamedTuple):
-    prompts: list[MessageFrame] | None = None
-    system_prompt: TextFrame | None = None
-    name: TextFrame | None = None
-    description: TextFrame | None = None
-    personality: TextFrame | None = None
-    scenario: TextFrame | None = None
-    first_message: TextFrame | None = None
-    example_messages: TextFrame | None = None
-    post_history_instructions: TextFrame | None = None
+    prompts: Sender[list[MessageFrame]] | None = None
+    system_prompt: Sender[TextFrame] | None = None
+    name: Sender[TextFrame] | None = None
+    description: Sender[TextFrame] | None = None
+    personality: Sender[TextFrame] | None = None
+    scenario: Sender[TextFrame] | None = None
+    first_message: Sender[TextFrame] | None = None
+    example_messages: Sender[TextFrame] | None = None
+    post_history_instructions: Sender[TextFrame] | None = None
 
 
-class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
+class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnStart[CharacterCardOutputs]):
     """A constant component holding a character card (V2 spec conformant).
 
     Initialize with either a path to a SillyTavern PNG character card,
@@ -114,37 +115,42 @@ class CharacterCard(ConstantComponent[tuple[()], CharacterCardOutputs]):
         else:
             raise ValueError("CharacterCard requires either path or config")
 
-    def get_values(self) -> CharacterCardOutputs:
+    def emit(self, outputs: CharacterCardOutputs) -> None:
         c = self.config
-        # Build prompts list matching SillyTavern message ordering
-        prompts: list[MessageFrame] = []
-        if c.description:
-            prompts.append(MessageFrame.new(role="system", content=c.description))
-        if c.personality:
-            prompts.append(MessageFrame.new(role="system", content=c.personality))
-        if c.scenario:
-            prompts.append(MessageFrame.new(role="system", content=c.scenario))
-        if c.example_messages:
-            prompts.append(MessageFrame.new(role="system", content=c.example_messages))
-        if c.system_prompt:
-            prompts.append(MessageFrame.new(role="system", content=c.system_prompt))
 
-        return CharacterCardOutputs(
-            prompts=prompts,
-            system_prompt=TextFrame.new(text=c.system_prompt)
-            if c.system_prompt
-            else None,
-            name=TextFrame.new(text=c.name) if c.name else None,
-            description=TextFrame.new(text=c.description) if c.description else None,
-            personality=TextFrame.new(text=c.personality) if c.personality else None,
-            scenario=TextFrame.new(text=c.scenario) if c.scenario else None,
-            first_message=TextFrame.new(text=c.first_message)
-            if c.first_message
-            else None,
-            example_messages=TextFrame.new(text=c.example_messages)
-            if c.example_messages
-            else None,
-            post_history_instructions=TextFrame.new(text=c.post_history_instructions)
-            if c.post_history_instructions
-            else None,
-        )
+        if outputs.prompts is not None:
+            prompts: list[MessageFrame] = []
+            if c.description:
+                prompts.append(MessageFrame.new(role="system", content=c.description))
+            if c.personality:
+                prompts.append(MessageFrame.new(role="system", content=c.personality))
+            if c.scenario:
+                prompts.append(MessageFrame.new(role="system", content=c.scenario))
+            if c.example_messages:
+                prompts.append(
+                    MessageFrame.new(role="system", content=c.example_messages)
+                )
+            if c.system_prompt:
+                prompts.append(
+                    MessageFrame.new(role="system", content=c.system_prompt)
+                )
+            outputs.prompts.send(prompts)
+
+        if outputs.system_prompt is not None and c.system_prompt:
+            outputs.system_prompt.send(TextFrame.new(text=c.system_prompt))
+        if outputs.name is not None and c.name:
+            outputs.name.send(TextFrame.new(text=c.name))
+        if outputs.description is not None and c.description:
+            outputs.description.send(TextFrame.new(text=c.description))
+        if outputs.personality is not None and c.personality:
+            outputs.personality.send(TextFrame.new(text=c.personality))
+        if outputs.scenario is not None and c.scenario:
+            outputs.scenario.send(TextFrame.new(text=c.scenario))
+        if outputs.first_message is not None and c.first_message:
+            outputs.first_message.send(TextFrame.new(text=c.first_message))
+        if outputs.example_messages is not None and c.example_messages:
+            outputs.example_messages.send(TextFrame.new(text=c.example_messages))
+        if outputs.post_history_instructions is not None and c.post_history_instructions:
+            outputs.post_history_instructions.send(
+                TextFrame.new(text=c.post_history_instructions)
+            )

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import io
 import math
 import os
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import numpy as np
 import torch
@@ -36,28 +35,7 @@ _OPENVR_TO_SMPL: dict[str, int] = {v: k for k, v in _SMPL_TO_OPENVR.items()}
 
 # SMPLX kinematic tree parents
 _SMPL_PARENTS = [
-    -1,
-    0,
-    0,
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    9,
-    9,
-    12,
-    13,
-    14,
-    16,
-    17,
-    18,
-    19,
+    -1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19,
 ]
 _N_JOINTS = 22
 
@@ -100,7 +78,6 @@ class PoseRenderer3DConfig(BaseModel):
     gender: str = "male"
     device: str = "cpu"
     camera_distance: float = 3.5
-    camera_height: float = 0.8
 
 
 class PoseRenderer3DInputs(NamedTuple):
@@ -112,37 +89,30 @@ class PoseRenderer3DOutputs(NamedTuple):
 
 
 class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutputs]):
+    """Renders BodyPoseFrame as a 3D SMPL body mesh using pyrender."""
+
     description = "Renders 3D pose skeletons onto video frames"
-
-    """Renders BodyPoseFrame as a 3D SMPL body mesh.
-
-    Uses pyrender with EGL on Linux, matplotlib software renderer on macOS.
-    """
-
     tags = Tag(io={"conduit"}, functionality={"video", "movement"})
 
     def __init__(self, config: PoseRenderer3DConfig) -> None:
         super().__init__()
         self.config = config
         self._initialized = False
-        self._use_pyrender = True
-        self._pyrender: Any = None
-        self._renderer: Any = None
-        self._scene: Any = None
-        self._trimesh: Any = None
-        self._body_model: Any = None
-        self._faces: np.ndarray = np.empty(0, dtype=np.int32)
 
     def _ensure_resources(self) -> None:
         if self._initialized:
             return
 
         import sys
+        if sys.platform == "linux":
+            os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 
-        import smplx
+        import pyrender
         import trimesh
+        import smplx
         from pathlib import Path
 
+        self._pyrender = pyrender
         self._trimesh = trimesh
 
         # Load SMPL body model
@@ -165,38 +135,26 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         )
         self._faces = self._body_model.faces.astype(np.int32)
 
-        # Try pyrender (works on Linux with EGL), fall back to matplotlib
-        if sys.platform != "darwin":
-            os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-            try:
-                import pyrender
+        # Set up pyrender renderer and scene
+        self._renderer = pyrender.OffscreenRenderer(
+            viewport_width=self.config.width,
+            viewport_height=self.config.height,
+            point_size=0.5,
+        )
+        self._scene = pyrender.Scene(
+            bg_color=[0.1, 0.1, 0.1, 1.0],
+            ambient_light=(0.4, 0.4, 0.4),
+        )
 
-                self._pyrender = pyrender
-                self._renderer = pyrender.OffscreenRenderer(
-                    viewport_width=self.config.width,
-                    viewport_height=self.config.height,
-                    point_size=0.5,
-                )
-                self._scene = pyrender.Scene(
-                    bg_color=[0.1, 0.1, 0.1, 1.0],
-                    ambient_light=(0.4, 0.4, 0.4),
-                )
-                light = pyrender.PointLight(color=[1.0, 1.0, 1.0], intensity=4.0)
-                for pos in [[0, -1, 1], [0, 1, 1], [1, 1, 2]]:
-                    light_pose = np.eye(4)
-                    light_pose[:3, 3] = pos
-                    self._scene.add(light, pose=light_pose)
-                self._use_pyrender = True
-            except Exception:
-                self._use_pyrender = False
-        else:
-            self._use_pyrender = False
+        # Add lights (same setup as DART renderer)
+        light = pyrender.PointLight(color=[1.0, 1.0, 1.0], intensity=4.0)
+        for pos in [[0, -1, 1], [0, 1, 1], [1, 1, 2]]:
+            light_pose = np.eye(4)
+            light_pose[:3, 3] = pos
+            self._scene.add(light, pose=light_pose)
 
-        if not self._use_pyrender:
-            import matplotlib
-
-            matplotlib.use("Agg")
         self._initialized = True
+        print("[PoseRenderer3D] Initialized SMPL model and pyrender scene")
 
     def _body_pose_to_smpl_params(
         self, poses: dict[str, BonePose | None]
@@ -211,7 +169,6 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             body_pose: [21, 3, 3] local rotation matrices
             transl: [3] root translation in Z-up
         """
-        # Get world-space Z-up rotation matrices for available joints
         world_rots_zup: dict[int, np.ndarray] = {}
         for part_name, bone in poses.items():
             if bone is None:
@@ -224,7 +181,6 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             world_rots_zup[smpl_idx] = _quat_to_rotmat(*q_zup)
 
         # Build all 22 world rotations in topological order
-        # For missing joints, inherit parent's world rotation (= identity local rotation)
         world_rots: list[np.ndarray] = [np.eye(3, dtype=np.float32)] * _N_JOINTS
         for j in range(_N_JOINTS):
             if j in world_rots_zup:
@@ -242,7 +198,6 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             body_pose[j - 1] = world_rots[parent].T @ world_rots[j]
 
         # Translation: waist position converted Y-up → Z-up
-        # Y-up (x, y, z) → Z-up: x_z = x_y, y_z = -z_y, z_z = y_y
         waist = poses.get("waist")
         if waist is not None:
             transl = np.array(
@@ -268,8 +223,8 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         mat[:3, 3] = eye
         return mat
 
-    def _render_mesh_pyrender(self, vertices: np.ndarray) -> np.ndarray:
-        """Render SMPL mesh using pyrender (Linux/EGL)."""
+    def _render_mesh(self, vertices: np.ndarray) -> np.ndarray:
+        """Render SMPL mesh to an RGB image."""
         pyrender = self._pyrender
 
         mesh = self._trimesh.Trimesh(
@@ -296,9 +251,7 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         ]
         for direction, color in axes:
             cyl = self._trimesh.creation.cylinder(
-                radius=axis_radius,
-                height=axis_len,
-                sections=8,
+                radius=axis_radius, height=axis_len, sections=8,
             )
             d = np.array(direction, dtype=np.float64)
             z = np.array([0, 0, 1], dtype=np.float64)
@@ -314,14 +267,13 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             T[:3, 3] = d * axis_len / 2
             cyl.apply_transform(T @ R)
             mat = pyrender.MetallicRoughnessMaterial(
-                metallicFactor=0.0,
-                alphaMode="OPAQUE",
-                baseColorFactor=color,
+                metallicFactor=0.0, alphaMode="OPAQUE", baseColorFactor=color,
             )
             axis_nodes.append(
                 self._scene.add(pyrender.Mesh.from_trimesh(cyl, material=mat), "axis")
             )
 
+        # Camera looks at mesh center from the front (-Y in SMPL's Z-up space)
         center = mesh.bounds.mean(axis=0)
         eye = center + np.array([0.0, -self.config.camera_distance, 0.0])
         cam_pose = self._look_at(eye, center, up=np.array([0.0, 0.0, 1.0]))
@@ -338,56 +290,6 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             self._scene.remove_node(n)
 
         return image
-
-    def _render_mesh_matplotlib(self, vertices: np.ndarray) -> np.ndarray:
-        """Render SMPL mesh using matplotlib (software, cross-platform)."""
-        from matplotlib import pyplot as plt
-        from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # type: ignore[import-untyped]
-
-        w = self.config.width
-        h = self.config.height
-        dpi = 100
-        fig = plt.figure(figsize=(w / dpi, h / dpi), dpi=dpi)
-        ax = fig.add_subplot(111, projection="3d")
-
-        tri_verts = vertices[self._faces]
-        mesh_coll = Poly3DCollection(
-            tri_verts,
-            alpha=0.9,
-            edgecolor=(0.3, 0.3, 0.3, 0.1),
-            facecolor=(1.0, 1.0, 0.9),
-            linewidth=0.1,
-        )
-        ax.add_collection3d(mesh_coll)
-
-        # Set axis limits from mesh bounds
-        mins = vertices.min(axis=0)
-        maxs = vertices.max(axis=0)
-        center = (mins + maxs) / 2
-        span = (maxs - mins).max() / 2 * 1.2
-        ax.set_xlim(center[0] - span, center[0] + span)
-        ax.set_ylim(center[1] - span, center[1] + span)
-        ax.set_zlim(center[2] - span, center[2] + span)
-
-        # Camera: view from front (-Y in Z-up)
-        ax.view_init(elev=10, azim=-90)
-        ax.set_facecolor((0.1, 0.1, 0.1))
-        ax.axis("off")
-        fig.patch.set_facecolor((0.1, 0.1, 0.1))
-        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-        buf = io.BytesIO()
-        fig.savefig(buf, format="raw", dpi=dpi, facecolor=fig.get_facecolor())
-        plt.close(fig)
-
-        buf.seek(0)
-        image = np.frombuffer(buf.getvalue(), dtype=np.uint8).reshape(h, w, 4)
-        return image[:, :, :3]
-
-    def _render_mesh(self, vertices: np.ndarray) -> np.ndarray:
-        if self._use_pyrender:
-            return self._render_mesh_pyrender(vertices)
-        return self._render_mesh_matplotlib(vertices)
 
     def run(self, inputs: PoseRenderer3DInputs, outputs: PoseRenderer3DOutputs) -> None:
         self._ensure_resources()
