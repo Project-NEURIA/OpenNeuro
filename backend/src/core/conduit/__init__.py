@@ -23,7 +23,7 @@ from src.core.conduit.monocular_depth_estimator import (
 from src.core.conduit.depth_estimation_visualizer import (
     DepthEstimationVisualizer as DepthEstimationVisualizer,
 )
-from src.core.conduit.object_segmenter import ObjectSegmenter as ObjectSegmenter
+from src.core.conduit.yolo.object_segmenter import ObjectSegmenter as ObjectSegmenter
 from src.core.conduit.object_segmentation_visualizer import (
     ObjectSegmentationVisualizer as ObjectSegmentationVisualizer,
 )
