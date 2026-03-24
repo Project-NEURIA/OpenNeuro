@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from fishaudio import FishAudio  # type: ignore[import-untyped]
 
 from src.core.channel import Receiver, Sender
-from src.core.component import PrimitiveComponent
+from src.core.component import ThreadedComponent
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 
@@ -28,7 +28,7 @@ class FishTTSOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
 
-class FishTTS(PrimitiveComponent[FishTTSInputs, FishTTSOutputs]):
+class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
     """Text-to-Speech using Fish Audio WebSocket streaming."""
 
     description = "Streaming TTS via Fish Audio"

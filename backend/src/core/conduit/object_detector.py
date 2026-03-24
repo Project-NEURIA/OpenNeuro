@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import NamedTuple, Any
+from typing import Any, Literal, NamedTuple
 
 import numpy as np
 from pydantic import BaseModel
@@ -27,7 +27,7 @@ class ObjectDetectorConfig(BaseModel):
     new_det_thresh: float = 0.85
     max_tracking_per_object: int = 4
     session_ttl: int = 400
-    device: str = "auto"
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto"
 
 
 class ObjectDetectorInputs(NamedTuple):
@@ -85,7 +85,7 @@ class ObjectDetector(ThreadedComponent[ObjectDetectorInputs, ObjectDetectorOutpu
         self._model = Sam3VideoModel.from_pretrained(
             MODEL_ID,
             config=config,
-        ).to(self._device, self._dtype)
+        ).to(self._device, self._dtype)  # type: ignore[arg-type]
         self._model.eval()
 
         self._processor = Sam3VideoProcessor.from_pretrained(

@@ -53,6 +53,7 @@ class ObjectSegmenterConfig(BaseModel):
     track_high_thresh: float = 0.15
     track_low_thresh: float = 0.07
     match_thresh: float = 0.8
+    device: Literal["auto", "cpu", "cuda", "rocm", "mps"] = "auto"
 
 
 class ObjectSegmenterInputs(NamedTuple):
@@ -77,7 +78,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         self._tracker_yaml: str | None = None
         self._prompts: list[str] = []
         self._lock = threading.Lock()
-        self._device = auto_device("auto")
+        self._device = auto_device(config.device)
 
     def _build_tracker_yaml(self) -> str:
         cfg = dict(_TRACKER_DEFAULTS)
@@ -89,7 +90,10 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
 
         lines = [f"{k}: {v}" for k, v in cfg.items()]
         tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", prefix="tracker_", delete=False,
+            mode="w",
+            suffix=".yaml",
+            prefix="tracker_",
+            delete=False,
         )
         tmp.write("\n".join(lines) + "\n")
         tmp.close()
@@ -127,9 +131,9 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         finally:
             os.chdir(prev_cwd)
 
-    def _infer(self, frame: np.ndarray) -> None | tuple[
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[str, ...]
-    ]:
+    def _infer(
+        self, frame: np.ndarray
+    ) -> None | tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[str, ...]]:
         kwargs: dict[str, Any] = dict(
             imgsz=640,
             conf=self.config.conf,
@@ -166,7 +170,9 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         if getattr(boxes, "is_track", False) and boxes.id is not None:
             track_ids = boxes.id.int().cpu().numpy()
 
-        mask_data = masks_result.data.cpu().numpy() if masks_result is not None else None
+        mask_data = (
+            masks_result.data.cpu().numpy() if masks_result is not None else None
+        )
 
         keep_masks: list[np.ndarray] = []
         keep_boxes: list[np.ndarray] = []
