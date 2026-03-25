@@ -4,12 +4,13 @@ import base64
 import json
 import struct
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Literal, NamedTuple
 
 from pydantic import BaseModel
 
 from src.core.channel import Sender
 from src.core.component import EmitOnStart, PrimitiveComponent, Tag
+from src.core.config import ASSETS_DIR
 from src.core.frames import MessageFrame, TextFrame
 
 
@@ -49,22 +50,14 @@ class CharacterCard(
     description = "Character card for persona-based chat"
     tags = Tag(io={"source"}, functionality={"llm"})
 
-    _PRESETS_DIR = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "assets"
-        / "character_cards"
-    )
+    _PRESETS_DIR = ASSETS_DIR / "character_cards"
 
     @classmethod
-    def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
-        if not cls._PRESETS_DIR.exists():
-            return {}
-        return {
-            "path": [
-                {"value": str(p), "label": p.stem.replace("_", " ").title()}
-                for p in sorted(cls._PRESETS_DIR.glob("*.png"))
-            ]
-        }
+    def _resolve_preset(cls, preset: str) -> Path:
+        path = cls._PRESETS_DIR / f"{preset}.png"
+        if not path.exists():
+            raise ValueError(f"Preset not found: {preset} (expected at {path})")
+        return path
 
     @staticmethod
     def _read_png(path: Path) -> CharacterCardConfig:
@@ -107,16 +100,26 @@ class CharacterCard(
 
     def __init__(
         self,
+        preset: Literal[
+            "calm_scientist",
+            "cool_mature_woman",
+            "energetic_girl",
+            "gentle_big_sister",
+            "tsundere_rich_girl",
+        ]
+        | None = None,
         path: Path | None = None,
         config: CharacterCardConfig | None = None,
     ) -> None:
         super().__init__()
-        if path is not None:
+        if preset is not None:
+            self.config = self._read_png(self._resolve_preset(preset))
+        elif path is not None:
             self.config = self._read_png(path)
         elif config is not None:
             self.config = config
         else:
-            raise ValueError("CharacterCard requires either path or config")
+            raise ValueError("CharacterCard requires preset, path, or config")
 
     def emit(self, outputs: CharacterCardOutputs) -> None:
         c = self.config

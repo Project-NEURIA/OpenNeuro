@@ -4,14 +4,12 @@ from typing import Any, NamedTuple
 
 import litellm
 from litellm import completion
+from litellm.types.utils import ModelResponseStream
+from pydantic import BaseModel
 
-litellm.drop_params = True
-from litellm.types.utils import ModelResponseStream  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
-
-from src.core.channel import Receiver, Sender  # noqa: E402
-from src.core.component import ThreadedComponent, Tag  # noqa: E402
-from src.core.frames import (  # noqa: E402
+from src.core.channel import Receiver, Sender
+from src.core.component import ThreadedComponent, Tag
+from src.core.frames import (
     EOS,
     InterruptFrame,
     MessageFrame,
@@ -19,6 +17,8 @@ from src.core.frames import (  # noqa: E402
     ToolCall,
     ToolDef,
 )
+
+litellm.drop_params = True
 
 
 class LLMConfig(BaseModel):
