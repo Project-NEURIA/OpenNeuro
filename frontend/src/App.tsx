@@ -318,7 +318,7 @@ function AppInner({
       return {
         id: nodeId,
         label: componentName,
-        category: info?.category ?? "conduit",
+        category: info ? categoryFromTags(info.tags) : "conduit",
         initArgs,
         onEditConfig: () => openNodeConfigEditor(nodeId),
         inputs: info ? Object.keys(info.inputs) : [],
