@@ -33,10 +33,10 @@ def test_square_walk():
     # Figure starts facing +Z in Y-up space, +X = figure's right
     # Goals are Y-up: (x=right, y=height, z=forward)
     waypoints = [
-        (0.0, 0.0, 4.0),    # straight ahead
-        (-4.0, 0.0, 4.0),   # turn left
-        (-4.0, 0.0, 0.0),   # turn left again
-        (0.0, 0.0, 0.0),    # back to origin
+        (0.0, 0.0, 4.0),  # straight ahead
+        (-4.0, 0.0, 4.0),  # turn left
+        (-4.0, 0.0, 0.0),  # turn left again
+        (0.0, 0.0, 0.0),  # back to origin
     ]
 
     # Create channels
@@ -110,7 +110,9 @@ def test_square_walk():
 
             if dist < SUCCESS_THRESHOLD:
                 elapsed = time.time() - start_time
-                print(f"  Reached waypoint {wp_idx} in {elapsed:.1f}s (dist={dist:.2f})")
+                print(
+                    f"  Reached waypoint {wp_idx} in {elapsed:.1f}s (dist={dist:.2f})"
+                )
                 reached.append(wp_idx)
                 break
         else:

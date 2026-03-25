@@ -36,6 +36,4 @@ class DoNothingTool(
         for call in inputs.tool_call(self):
             if call is None:
                 break
-            outputs.tool_result.send(
-                ToolResult.new(call_id=call.call_id, content="")
-            )
+            outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))

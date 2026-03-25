@@ -90,7 +90,9 @@ def drain[F1: Frame, F2: Frame, F3: Frame, F4: Frame, F5: Frame, F6: Frame](
     r5: Iterator[F5 | None] | None,
     r6: Iterator[F6 | None] | None,
     /,
-) -> Iterator[tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None, F6 | None]]: ...
+) -> Iterator[
+    tuple[F1 | None, F2 | None, F3 | None, F4 | None, F5 | None, F6 | None]
+]: ...
 def drain(
     *iters: Iterator[Any] | None,
 ) -> Iterator[tuple[Any, ...]]:
