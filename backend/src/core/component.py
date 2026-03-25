@@ -173,7 +173,12 @@ class Component[
 
     @classmethod
     def from_args(cls, init_args: dict[str, Any]) -> Component[Any, Any]:
-        """Construct a component instance, deserializing any BaseModel init params."""
+        """Construct a component instance, deserializing any BaseModel init params.
+
+        Extra keys in *init_args* that do not correspond to any ``__init__``
+        parameter are silently ignored.  Missing **required** parameters
+        (those without a default value) raise a clear ``ValueError``.
+        """
 
         def _extract_basemodel_type(t: Any) -> type[BaseModel] | None:
             if isinstance(t, type) and issubclass(t, BaseModel):
@@ -186,8 +191,28 @@ class Component[
                     return arg
             return None
 
+        # Determine which init params are required (no default value).
+        sig = inspect.signature(cls.__init__)
+        required_params: set[str] = set()
+        for name, param in sig.parameters.items():
+            if name == "self":
+                continue
+            if param.default is inspect.Parameter.empty:
+                required_params.add(name)
+
+        # Only consider params that __init__ actually declares.
+        valid_params = cls.get_init_types()
+
+        # Check for missing required fields before doing any work.
+        missing = required_params - init_args.keys()
+        if missing:
+            raise ValueError(
+                f"{cls.__name__}: missing required init field(s): "
+                f"{', '.join(sorted(missing))}"
+            )
+
         kwargs: dict[str, Any] = {}
-        for k, v in cls.get_init_types().items():
+        for k, v in valid_params.items():
             if k not in init_args:
                 continue
             model_type = _extract_basemodel_type(v)
