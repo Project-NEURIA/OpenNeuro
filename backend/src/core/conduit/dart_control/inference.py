@@ -173,6 +173,7 @@ def _load_tyro_yaml(path: Path, cls: type):
             if k in model_args_data and isinstance(model_args_data[k], list):
                 model_args_data[k] = tuple(model_args_data[k])
         model_type = da.get("model_type", "mlp")
+        model_args: DenoiserMLPArgs | DenoiserTransformerArgs
         if "transformer" in model_type.lower():
             model_args = DenoiserTransformerArgs(**{
                 k: v for k, v in model_args_data.items()

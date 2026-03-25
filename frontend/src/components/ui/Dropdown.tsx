@@ -44,7 +44,7 @@ export function Dropdown({ value, options, onChange, placeholder = "Select...", 
           "rounded-lg px-3 py-1.5 text-[13px] font-mono text-left",
           "bg-accent border border-white/[0.1] text-foreground",
           "focus:outline-none focus:border-conduit/60",
-          "transition-colors hover:bg-glass-hover",
+          "cursor-pointer transition-colors hover:bg-glass-hover",
         )}
       >
         <span className={cn("truncate", !selected && "text-muted-foreground")}>
