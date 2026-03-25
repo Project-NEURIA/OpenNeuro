@@ -21,6 +21,7 @@ class Channel[T]:
     def _send(self, item: T) -> None:
         with self._condition:
             self._items.append(item)
+            self._gc()
             self._condition.notify_all()
 
     def _register(self, sub_id: int, latest: bool = True) -> None:
@@ -66,6 +67,10 @@ class Channel[T]:
 
     def _gc(self) -> None:
         if not self._cursors:
+            # No registered readers — drop everything.
+            if self._items:
+                self._offset += len(self._items)
+                self._items.clear()
             return
         drop = min(self._cursors.values()) - self._offset
         if drop > 0:
@@ -98,12 +103,16 @@ class Sender[T]:
 
 
 class ReceiverIterator[T]:
-    """Eager-registering iterator returned by ``Receiver.__call__``.
+    """Iterator returned by ``Receiver.__call__``.
 
-    Unlike a generator, the channel cursor is registered immediately on
+    For ``newest=False``: the channel cursor is registered immediately on
     construction so that multiple iterators created in sequence all start
     at the same channel head — eliminating off-by-one frame lag when a
     component consumes several inputs from the same upstream.
+
+    For ``newest=True``: registration is deferred until the first
+    ``__next__`` call. This avoids pinning the GC cursor while blocked on
+    another input, which would cause unbounded buffer growth.
     """
 
     def __init__(
@@ -123,8 +132,17 @@ class ReceiverIterator[T]:
         self._newest = newest
         self._no_block = no_block
         self._done = False
-        # Register cursor EAGERLY — this is the whole point.
-        self._channel._register(sub_id, latest=latest)
+        self._registered = False
+        if newest:
+            # Defer registration until first read — avoids pinning the GC
+            # cursor while blocked on another input, which would cause
+            # unbounded buffer growth in the channel.
+            self._latest = latest
+        else:
+            # Register cursor EAGERLY so multiple iterators created in
+            # sequence all start at the same channel head.
+            self._channel._register(sub_id, latest=latest)
+            self._registered = True
 
     def __iter__(self) -> Iterator[T | None]:
         return self
@@ -135,6 +153,9 @@ class ReceiverIterator[T]:
         if self._stop_event.is_set():
             self._finish()
             return None
+        if not self._registered:
+            self._channel._register(self._sub_id, latest=self._latest)
+            self._registered = True
         if self._newest:
             self._channel._fast_forward(self._sub_id)
         if self._no_block:
@@ -149,7 +170,8 @@ class ReceiverIterator[T]:
     def _finish(self) -> None:
         if not self._done:
             self._done = True
-            self._channel._unregister(self._sub_id)
+            if self._registered:
+                self._channel._unregister(self._sub_id)
 
     def close(self) -> None:
         self._finish()
