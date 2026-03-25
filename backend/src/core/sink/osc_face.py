@@ -485,22 +485,21 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                 "shock",
                 "shocked",
                 "afraid",
-                "害怕",
-                "恐惧",
-                "慌",
-                "吓",
+                "fear",
+                "frightened",
+                "startled",
             ]
         ):
             return "scared", hits, True
         if any_hit(
-            ["shy", "embarrass", "embarrassed", "blush", "害羞", "尴尬", "脸红"]
+            ["shy", "embarrass", "embarrassed", "blush", "awkward", "blushing"]
         ):
             return "shy", hits, True
-        if any_hit(["smirk", "sly", "hehe", "坏笑", "阴笑", "嘿嘿"]):
+        if any_hit(["smirk", "sly", "hehe", "mischievous", "sneer"]):
             return "smirk", hits, True
-        if any_hit(["sleepy", "tired", "zzz", "困", "想睡", "好困"]):
+        if any_hit(["sleepy", "tired", "zzz", "want to sleep", "very sleepy"]):
             return "sleepy", hits, True
-        if any_hit(["cute", "aww", "可爱", "萌", "awww"]):
+        if any_hit(["cute", "aww", "adorable", "awww"]):
             return "cute", hits, True
         if any_hit(
             [
@@ -509,11 +508,10 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                 "awesome",
                 "love",
                 "thanks",
-                "开心",
-                "高兴",
-                "好耶",
-                "谢谢",
-                "爱你",
+                "glad",
+                "yay",
+                "thank you",
+                "love you",
             ]
         ):
             return "happy", hits, True
@@ -524,20 +522,17 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                 "unfortunate",
                 "miss",
                 "cry",
-                "难过",
-                "伤心",
-                "抱歉",
-                "想你",
-                "哭",
+                "heartbroken",
+                "apology",
             ]
         ):
             return "sad", hits, True
         if any_hit(
-            ["angry", "mad", "annoy", "hate", "furious", "生气", "烦", "恼火", "讨厌"]
+            ["angry", "mad", "annoy", "hate", "furious", "irritated", "dislike"]
         ):
             return "angry", hits, True
         if any_hit(
-            ["wow", "surprise", "omg", "amazing", "震惊", "惊讶", "天啊", "卧槽"]
+            ["wow", "surprise", "omg", "amazing", "shocked", "surprised", "oh my god", "wtf"]
         ):
             return "surprised", hits, True
 

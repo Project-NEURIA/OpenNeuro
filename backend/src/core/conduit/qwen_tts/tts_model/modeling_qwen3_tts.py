@@ -2195,7 +2195,7 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
                                                 self.talker.text_projection(self.talker.get_text_embeddings()(input_id[:, 3:4])) + codec_input_emebdding[:, -1:]], 
                                                 dim=1)
                 if non_streaming_mode:
-                    talker_input_embed = talker_input_embed[:, :-1] # 去掉原本放进去的text
+                    talker_input_embed = talker_input_embed[:, :-1] # Remove the text token that was inserted earlier.
                     talker_input_embed = torch.cat([talker_input_embed,
                                                     torch.cat((self.talker.text_projection(
                                                         self.talker.get_text_embeddings()(input_id[:, 3:-5])
@@ -2220,7 +2220,7 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
                                                     ], dim=1)
                     trailing_text_hidden = tts_pad_embed
                 else:
-                    # 叫通义千问，是阿里云的开源大模型。
+                    # Tongyi Qianwen is an open-source model from Alibaba Cloud.
                     trailing_text_hidden = torch.cat((self.talker.text_projection(
                                                         self.talker.get_text_embeddings()(input_id[:, 4:-5])
                                                     ), tts_eos_embed), dim=1)

@@ -92,7 +92,8 @@ class Sender[T]:
             ch._send(item)
         self._msg_count += 1
         self._byte_count += sys.getsizeof(item)
-        self._last_send_time = time.monotonic()
+        # Use Unix epoch seconds to align with metrics.timestamp (time.time()).
+        self._last_send_time = time.time()
 
     @property
     def buffer_depth(self) -> int:
@@ -109,14 +110,14 @@ class ReceiverIterator[T]:
     """
 
     def __init__(
-        self,
-        receiver: Receiver[T],
-        channel: Channel[T],
-        stop_event: threading.Event,
-        sub_id: int,
-        newest: bool,
-        no_block: bool,
-        latest: bool,
+            self,
+            receiver: Receiver[T],
+            channel: Channel[T],
+            stop_event: threading.Event,
+            sub_id: int,
+            newest: bool,
+            no_block: bool,
+            latest: bool,
     ) -> None:
         self._receiver = receiver
         self._channel = channel
@@ -170,11 +171,11 @@ class Receiver[T]:
         self._sub_id: int | None = None
 
     def __call__(
-        self,
-        subscriber: ThreadedComponent[Any, Any],
-        newest: bool = False,
-        no_block: bool = False,
-        latest: bool = True,
+            self,
+            subscriber: ThreadedComponent[Any, Any],
+            newest: bool = False,
+            no_block: bool = False,
+            latest: bool = True,
     ) -> Iterator[T | None]:
         """Return an iterator over items from the channel.
 

@@ -3,140 +3,171 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-source: var(--source);
-  --color-conduit: var(--conduit);
-  --color-sink: var(--sink);
-  --color-status-running: var(--status-running);
-  --color-status-setup: var(--status-setup);
-  --color-status-startup: var(--status-startup);
-  --color-status-stopped: var(--status-stopped);
-  --color-glass: var(--glass);
-  --color-glass-border: var(--glass-border);
-  --color-glass-hover: var(--glass-hover);
-  --color-glass-subtle: var(--glass-subtle);
-  --color-edge: var(--edge);
-  --color-edge-dot: var(--edge-dot);
-  --color-handle: var(--handle);
-  --color-handle-border: var(--handle-border);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --color-source: var(--source);
+    --color-conduit: var(--conduit);
+    --color-sink: var(--sink);
+    --color-status-running: var(--status-running);
+    --color-status-setup: var(--status-setup);
+    --color-status-startup: var(--status-startup);
+    --color-status-stopped: var(--status-stopped);
+    --color-glass: var(--glass);
+    --color-glass-border: var(--glass-border);
+    --color-glass-hover: var(--glass-hover);
+    --color-glass-subtle: var(--glass-subtle);
+    --color-edge: var(--edge);
+    --color-edge-dot: var(--edge-dot);
+    --color-handle: var(--handle);
+    --color-handle-border: var(--handle-border);
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: #08060d;
-  --foreground: #fafafa;
-  --card: #16141f;
-  --card-foreground: #fafafa;
-  --popover: #16141f;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #08060d;
-  --secondary: #16141f;
-  --secondary-foreground: #fafafa;
-  --muted: #16141f;
-  --muted-foreground: #8a8697;
-  --accent: #1a1724;
-  --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #fafafa;
-  --border: transparent;
-  --input: #16141f;
-  --ring: #d4d4d8;
+    --radius: 0.5rem;
+    --background: #08060d;
+    --foreground: #fafafa;
+    --card: #16141f;
+    --card-foreground: #fafafa;
+    --popover: #16141f;
+    --popover-foreground: #fafafa;
+    --primary: #fafafa;
+    --primary-foreground: #08060d;
+    --secondary: #16141f;
+    --secondary-foreground: #fafafa;
+    --muted: #16141f;
+    --muted-foreground: #8a8697;
+    --accent: #1a1724;
+    --accent-foreground: #fafafa;
+    --destructive: #7f1d1d;
+    --destructive-foreground: #fafafa;
+    --border: transparent;
+    --input: #16141f;
+    --ring: #d4d4d8;
 
-  /* Category colors (source / conduit / sink) */
-  --source: #10b981;
-  --conduit: #3b82f6;
-  --sink: #f59e0b;
+    /* Category colors (source / conduit / sink) */
+    --source: #10b981;
+    --conduit: #3b82f6;
+    --sink: #f59e0b;
 
-  /* Status colors */
-  --status-running: #4ade80;
-  --status-setup: #facc15;
-  --status-startup: #facc15;
-  --status-stopped: #5a5666;
+    /* Status colors */
+    --status-running: #4ade80;
+    --status-setup: #facc15;
+    --status-startup: #facc15;
+    --status-stopped: #5a5666;
 
-  /* Surface / glass tokens */
-  --glass: rgba(30, 27, 53, 0.3);
-  --glass-border: transparent;
-  --glass-hover: rgba(255, 255, 255, 0.06);
-  --glass-subtle: rgba(255, 255, 255, 0.03);
+    /* Surface / glass tokens */
+    --glass: rgba(30, 27, 53, 0.3);
+    --glass-border: transparent;
+    --glass-hover: rgba(255, 255, 255, 0.06);
+    --glass-subtle: rgba(255, 255, 255, 0.03);
 
-  /* Grid */
-  --grid: #322e3c;
+    /* Grid */
+    --grid: #322e3c;
 
-  /* Edge */
-  --edge: #5a5666;
-  --edge-dot: #8a8697;
+    /* Edge */
+    --edge: #5a5666;
+    --edge-dot: #8a8697;
 
-  /* Handle */
-  --handle: #5a5666;
-  --handle-border: transparent;
+    /* Handle */
+    --handle: #5a5666;
+    --handle-border: transparent;
 
-  /* Syntax highlighting */
-  --syn-param: #c4b5fd;     /* lavender — parameter names */
-  --syn-type: #67e8f9;      /* cyan — type/class names */
-  --syn-primitive: #fbbf24;  /* amber — primitive type params */
-  --syn-punct: #8a8697;      /* muted — colons, brackets */
+    /* Syntax highlighting */
+    --syn-param: #c4b5fd; /* lavender — parameter names */
+    --syn-type: #67e8f9; /* cyan — type/class names */
+    --syn-primitive: #fbbf24; /* amber — primitive type params */
+    --syn-punct: #8a8697; /* muted — colons, brackets */
 }
 
 body {
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* ReactFlow overrides for dark theme */
 .react-flow__background {
-  background-color: var(--background) !important;
+    background-color: var(--background) !important;
 }
 
 /* Force native select panels to use dark theme colors */
 select {
-  color: var(--foreground);
-  background-color: var(--accent);
+    color: var(--foreground);
+    background-color: var(--accent);
 }
 
 select option {
-  color: var(--foreground);
-  background-color: #14111e;
+    color: var(--foreground);
+    background-color: #14111e;
 }
 
 .react-flow__pane {
-  cursor: default !important;
+    cursor: default !important;
 }
+
 .react-flow__pane.dragging {
-  cursor: grabbing !important;
+    cursor: grabbing !important;
 }
+
 .react-flow__pane.selection {
-  cursor: crosshair !important;
+    cursor: crosshair !important;
 }
 
 .react-flow__nodesselection-rect {
-  display: none !important;
+    display: none !important;
+}
+
+/* Global transparent scrollbar styling */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.24);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.38);
+}
+
+*::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 
 [data-tauri-drag-region] {
-  -webkit-app-region: drag;
+    -webkit-app-region: drag;
 }

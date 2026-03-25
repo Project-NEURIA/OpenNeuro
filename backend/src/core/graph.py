@@ -275,6 +275,20 @@ class GraphManager:
                 new_sender_handles[skey] = old_sender
             else:
                 new_sender_handles[skey] = Sender(*channels)
+
+        # Ensure every declared output slot has a sender handle, even when no edges
+        # are connected. This keeps per-output metrics (e.g. last_send_time) visible
+        # for standalone sources.
+        for node_id, comp in self._components.items():
+            for slot in comp.get_output_types():
+                skey: SenderKey = (node_id, slot)
+                if skey in new_sender_handles:
+                    continue
+                old_sender = self._sender_handles.get(skey)
+                if old_sender is not None and len(old_sender._channels) == 0:
+                    new_sender_handles[skey] = old_sender
+                else:
+                    new_sender_handles[skey] = Sender()
         self._sender_handles = new_sender_handles
 
         new_receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
