@@ -34,7 +34,7 @@ class TTSOutputs(NamedTuple):
 
 
 class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
-    description = "Converts text to speech audio"
+    description = "Converts text to **speech audio** using the *Inworld TTS* API. Streams `TextFrame` tokens into synthesized `AudioFrame` output with configurable *voice* and *model* selection."
 
     """Text-to-Speech component using Inworld API."""
 

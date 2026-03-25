@@ -22,7 +22,7 @@ class SpeakerInputs(NamedTuple):
 
 class Speaker(ThreadedComponent[SpeakerInputs, tuple[()]]):
     tags = Tag(io={"sink"}, functionality={"audio"})
-    description = "Plays audio through a system speaker"
+    description = "Plays `AudioFrame` data through a system **speaker** using *sounddevice*. Supports configurable *sample rate* and *channel count* for real-time audio playback."
 
     def __init__(self, config: SpeakerConfig) -> None:
         super().__init__()

@@ -38,7 +38,7 @@ class VADOutputs(NamedTuple):
 
 class VAD(ThreadedComponent[VADInputs, VADOutputs]):
     tags = Tag(io={"conduit"}, functionality={"audio"})
-    description = "Detects voice activity in an audio stream"
+    description = "Detects **voice activity** in an audio stream using *Silero VAD* and *Smart Turn* models. Segments speech from silence with configurable thresholds, emitting trimmed audio and optional `InterruptFrame` signals."
 
     def __init__(self, config: VADConfig) -> None:
         super().__init__()

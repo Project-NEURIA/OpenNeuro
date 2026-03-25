@@ -47,7 +47,7 @@ class DiscordOutputs(NamedTuple):
 
 
 class DiscordIO(ThreadedComponent[DiscordInputs, DiscordOutputs]):
-    description = "Sends and receives messages via Discord"
+    description = "Sends and receives **audio** via *Discord* voice channels. Acts as a bidirectional audio conduit, capturing voice input and playing back `AudioFrame` output in real time."
 
     """Discord audio conduit that handles both input and output."""
 

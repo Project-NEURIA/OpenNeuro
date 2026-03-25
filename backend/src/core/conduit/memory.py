@@ -157,7 +157,7 @@ def _get_or_create_memory(config: Mem0Config) -> Memory:
 
 
 class Mem0(ThreadedComponent[Mem0Inputs, Mem0Outputs]):
-    description = "Stores and retrieves conversational memory"
+    description = "Stores and retrieves **conversational memory** using *mem0*. Queries past context on each turn, prefixes relevant memories to the conversation, and asynchronously updates the memory store."
 
     """Memory component backed by mem0.
 

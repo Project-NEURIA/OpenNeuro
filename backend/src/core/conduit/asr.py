@@ -34,7 +34,7 @@ class ASROutputs(NamedTuple):
 
 class ASR(ThreadedComponent[ASRInputs, ASROutputs]):
     tags = Tag(io={"conduit"}, functionality={"audio"}, gpu={"cpu", "nvidia", "apple"})
-    description = "Transcribes audio to text using speech recognition"
+    description = "Transcribes audio to text using **speech recognition**. Sends `AudioFrame` chunks to a *Whisper*-compatible API (default: `whisper-large-v3-turbo` via Groq) and outputs `TextFrame` transcriptions."
 
     def __init__(self, config: ASRConfig) -> None:
         super().__init__()

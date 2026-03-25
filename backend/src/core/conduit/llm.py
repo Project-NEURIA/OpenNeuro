@@ -34,7 +34,7 @@ class LLMOutputs(NamedTuple):
 
 
 class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
-    description = "Generates text responses using a large language model"
+    description = "Generates text responses using a **large language model** via *litellm*. Accepts `MessageFrame` conversations and optional `ToolDef` definitions, streaming `TextFrame` tokens with support for *tool calls* and *interrupts*."
 
     """LLM text generation component using litellm."""
 

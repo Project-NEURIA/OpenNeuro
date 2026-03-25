@@ -43,7 +43,7 @@ class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnS
     or a manual CharacterCardConfig. One of the two must be provided.
     """
 
-    description = "Character card for persona-based chat"
+    description = "Loads a **character card** for persona-based chat. Supports *SillyTavern PNG* imports and manual config, emitting `MessageFrame` prompts, *system prompt*, *personality*, and *scenario* outputs."
     tags = Tag(io={"source"}, functionality={"llm"})
 
     _PRESETS_DIR = (
