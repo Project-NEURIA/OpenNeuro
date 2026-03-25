@@ -31,13 +31,19 @@ class MovementTool(
             ToolDef.new(
                 name="move",
                 description="You are an embodied agent with a physical body. Use this tool to perform motions. "
-                            "YOU MUST Provide *BOTH* x and y when you want to move to a specific location. "
-                            "Omit x and y for in-place motions like dancing or waving.",
+                "YOU MUST Provide *BOTH* x and y when you want to move to a specific location. "
+                "Omit x and y for in-place motions like dancing or waving.",
                 parameters={
                     "type": "object",
                     "properties": {
-                        "x": {"type": "number", "description": "Target x position in meters"},
-                        "z": {"type": "number", "description": "Target z position in meters"},
+                        "x": {
+                            "type": "number",
+                            "description": "Target x position in meters",
+                        },
+                        "z": {
+                            "type": "number",
+                            "description": "Target z position in meters",
+                        },
                         "instruction": {
                             "type": "string",
                             "description": "Any motion, e.g. 'walk', 'run', 'sit', 'wave', 'dance'",
@@ -50,8 +56,6 @@ class MovementTool(
 
     def run(self, inputs: MovementToolInputs, outputs: MovementToolOutputs) -> None:
         for call in inputs.tool_call(self):
-            print(call)
-            print(call.arguments)
             if call is None:
                 break
             if call.name != "move":
