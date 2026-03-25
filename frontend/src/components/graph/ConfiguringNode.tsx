@@ -24,6 +24,7 @@ type SchemaObj = {
   anyOf?: SchemaObj[];
   description?: string;
   enum?: unknown[];
+  format?: string;
   options?: Record<string, object>;
 };
 
@@ -238,16 +239,65 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
             );
           }
 
-          if (prop.enum) {
+          // File path field — show filename + browse button
+          const format = prop.format ?? prop.anyOf?.find((b) => b.format)?.format;
+          if (format === "path") {
+            const currentPath = String(values[key] ?? "");
+            const displayName = currentPath ? currentPath.split(/[/\\]/).pop() : "No file selected";
             return (
-              <label key={key} className="flex flex-col gap-1">
+              <div key={key} className="flex flex-col gap-1">
+                <span className="text-[12px] font-mono text-white/60">{key}</span>
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 truncate rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white/40">
+                    {displayName}
+                  </span>
+                  <button
+                    type="button"
+                    className="nodrag nopan shrink-0 cursor-pointer rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/60 hover:bg-white/10"
+                    onClick={async () => {
+                      if (window.__TAURI__) {
+                        const { open } = await import("@tauri-apps/plugin-dialog");
+                        const selected = await open({ multiple: false });
+                        if (selected) {
+                          setValues((v) => ({ ...v, [key]: selected }));
+                        }
+                      } else {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.onchange = async () => {
+                          const file = input.files?.[0];
+                          if (!file) return;
+                          const form = new FormData();
+                          form.append("file", file);
+                          const res = await fetch("/upload", { method: "POST", body: form });
+                          if (res.ok) {
+                            const { path } = await res.json();
+                            setValues((v) => ({ ...v, [key]: path }));
+                          }
+                        };
+                        input.click();
+                      }
+                    }}
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          // Unwrap enum from anyOf (e.g. Literal[...] | None → anyOf with enum branch)
+          const enumValues = prop.enum ?? prop.anyOf?.find((b) => b.enum)?.enum;
+          if (enumValues) {
+            return (
+              <div key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
                 <Dropdown
                   value={String(values[key] ?? "")}
-                  options={prop.enum.map((val: unknown) => ({ value: String(val), label: String(val) }))}
+                  options={enumValues.map((val: unknown) => ({ value: String(val), label: String(val) }))}
                   onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
                 />
-              </label>
+              </div>
             );
           }
 

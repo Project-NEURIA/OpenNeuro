@@ -35,7 +35,28 @@ _OPENVR_TO_SMPL: dict[str, int] = {v: k for k, v in _SMPL_TO_OPENVR.items()}
 
 # SMPLX kinematic tree parents
 _SMPL_PARENTS = [
-    -1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19,
+    -1,
+    0,
+    0,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    9,
+    9,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
 ]
 _N_JOINTS = 22
 
@@ -104,6 +125,7 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             return
 
         import sys
+
         if sys.platform == "linux":
             os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
 
@@ -251,7 +273,9 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         ]
         for direction, color in axes:
             cyl = self._trimesh.creation.cylinder(
-                radius=axis_radius, height=axis_len, sections=8,
+                radius=axis_radius,
+                height=axis_len,
+                sections=8,
             )
             d = np.array(direction, dtype=np.float64)
             z = np.array([0, 0, 1], dtype=np.float64)
@@ -267,7 +291,9 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             T[:3, 3] = d * axis_len / 2
             cyl.apply_transform(T @ R)
             mat = pyrender.MetallicRoughnessMaterial(
-                metallicFactor=0.0, alphaMode="OPAQUE", baseColorFactor=color,
+                metallicFactor=0.0,
+                alphaMode="OPAQUE",
+                baseColorFactor=color,
             )
             axis_nodes.append(
                 self._scene.add(pyrender.Mesh.from_trimesh(cyl, material=mat), "axis")
