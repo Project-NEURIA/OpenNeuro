@@ -14,7 +14,6 @@ from typing import Literal
 import clip
 import torch
 import yaml
-import tyro
 
 from .models.denoiser import DenoiserMLP, DenoiserTransformer, ClassifierFreeWrapper
 from .models.vae import AutoMldVae
@@ -152,6 +151,7 @@ def _load_tyro_yaml(path: Path, cls: type):
     manually constructs the dataclass.
     """
     import re
+
     with open(path, "r") as f:
         text = f.read()
     # Strip all YAML tags (!dataclass:X, !!python/tuple, etc.)
@@ -174,19 +174,28 @@ def _load_tyro_yaml(path: Path, cls: type):
                 model_args_data[k] = tuple(model_args_data[k])
         model_type = da.get("model_type", "mlp")
         if "transformer" in model_type.lower():
-            model_args = DenoiserTransformerArgs(**{
-                k: v for k, v in model_args_data.items()
-                if k in DenoiserTransformerArgs.__dataclass_fields__
-            })
+            model_args = DenoiserTransformerArgs(
+                **{
+                    k: v
+                    for k, v in model_args_data.items()
+                    if k in DenoiserTransformerArgs.__dataclass_fields__
+                }
+            )
         else:
-            model_args = DenoiserMLPArgs(**{
-                k: v for k, v in model_args_data.items()
-                if k in DenoiserMLPArgs.__dataclass_fields__
-            })
-        diff_args = DiffusionArgs(**{
-            k: v for k, v in diff_args_data.items()
-            if k in DiffusionArgs.__dataclass_fields__
-        })
+            model_args = DenoiserMLPArgs(
+                **{
+                    k: v
+                    for k, v in model_args_data.items()
+                    if k in DenoiserMLPArgs.__dataclass_fields__
+                }
+            )
+        diff_args = DiffusionArgs(
+            **{
+                k: v
+                for k, v in diff_args_data.items()
+                if k in DiffusionArgs.__dataclass_fields__
+            }
+        )
         denoiser_args = DenoiserArgs(
             model_type=model_type,
             model_args=model_args,
@@ -200,10 +209,9 @@ def _load_tyro_yaml(path: Path, cls: type):
         ma = raw["model_args"]
         if "latent_dim" in ma and isinstance(ma["latent_dim"], list):
             ma["latent_dim"] = tuple(ma["latent_dim"])
-        vae_args = VAEArgs(**{
-            k: v for k, v in ma.items()
-            if k in VAEArgs.__dataclass_fields__
-        })
+        vae_args = VAEArgs(
+            **{k: v for k, v in ma.items() if k in VAEArgs.__dataclass_fields__}
+        )
         return MVAEArgs(model_args=vae_args)
     return cls()
 

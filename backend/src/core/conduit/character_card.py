@@ -36,7 +36,10 @@ class CharacterCardOutputs(NamedTuple):
     post_history_instructions: Sender[TextFrame] | None = None
 
 
-class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnStart[CharacterCardOutputs]):
+class CharacterCard(
+    PrimitiveComponent[tuple[()], CharacterCardOutputs],
+    EmitOnStart[CharacterCardOutputs],
+):
     """A constant component holding a character card (V2 spec conformant).
 
     Initialize with either a path to a SillyTavern PNG character card,
@@ -131,9 +134,7 @@ class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnS
                     MessageFrame.new(role="system", content=c.example_messages)
                 )
             if c.system_prompt:
-                prompts.append(
-                    MessageFrame.new(role="system", content=c.system_prompt)
-                )
+                prompts.append(MessageFrame.new(role="system", content=c.system_prompt))
             outputs.prompts.send(prompts)
 
         if outputs.system_prompt is not None and c.system_prompt:
@@ -150,7 +151,10 @@ class CharacterCard(PrimitiveComponent[tuple[()], CharacterCardOutputs], EmitOnS
             outputs.first_message.send(TextFrame.new(text=c.first_message))
         if outputs.example_messages is not None and c.example_messages:
             outputs.example_messages.send(TextFrame.new(text=c.example_messages))
-        if outputs.post_history_instructions is not None and c.post_history_instructions:
+        if (
+            outputs.post_history_instructions is not None
+            and c.post_history_instructions
+        ):
             outputs.post_history_instructions.send(
                 TextFrame.new(text=c.post_history_instructions)
             )
