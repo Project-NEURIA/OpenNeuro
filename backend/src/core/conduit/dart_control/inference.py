@@ -14,7 +14,6 @@ from typing import Literal
 import clip
 import torch
 import yaml
-import tyro
 
 from .models.denoiser import DenoiserMLP, DenoiserTransformer, ClassifierFreeWrapper
 from .models.vae import AutoMldVae

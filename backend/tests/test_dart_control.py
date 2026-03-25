@@ -14,15 +14,13 @@ Coordinate systems:
 
 from __future__ import annotations
 
-import threading
 import time
 
 import numpy as np
-import torch
 
 from src.core.channel import Channel, Sender, Receiver
 from src.core.conduit.dart_control.component import DartControl, DartControlConfig
-from src.core.frames import BodyPoseFrame, GoalFrame, TextFrame
+from src.core.frames import GoalFrame, TextFrame
 
 
 SUCCESS_THRESHOLD = 0.3  # meters

@@ -4,8 +4,6 @@ from typing import Any, NamedTuple
 
 import litellm
 from litellm import completion
-
-litellm.drop_params = True
 from litellm.types.utils import ModelResponseStream
 from pydantic import BaseModel
 
@@ -19,6 +17,8 @@ from src.core.frames import (
     ToolCall,
     ToolDef,
 )
+
+litellm.drop_params = True
 
 
 class LLMConfig(BaseModel):
