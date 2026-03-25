@@ -14,3 +14,20 @@ class ProjectCreateRequest(BaseModel):
 
 class CurrentProjectResponse(BaseModel):
     current_project: str | None
+
+
+class ProjectExportRequest(BaseModel):
+    name: str
+
+
+class ProjectExportResponse(BaseModel):
+    project_dir: str
+    assets_copied: list[str]
+
+
+class ProjectImportRequest(BaseModel):
+    git_url: str
+
+
+class ProjectImportResponse(BaseModel):
+    name: str
