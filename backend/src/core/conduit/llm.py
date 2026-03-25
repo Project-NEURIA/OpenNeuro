@@ -4,14 +4,21 @@ from typing import Any, NamedTuple
 
 import litellm
 from litellm import completion
-
-litellm.drop_params = True
 from litellm.types.utils import ModelResponseStream
 from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import EOS, InterruptFrame, MessageFrame, TextFrame, ToolCall, ToolDef
+from src.core.frames import (
+    EOS,
+    InterruptFrame,
+    MessageFrame,
+    TextFrame,
+    ToolCall,
+    ToolDef,
+)
+
+litellm.drop_params = True
 
 
 class LLMConfig(BaseModel):
@@ -59,16 +66,22 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
             for td in inputs.tools(self, no_block=True, latest=False):
                 if td is None:
                     break
-                tool_defs.append({
-                    "type": "function",
-                    "function": {
-                        "name": td.name,
-                        "description": td.description,
-                        "parameters": td.parameters,
-                        **({"strict": td.strict} if td.strict is not None else {}),
-                    },
-                })
-        print(f"[LLM] Tools: {[td['function']['name'] for td in tool_defs]}" if tool_defs else "[LLM] No tools")
+                tool_defs.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": td.name,
+                            "description": td.description,
+                            "parameters": td.parameters,
+                            **({"strict": td.strict} if td.strict is not None else {}),
+                        },
+                    }
+                )
+        print(
+            f"[LLM] Tools: {[td['function']['name'] for td in tool_defs]}"
+            if tool_defs
+            else "[LLM] No tools"
+        )
 
         for messages in inputs.messages(self):
             if messages is None:
@@ -96,9 +109,21 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                 "model": self.config.model,
                 "messages": msgs,
                 "stream": True,
-                **({"top_p": self.config.top_p} if self.config.top_p is not None else {}),
-                **({"temperature": self.config.temperature} if self.config.temperature is not None else {}),
-                **({"max_tokens": self.config.max_tokens} if self.config.max_tokens is not None else {}),
+                **(
+                    {"top_p": self.config.top_p}
+                    if self.config.top_p is not None
+                    else {}
+                ),
+                **(
+                    {"temperature": self.config.temperature}
+                    if self.config.temperature is not None
+                    else {}
+                ),
+                **(
+                    {"max_tokens": self.config.max_tokens}
+                    if self.config.max_tokens is not None
+                    else {}
+                ),
             }
             if tool_defs:
                 kwargs["tools"] = tool_defs
