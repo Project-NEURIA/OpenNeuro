@@ -42,7 +42,7 @@ class ObjectLocator(ThreadedComponent[ObjectLocatorInputs, ObjectLocatorOutputs]
         depth_iter = inputs.depth(self, newest=True)
         cam_iter = inputs.camera_params(self, newest=True)
 
-        for seg_frame in inputs.segmentations(self):
+        for seg_frame in inputs.segmentations(self, newest=True):
             if seg_frame is None:
                 break
 

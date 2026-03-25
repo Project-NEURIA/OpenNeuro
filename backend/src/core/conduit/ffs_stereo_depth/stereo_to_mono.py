@@ -30,6 +30,7 @@ class StereoToMonocularVideo(
 ):
     """Extracts a single eye (left or right) from a StereoVideoFrame."""
 
+    description = "Extracts a single eye from stereo video"
     tags = Tag(io={"conduit"}, functionality={"video"})
 
     def __init__(self, config: StereoToMonocularVideoConfig) -> None:

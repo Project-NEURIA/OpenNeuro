@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from collections import deque
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, NamedTuple
 
 import requests
 from pydantic import BaseModel
@@ -82,7 +82,7 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 
-def expression_neutral() -> Dict[str, float]:
+def expression_neutral() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": 0.0,
         "v2/SmileFrownRight": 0.0,
@@ -105,7 +105,7 @@ def expression_neutral() -> Dict[str, float]:
     }
 
 
-def expression_happy() -> Dict[str, float]:
+def expression_happy() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": 0.92,
         "v2/SmileFrownRight": 0.92,
@@ -120,7 +120,7 @@ def expression_happy() -> Dict[str, float]:
     }
 
 
-def expression_sad() -> Dict[str, float]:
+def expression_sad() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": -0.82,
         "v2/SmileFrownRight": -0.82,
@@ -138,7 +138,7 @@ def expression_sad() -> Dict[str, float]:
     }
 
 
-def expression_angry() -> Dict[str, float]:
+def expression_angry() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": -0.38,
         "v2/SmileFrownRight": -0.38,
@@ -154,7 +154,7 @@ def expression_angry() -> Dict[str, float]:
     }
 
 
-def expression_surprised() -> Dict[str, float]:
+def expression_surprised() -> dict[str, float]:
     return {
         "v2/BrowExpressionLeft": 0.75,
         "v2/BrowExpressionRight": 0.75,
@@ -168,7 +168,7 @@ def expression_surprised() -> Dict[str, float]:
     }
 
 
-def expression_scared() -> Dict[str, float]:
+def expression_scared() -> dict[str, float]:
     return {
         "v2/BrowExpressionLeft": 0.95,
         "v2/BrowExpressionRight": 0.95,
@@ -184,7 +184,7 @@ def expression_scared() -> Dict[str, float]:
     }
 
 
-def expression_thinking() -> Dict[str, float]:
+def expression_thinking() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": 0.10,
         "v2/SmileFrownRight": 0.06,
@@ -202,7 +202,7 @@ def expression_thinking() -> Dict[str, float]:
     }
 
 
-def expression_shy() -> Dict[str, float]:
+def expression_shy() -> dict[str, float]:
     return {
         "v2/EyeLeftX": -0.55,
         "v2/EyeRightX": -0.55,
@@ -222,7 +222,7 @@ def expression_shy() -> Dict[str, float]:
     }
 
 
-def expression_smirk() -> Dict[str, float]:
+def expression_smirk() -> dict[str, float]:
     return {
         "v2/MouthX": 0.45,
         "v2/SmileFrownLeft": 0.55,
@@ -239,7 +239,7 @@ def expression_smirk() -> Dict[str, float]:
     }
 
 
-def expression_sleepy() -> Dict[str, float]:
+def expression_sleepy() -> dict[str, float]:
     return {
         "v2/EyeLeftY": -0.20,
         "v2/EyeRightY": -0.20,
@@ -256,7 +256,7 @@ def expression_sleepy() -> Dict[str, float]:
     }
 
 
-def expression_cute() -> Dict[str, float]:
+def expression_cute() -> dict[str, float]:
     return {
         "v2/SmileFrownLeft": 0.70,
         "v2/SmileFrownRight": 0.70,
@@ -301,16 +301,16 @@ Schema:
 
 
 def build_full_targets(
-    base_neutral: Dict[str, float],
-) -> Tuple[Dict[str, float], List[str]]:
+    base_neutral: dict[str, float],
+) -> tuple[dict[str, float], list[str]]:
     keys = list(MANAGED_PARAMS)
     base_defaults = {k: float(base_neutral.get(k, 0.0)) for k in keys}
     return base_defaults, keys
 
 
 def preset_to_full(
-    preset_name: str, base_defaults: Dict[str, float]
-) -> Dict[str, float]:
+    preset_name: str, base_defaults: dict[str, float]
+) -> dict[str, float]:
     fn = EXPRESSION_PRESETS.get(preset_name, expression_neutral)
     full = dict(base_defaults)
     full.update({k: float(v) for k, v in fn().items()})
@@ -440,7 +440,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
     def _build_param_path(self, param_name: str) -> str:
         return f"{self.param_prefix}/{param_name}" if self.param_prefix else param_name
 
-    def _send_params(self, params: Dict[str, float]) -> None:
+    def _send_params(self, params: dict[str, float]) -> None:
         for name, value in params.items():
             address = f"{self.osc_prefix}/{self._build_param_path(name)}"
             self._client.send_message(address, float(value))
@@ -448,8 +448,8 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                 time.sleep(self.send_gap_seconds)
 
     def _transition(
-        self, current: Dict[str, float], target: Dict[str, float]
-    ) -> Dict[str, float]:
+        self, current: dict[str, float], target: dict[str, float]
+    ) -> dict[str, float]:
         for i in range(1, self.transition_steps + 1):
             t = i / self.transition_steps
             frame = {
@@ -460,9 +460,9 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
             time.sleep(self.step_sleep)
         return dict(target)
 
-    def _select_expression_rule(self, text: str) -> Tuple[str, List[str], bool]:
+    def _select_expression_rule(self, text: str) -> tuple[str, list[str], bool]:
         lower = (text or "").lower()
-        hits: List[str] = []
+        hits: list[str] = []
 
         if any(tag in lower for tag in ["emotion:", "expr:", "expression:"]):
             for name in EXPRESSION_PRESETS.keys():
@@ -470,7 +470,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                     hits.append(f"manual:{name}")
                     return name, hits, True
 
-        def any_hit(words: List[str]) -> bool:
+        def any_hit(words: list[str]) -> bool:
             for word in words:
                 if word in lower:
                     hits.append(word)
@@ -547,7 +547,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
 
         return "neutral", hits, False
 
-    def _select_expression_llm(self, text: str) -> Tuple[Optional[str], str]:
+    def _select_expression_llm(self, text: str) -> tuple[str | None, str]:
         if not self.emotion_llm_enable:
             return None, "LLM disabled (EMOTION_LLM_ENABLE!=1)"
         if not self.emotion_llm_url:
@@ -590,10 +590,10 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
         except Exception as exc:
             return None, f"LLM error: {exc!r}"
 
-    def _fuse_expression(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _fuse_expression(self, text: str) -> tuple[str, dict[str, str]]:
         rule_expr, hits, strong = self._select_expression_rule(text)
 
-        dbg: Dict[str, str] = {
+        dbg: dict[str, str] = {
             "rule_expr": rule_expr,
             "rule_hits": ", ".join(hits) if hits else "(none)",
             "rule_strong": "1" if strong else "0",
@@ -602,7 +602,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
             "force_llm": "1" if self.force_llm else "0",
         }
 
-        llm_expr: Optional[str] = None
+        llm_expr: str | None = None
         llm_detail: str = "(not called)"
 
         def call_llm() -> None:
