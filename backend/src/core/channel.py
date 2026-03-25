@@ -25,7 +25,9 @@ class Channel[T]:
 
     def _register(self, sub_id: int, latest: bool = True) -> None:
         with self._condition:
-            self._cursors[sub_id] = self._offset + len(self._items) if latest else self._offset
+            self._cursors[sub_id] = (
+                self._offset + len(self._items) if latest else self._offset
+            )
 
     def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
         with self._condition:
@@ -212,7 +214,6 @@ class Receiver[T]:
                 return 0
             head = ch._offset + len(ch._items)
             return head - cursor
-
 
 
 # -- UI channel markers --

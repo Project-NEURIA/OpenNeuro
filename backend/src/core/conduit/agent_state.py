@@ -125,8 +125,12 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         feedback_it = inputs.feedback(self, no_block=True) if inputs.feedback else None
         vision_it = inputs.vision(self, no_block=True) if inputs.vision else None
         memory_it = inputs.memory(self, no_block=True) if inputs.memory else None
-        tool_call_it = inputs.tool_call(self, no_block=True) if inputs.tool_call else None
-        tool_result_it = inputs.tool_result(self, no_block=True) if inputs.tool_result else None
+        tool_call_it = (
+            inputs.tool_call(self, no_block=True) if inputs.tool_call else None
+        )
+        tool_result_it = (
+            inputs.tool_result(self, no_block=True) if inputs.tool_result else None
+        )
         objects_it = (
             inputs.objects(self, newest=True, no_block=True)
             if inputs.objects is not None
@@ -155,7 +159,12 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                 )
 
             for speech, feedback, vision, memory, tc, tr in drain(
-                speech_it, feedback_it, vision_it, memory_it, tool_call_it, tool_result_it
+                speech_it,
+                feedback_it,
+                vision_it,
+                memory_it,
+                tool_call_it,
+                tool_result_it,
             ):
                 if speech is not None:
                     ts = datetime.fromtimestamp(speech.pts / 1e9).strftime("%H:%M:%S")
@@ -165,7 +174,9 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                 if feedback is not None:
                     ts = datetime.fromtimestamp(feedback.pts / 1e9).strftime("%H:%M:%S")
                     self._history.append(
-                        MessageFrame.new(role="assistant", content=f"[{ts}] {feedback.text}")
+                        MessageFrame.new(
+                            role="assistant", content=f"[{ts}] {feedback.text}"
+                        )
                     )
                 if vision is not None:
                     ts = datetime.fromtimestamp(vision.pts / 1e9).strftime("%H:%M:%S")
@@ -220,12 +231,14 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     waist = poses.get("waist")
                     if waist is not None:
                         px, py, pz = waist.pos_x, waist.pos_y, waist.pos_z
-                        heading = self._heading_from_quat(waist.rot_w, waist.rot_x, waist.rot_y, waist.rot_z)
+                        heading = self._heading_from_quat(
+                            waist.rot_w, waist.rot_x, waist.rot_y, waist.rot_z
+                        )
                         msgs.append(
                             MessageFrame.new(
                                 role="system",
                                 content=f"[Position (y-up): x={px:.2f}, y={py:.2f}, z={pz:.2f}]\n"
-                                        f"[Heading (from +Z clockwise): {heading:.0f}°]",
+                                f"[Heading (from +Z clockwise): {heading:.0f}°]",
                             )
                         )
 
