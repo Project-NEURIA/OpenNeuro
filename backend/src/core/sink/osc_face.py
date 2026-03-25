@@ -491,9 +491,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
             ]
         ):
             return "scared", hits, True
-        if any_hit(
-            ["shy", "embarrass", "embarrassed", "blush", "awkward", "blushing"]
-        ):
+        if any_hit(["shy", "embarrass", "embarrassed", "blush", "awkward", "blushing"]):
             return "shy", hits, True
         if any_hit(["smirk", "sly", "hehe", "mischievous", "sneer"]):
             return "smirk", hits, True
@@ -532,7 +530,16 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
         ):
             return "angry", hits, True
         if any_hit(
-            ["wow", "surprise", "omg", "amazing", "shocked", "surprised", "oh my god", "wtf"]
+            [
+                "wow",
+                "surprise",
+                "omg",
+                "amazing",
+                "shocked",
+                "surprised",
+                "oh my god",
+                "wtf",
+            ]
         ):
             return "surprised", hits, True
 

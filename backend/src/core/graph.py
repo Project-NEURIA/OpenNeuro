@@ -281,14 +281,14 @@ class GraphManager:
         # for standalone sources.
         for node_id, comp in self._components.items():
             for slot in comp.get_output_types():
-                skey: SenderKey = (node_id, slot)
-                if skey in new_sender_handles:
+                output_key: SenderKey = (node_id, slot)
+                if output_key in new_sender_handles:
                     continue
-                old_sender = self._sender_handles.get(skey)
+                old_sender = self._sender_handles.get(output_key)
                 if old_sender is not None and len(old_sender._channels) == 0:
-                    new_sender_handles[skey] = old_sender
+                    new_sender_handles[output_key] = old_sender
                 else:
-                    new_sender_handles[skey] = Sender()
+                    new_sender_handles[output_key] = Sender()
         self._sender_handles = new_sender_handles
 
         new_receiver_handles: dict[ReceiverKey, Receiver[Any]] = {}
