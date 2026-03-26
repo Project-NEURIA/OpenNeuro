@@ -68,6 +68,14 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      external: ["@tauri-apps/plugin-dialog"],
+    },
+  },
+  optimizeDeps: {
+    exclude: ["@tauri-apps/plugin-dialog"],
+  },
   server: {
     proxy: {
       "/graph": {
