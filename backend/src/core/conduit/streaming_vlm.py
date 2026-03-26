@@ -49,7 +49,7 @@ class StreamingVLMOutputs(NamedTuple):
 
 
 class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
-    description = "Streams visual language model inference on video frames"
+    description = "Streams **visual language model** inference on `VideoFrame` input. Maintains a rolling frame buffer and submits VLM caption requests to a thread pool, outputting `TextFrame` descriptions."
 
     """Streaming VLM component that generates captions from video frames.
 

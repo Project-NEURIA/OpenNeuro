@@ -114,17 +114,7 @@
       "id_": "860ae347-074e-449e-bcc4-549f463134fc",
       "type": "CharacterCard",
       "init_args": {
-        "path": "C:/Users/Shadow/Desktop/OpenNeuro/backend/assets/character_cards/energetic_girl.png",
-        "config": {
-          "name": "",
-          "description": "",
-          "personality": "",
-          "scenario": "",
-          "first_message": "",
-          "example_messages": "",
-          "system_prompt": "",
-          "post_history_instructions": ""
-        }
+        "preset": "energetic_girl"
       },
       "x": -502.2520117585128,
       "y": 850.9094372775957,

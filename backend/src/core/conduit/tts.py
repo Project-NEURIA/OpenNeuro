@@ -34,7 +34,7 @@ class TTSOutputs(NamedTuple):
 
 
 class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
-    description = "Converts text to speech audio"
+    description = "Converts text to **speech audio** using the *Inworld TTS* API. Streams `TextFrame` tokens into synthesized `AudioFrame` output with configurable *voice* and *model* selection."
 
     """Text-to-Speech component using Inworld API."""
 
@@ -58,7 +58,11 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                         continue
 
                 cred = os.getenv(self.config.api_key_env_var)
-                print(f"[TTS] Using {self.config.api_key_env_var}: {cred[:8]}..." if cred else f"[TTS] {self.config.api_key_env_var} not set")
+                print(
+                    f"[TTS] Using {self.config.api_key_env_var}: {cred[:8]}..."
+                    if cred
+                    else f"[TTS] {self.config.api_key_env_var} not set"
+                )
                 if not cred:
                     raise ValueError(
                         f"Environment variable {self.config.api_key_env_var} must be set"

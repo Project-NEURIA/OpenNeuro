@@ -318,7 +318,7 @@ function AppInner({
       return {
         id: nodeId,
         label: componentName,
-        category: info?.category ?? "conduit",
+        category: info ? categoryFromTags(info.tags) : "conduit",
         initArgs,
         onEditConfig: () => openNodeConfigEditor(nodeId),
         inputs: info ? Object.keys(info.inputs) : [],
@@ -394,6 +394,12 @@ function AppInner({
       }
     })();
   }, [components, componentMap, setNodes, setEdges, runTypeCheck, buildGraphNodeData]);
+
+  // Re-run type checking when concreteTypes finishes loading after init
+  useEffect(() => {
+    if (!initialized.current || concreteTypes.size === 0) return;
+    runTypeCheck();
+  }, [concreteTypes, runTypeCheck]);
 
   // Update node and edge data with metrics
   useEffect(() => {

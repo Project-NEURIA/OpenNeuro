@@ -17,7 +17,7 @@ class TextInputOutputs(NamedTuple):
 
 
 class TextInput(ThreadedComponent[TextInputInputs, TextInputOutputs]):
-    description = "Accepts text input from the UI"
+    description = "Accepts **text input** from the frontend node UI widget. Captures user-typed messages and emits them as `TextFrame` data downstream."
 
     """Receives text from the frontend node UI and sends it downstream."""
 

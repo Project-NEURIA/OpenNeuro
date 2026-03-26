@@ -16,6 +16,7 @@ export function categoryFromTags(tags: Tag): IOTag {
 
 export interface ComponentInfo {
   type_: string;
+  description?: string;
   tags: Tag;
   init: Record<string, unknown>;
   inputs: Record<string, string>;
