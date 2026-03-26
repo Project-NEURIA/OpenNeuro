@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo, IOTag, FunctionalityTag } from "@/lib/types";
 import type { ProjectSummary } from "@/lib/api";
@@ -146,6 +146,7 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
 export function NodeSidebar({ components, projects, currentProject }: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [hovered, setHovered] = useState<{ item: ComponentInfo; y: number } | null>(null);
+  const [search, setSearch] = useState("");
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -181,7 +182,11 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
   }
 
   const otherProjects = projects.filter((p) => p.name !== currentProject);
-  const groups = groupComponents(components);
+  const query = search.toLowerCase();
+  const filtered = query
+    ? components.filter((c) => c.type_.toLowerCase().includes(query))
+    : components;
+  const groups = groupComponents(filtered);
 
   return (
     <>
@@ -198,6 +203,28 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
       <h2 className="text-sm font-semibold text-white px-1 mb-1 shrink-0">
         Components
       </h2>
+      <div className="relative shrink-0 mx-0.5 mb-1">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search..."
+          className={cn(
+            "w-full pl-7 pr-7 py-1.5 text-[11px] text-white/90 placeholder:text-muted-foreground",
+            "bg-white/[0.06] border border-glass-border rounded-lg",
+            "outline-none focus:border-white/20 transition-colors",
+          )}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
       <div className="flex flex-col gap-0.5 overflow-y-auto overscroll-none min-h-0">
         {ioOrder.map((io) => {
           const funcGroups = groups[io];
