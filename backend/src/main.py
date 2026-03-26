@@ -11,6 +11,7 @@ from src.api.graph.edge.controller import router as edge_router
 from src.api.graph.run.controller import router as run_router
 from src.api.graph.save.controller import router as save_router
 from src.api.metrics.controller import router as metrics_router
+from src.api.logs.controller import router as logs_router
 from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
@@ -18,6 +19,7 @@ from src.api.env.controller import router as env_router
 from src.core.graph import Graph
 from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
+from src.core.log_capture import install_global_stream_capture
 
 
 def _copy_presets() -> None:
@@ -39,6 +41,7 @@ def _copy_presets() -> None:
 async def lifespan(app: FastAPI):
     PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
     _copy_presets()
+    install_global_stream_capture()
 
     config = AppConfig.load_config()
     app.state.current_project = config.current_project
@@ -62,6 +65,7 @@ app.include_router(edge_router)
 app.include_router(run_router)
 app.include_router(save_router)
 app.include_router(metrics_router)
+app.include_router(logs_router)
 app.include_router(component_router)
 app.include_router(project_router)
 app.include_router(ui_router)

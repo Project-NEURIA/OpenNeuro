@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import Component, EmitOnStart
+from src.core.log_capture import get_log_store
 
 
 SenderKey = tuple[str, str]  # (node_id, slot_name)
@@ -157,6 +158,7 @@ class GraphManager:
 
         del self._graph.nodes[node_id]
         self._components.pop(node_id, None)
+        get_log_store().clear_node(node_id)
         self._reconcile()
 
     # --- edge CRUD ---
@@ -210,6 +212,7 @@ class GraphManager:
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
+        get_log_store().clear_all()
 
         classes = Component.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
@@ -311,6 +314,7 @@ class GraphManager:
         start_queue: list[tuple[Component[Any, Any], Any, Any]] = []
         for node_id in self._graph.nodes:
             comp = self._components[node_id]
+            comp.bind_runtime(node_id)
             cls = type(comp)
 
             input_type = cls._get_type_param(0)

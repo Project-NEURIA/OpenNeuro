@@ -831,7 +831,7 @@ function AppInner({
                 onOpenEnv={() => setEnvOpen(true)}
             />
             {loggingOpen && (
-                <LoggingPanel selectedNode={selectedLoggingNode} metrics={metrics}/>
+                <LoggingPanel selectedNode={selectedLoggingNode}/>
             )}
             {metricsOpen && (
                 <MetricsDashboard

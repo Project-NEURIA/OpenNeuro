@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import threading
+import traceback
 from abc import ABC, abstractmethod
 from pathlib import Path
 from enum import Enum
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_h
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
+from src.core.log_capture import get_log_store
 
 if TYPE_CHECKING:
     from src.core.graph import Graph, GraphManager
@@ -49,6 +51,7 @@ class Component[
 
     def __init__(self) -> None:
         self._status = Status.STARTUP
+        self._runtime_node_id: str | None = None
 
     @property
     @abstractmethod
@@ -65,6 +68,9 @@ class Component[
     def stop(self) -> None:
         """Idempotent. Signals the component to stop."""
         self._status = Status.STOPPED
+
+    def bind_runtime(self, node_id: str) -> None:
+        self._runtime_node_id = node_id
 
     # --- Reflection / introspection ---
 
@@ -313,12 +319,20 @@ class ThreadedComponent[
         """Override to perform heavy initialization before run()."""
 
     def _safe_run(self, inputs: I, outputs: O) -> None:
+        log_store = get_log_store()
+        node_id = self._runtime_node_id
+        if node_id is not None:
+            log_store.register_thread(node_id)
         try:
             self._status = Status.SETUP
             self.setup()
             self._status = Status.RUNNING
             self.run(inputs, outputs)
+        except Exception:
+            traceback.print_exc()
         finally:
+            if node_id is not None:
+                log_store.unregister_thread()
             self._status = Status.STOPPED
 
     def start(self, inputs: I, outputs: O) -> None:
