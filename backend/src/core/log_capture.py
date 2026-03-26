@@ -26,13 +26,15 @@ class ComponentLogStore:
         self._seq = 0
         self._lock = threading.Lock()
 
-    def register_thread(self, node_id: str) -> None:
-        ident = threading.get_ident()
+    def register_thread(self, node_id: str, ident: int | None = None) -> None:
+        if ident is None:
+            ident = threading.get_ident()
         with self._lock:
             self._thread_to_node[ident] = node_id
 
-    def unregister_thread(self) -> None:
-        ident = threading.get_ident()
+    def unregister_thread(self, ident: int | None = None) -> None:
+        if ident is None:
+            ident = threading.get_ident()
         with self._lock:
             node_id = self._thread_to_node.pop(ident, None)
             if node_id is None:
@@ -75,10 +77,6 @@ class ComponentLogStore:
     def clear_node(self, node_id: str) -> None:
         with self._lock:
             self._entries.pop(node_id, None)
-
-    def clear_all(self) -> None:
-        with self._lock:
-            self._entries.clear()
 
     def _append_locked(self, node_id: str, stream: str, text: str) -> None:
         self._seq += 1

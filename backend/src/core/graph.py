@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from collections import defaultdict
 from typing import Any, get_args, get_origin
@@ -8,7 +9,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component, EmitOnStart
+from src.core.component import Component, EmitOnStart, ThreadedComponent
 from src.core.log_capture import get_log_store
 
 
@@ -212,7 +213,6 @@ class GraphManager:
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
-        get_log_store().clear_all()
 
         classes = Component.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
@@ -311,10 +311,9 @@ class GraphManager:
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
-        start_queue: list[tuple[Component[Any, Any], Any, Any]] = []
+        start_queue: list[tuple[str, Component[Any, Any], Any, Any]] = []
         for node_id in self._graph.nodes:
             comp = self._components[node_id]
-            comp.bind_runtime(node_id)
             cls = type(comp)
 
             input_type = cls._get_type_param(0)
@@ -370,11 +369,22 @@ class GraphManager:
 
             if isinstance(comp, EmitOnStart):
                 comp.emit(outputs)
-            start_queue.append((comp, inputs, outputs))
+            start_queue.append((node_id, comp, inputs, outputs))
 
         # Start all components after all emits are done
-        for comp, inputs, outputs in start_queue:
+        for node_id, comp, inputs, outputs in start_queue:
             comp.start(inputs, outputs)
+            if isinstance(comp, ThreadedComponent):
+                ident = comp.get_ident()
+                if ident is None:
+                    # Thread ident may lag briefly after start().
+                    for _ in range(10):
+                        time.sleep(0.005)
+                        ident = comp.get_ident()
+                        if ident is not None:
+                            break
+                if ident is not None:
+                    get_log_store().register_thread(node_id=node_id, ident=ident)
 
         # Notify WS listeners that UI channels are ready
         self._ui_version += 1

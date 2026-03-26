@@ -51,7 +51,6 @@ class Component[
 
     def __init__(self) -> None:
         self._status = Status.STARTUP
-        self._runtime_node_id: str | None = None
 
     @property
     @abstractmethod
@@ -68,9 +67,6 @@ class Component[
     def stop(self) -> None:
         """Idempotent. Signals the component to stop."""
         self._status = Status.STOPPED
-
-    def bind_runtime(self, node_id: str) -> None:
-        self._runtime_node_id = node_id
 
     # --- Reflection / introspection ---
 
@@ -319,10 +315,6 @@ class ThreadedComponent[
         """Override to perform heavy initialization before run()."""
 
     def _safe_run(self, inputs: I, outputs: O) -> None:
-        log_store = get_log_store()
-        node_id = self._runtime_node_id
-        if node_id is not None:
-            log_store.register_thread(node_id)
         try:
             self._status = Status.SETUP
             self.setup()
@@ -331,8 +323,9 @@ class ThreadedComponent[
         except Exception:
             traceback.print_exc()
         finally:
-            if node_id is not None:
-                log_store.unregister_thread()
+            # Registration happens in GraphManager when start() is called.
+            # Unregister here to ensure buffered partial lines are flushed.
+            get_log_store().unregister_thread()
             self._status = Status.STOPPED
 
     def start(self, inputs: I, outputs: O) -> None:
@@ -343,6 +336,9 @@ class ThreadedComponent[
             target=self._safe_run, args=(inputs, outputs), daemon=True
         )
         self._thread.start()
+
+    def get_ident(self) -> int | None:
+        return None if self._thread is None else self._thread.ident
 
     def stop(self) -> None:
         if self.status == Status.STOPPED:
