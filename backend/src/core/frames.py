@@ -479,15 +479,28 @@ class ObjectLocationFrame(Frame):
 
 @dataclass(frozen=True, slots=True)
 class GoalFrame(Frame):
-    """Frame containing a 3D goal coordinate for motion control."""
+    """Frame containing a 3D goal coordinate and/or target heading for motion control.
 
-    x: float
-    y: float
-    z: float = 0.0
+    For position goals: set x, y, z.
+    For orientation-only goals: set heading (degrees, from +Z clockwise) and leave x/y/z as None.
+    For combined goals: set both.
+    """
+
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    heading: float | None = None
 
     @classmethod
-    def new(cls, *, x: float, y: float, z: float = 0.0) -> GoalFrame:
-        return cls(pts=time.time_ns(), id=obj_id(), x=x, y=y, z=z)
+    def new(
+        cls,
+        *,
+        x: float | None = None,
+        y: float | None = None,
+        z: float | None = None,
+        heading: float | None = None,
+    ) -> GoalFrame:
+        return cls(pts=time.time_ns(), id=obj_id(), x=x, y=y, z=z, heading=heading)
 
 
 @dataclass(frozen=True, slots=True)
