@@ -45,7 +45,7 @@ class AgentStateOutputs(NamedTuple):
 class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
     """Manages conversation history, optionally enriched by memory and character card."""
 
-    description = "Tracks and manages agent conversation state"
+    description = "Tracks and manages **agent conversation state**. Maintains message history enriched by optional *memory* and *character card* inputs, and outputs assembled `MessageFrame` lists for the LLM."
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
     def __init__(self, config: AgentStateConfig) -> None:

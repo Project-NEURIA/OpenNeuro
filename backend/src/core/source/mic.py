@@ -22,7 +22,7 @@ class MicOutputs(NamedTuple):
 
 class Mic(ThreadedComponent[tuple[()], MicOutputs]):
     tags = Tag(io={"source"}, functionality={"audio"})
-    description = "Captures audio from a system microphone"
+    description = "Captures audio from a system **microphone**. Streams raw `AudioFrame` data at a configurable *sample rate*, *channel count*, and *frame duration*."
 
     def __init__(self, config: MicConfig) -> None:
         super().__init__()

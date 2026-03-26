@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ComponentInfo, IOTag, FunctionalityTag } from "@/lib/types";
+import type { ComponentInfo, IOTag, FunctionalityTag, GPUTag } from "@/lib/types";
 import type { ProjectSummary } from "@/lib/api";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -41,6 +41,57 @@ const ioAccent: Record<IOTag, string> = {
   conduit: "text-conduit",
   sink: "text-sink",
 };
+
+const ioTagColors: Record<IOTag, { bg: string; text: string; border: string }> = {
+  source: { bg: "bg-source/15", text: "text-source", border: "border-source/30" },
+  conduit: { bg: "bg-conduit/15", text: "text-conduit", border: "border-conduit/30" },
+  sink: { bg: "bg-sink/15", text: "text-sink", border: "border-sink/30" },
+};
+
+const funcTagColors: Record<FunctionalityTag, { bg: string; text: string; border: string }> = {
+  audio: { bg: "bg-tag-audio/15", text: "text-tag-audio", border: "border-tag-audio/30" },
+  video: { bg: "bg-tag-video/15", text: "text-tag-video", border: "border-tag-video/30" },
+  llm: { bg: "bg-tag-llm/15", text: "text-tag-llm", border: "border-tag-llm/30" },
+  image: { bg: "bg-tag-image/15", text: "text-tag-image", border: "border-tag-image/30" },
+  movement: { bg: "bg-tag-movement/15", text: "text-tag-movement", border: "border-tag-movement/30" },
+  misc: { bg: "bg-tag-misc/15", text: "text-tag-misc", border: "border-tag-misc/30" },
+  other: { bg: "bg-tag-other/15", text: "text-tag-other", border: "border-tag-other/30" },
+};
+
+const gpuTagColors: Record<string, { bg: string; text: string; border: string }> = {
+  nvidia: { bg: "bg-tag-nvidia/15", text: "text-tag-nvidia", border: "border-tag-nvidia/30" },
+  apple: { bg: "bg-tag-apple/15", text: "text-tag-apple", border: "border-tag-apple/30" },
+  intel: { bg: "bg-tag-intel/15", text: "text-tag-intel", border: "border-tag-intel/30" },
+  amd: { bg: "bg-tag-amd/15", text: "text-tag-amd", border: "border-tag-amd/30" },
+};
+
+/** Render simple inline markdown: **bold**, *italic*, `code` */
+function InlineMarkdown({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  // Match **bold**, *italic*, `code`
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    if (match[2]) {
+      parts.push(<strong key={key++} className="font-bold text-white/90">{match[2]}</strong>);
+    } else if (match[3]) {
+      parts.push(<em key={key++} className="italic text-white/70">{match[3]}</em>);
+    } else if (match[4]) {
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{match[4]}</code>);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
 
 interface NodeSidebarProps {
   components: ComponentInfo[];
@@ -90,20 +141,31 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
 
       {/* Description */}
       {item.description && (
-        <div className="text-muted-foreground mb-2 leading-relaxed">{item.description}</div>
+        <div className="text-muted-foreground mb-2 leading-relaxed text-[11px]">
+          <InlineMarkdown text={item.description} />
+        </div>
       )}
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1 mb-2">
-        {item.tags.io.map((t) => (
-          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
-        ))}
-        {item.tags.functionality.map((t) => (
-          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
-        ))}
-        {item.tags.gpu.filter((g) => g !== "cpu").map((t) => (
-          <span key={t} className="px-1.5 py-0.5 bg-white/[0.06] text-white/60 uppercase tracking-wider text-[9px] font-semibold">{t}</span>
-        ))}
+        {item.tags.io.map((t) => {
+          const colors = ioTagColors[t];
+          return (
+            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
+          );
+        })}
+        {item.tags.functionality.map((t) => {
+          const colors = funcTagColors[t];
+          return (
+            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
+          );
+        })}
+        {item.tags.gpu.filter((g: GPUTag) => g !== "cpu").map((t: GPUTag) => {
+          const colors = gpuTagColors[t] ?? { bg: "bg-white/[0.06]", text: "text-white/60", border: "border-white/10" };
+          return (
+            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
+          );
+        })}
       </div>
 
       {/* IO */}
@@ -146,6 +208,7 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
 export function NodeSidebar({ components, projects, currentProject }: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [hovered, setHovered] = useState<{ item: ComponentInfo; y: number } | null>(null);
+  const [search, setSearch] = useState("");
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -181,7 +244,11 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
   }
 
   const otherProjects = projects.filter((p) => p.name !== currentProject);
-  const groups = groupComponents(components);
+  const query = search.toLowerCase();
+  const filtered = query
+    ? components.filter((c) => c.type_.toLowerCase().includes(query))
+    : components;
+  const groups = groupComponents(filtered);
 
   return (
     <>
@@ -198,6 +265,28 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
       <h2 className="text-sm font-semibold text-white px-1 mb-1 shrink-0">
         Components
       </h2>
+      <div className="relative shrink-0 mx-0.5 mb-1">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search..."
+          className={cn(
+            "w-full pl-7 pr-7 py-1.5 text-[11px] text-white/90 placeholder:text-muted-foreground",
+            "bg-white/[0.06] border border-glass-border rounded-lg",
+            "outline-none focus:border-white/20 transition-colors",
+          )}
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
       <div className="flex flex-col gap-0.5 overflow-y-auto overscroll-none min-h-0">
         {ioOrder.map((io) => {
           const funcGroups = groups[io];

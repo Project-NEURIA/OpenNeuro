@@ -47,10 +47,22 @@ class CharacterCard(
     or a manual CharacterCardConfig. One of the two must be provided.
     """
 
-    description = "Character card for persona-based chat"
+    description = "Loads a **character card** for persona-based chat. Supports *SillyTavern PNG* imports and manual config, emitting `MessageFrame` prompts, *system prompt*, *personality*, and *scenario* outputs."
     tags = Tag(io={"source"}, functionality={"llm"})
 
     _PRESETS_DIR = ASSETS_DIR / "character_cards"
+    _PRESET_OPTIONS = [
+        {"value": "tsundere_rich_girl", "label": "Tsundere"},
+        {"value": "cool_mature_woman", "label": "Elegant"},
+        {"value": "calm_scientist", "label": "Stoic"},
+        {"value": "gentle_big_sister", "label": "Manipulative"},
+        {"value": "energetic_girl", "label": "Energetic"},
+    ]
+
+    @classmethod
+    def get_options(cls, values: dict[str, object]) -> dict[str, object]:
+        _ = values
+        return {"preset": cls._PRESET_OPTIONS}
 
     @classmethod
     def _resolve_preset(cls, preset: str) -> Path:

@@ -41,7 +41,7 @@ class ObjectDetectorOutputs(NamedTuple):
 
 
 class ObjectDetector(ThreadedComponent[ObjectDetectorInputs, ObjectDetectorOutputs]):
-    description = "Detects objects in video frames"
+    description = "Detects **objects** in `VideoFrame` input using *SAM3*. Accepts text prompts (e.g. `head, hand`) and emits `ObjectDetectionFrame` results with bounding boxes and tracking."
 
     """Text-prompted object detector backed by SAM3.
 

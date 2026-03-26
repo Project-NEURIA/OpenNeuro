@@ -31,7 +31,7 @@ class FishTTSOutputs(NamedTuple):
 class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
     """Text-to-Speech using Fish Audio WebSocket streaming."""
 
-    description = "Streaming TTS via Fish Audio"
+    description = "**Streaming TTS** via *Fish Audio* WebSocket API. Converts `TextFrame` tokens into `AudioFrame` output using configurable *voice references* and the `s2-pro` model."
 
     def __init__(self, config: FishTTSConfig) -> None:
         super().__init__()
