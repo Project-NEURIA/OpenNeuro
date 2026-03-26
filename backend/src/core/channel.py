@@ -92,7 +92,8 @@ class Sender[T]:
             ch._send(item)
         self._msg_count += 1
         self._byte_count += sys.getsizeof(item)
-        self._last_send_time = time.monotonic()
+        # Use Unix epoch seconds to align with metrics.timestamp (time.time()).
+        self._last_send_time = time.time()
 
     @property
     def buffer_depth(self) -> int:

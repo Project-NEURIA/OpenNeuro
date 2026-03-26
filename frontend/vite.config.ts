@@ -94,6 +94,10 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      "/logs": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });

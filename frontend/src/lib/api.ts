@@ -1,5 +1,17 @@
 import type { ComponentInfo } from "./types";
 
+export interface ComponentLogEntry {
+  seq: number;
+  timestamp: number;
+  stream: "stdout" | "stderr";
+  text: string;
+}
+
+export interface ComponentLogsResponse {
+  node_id: string;
+  entries: ComponentLogEntry[];
+}
+
 export interface EdgeData {
   source_node: string;
   source_slot: string;
@@ -245,5 +257,26 @@ export async function fetchOptions(
     },
   );
   if (!res.ok) throw new Error(`Fetch config options failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchComponentLogs(
+  nodeId: string,
+  after = 0,
+  limit = 400,
+): Promise<ComponentLogsResponse> {
+  const res = await fetch(
+    `/logs/${encodeURIComponent(nodeId)}?after=${after}&limit=${limit}`,
+  );
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!res.ok) {
+    throw new Error(`Fetch component logs failed: ${res.status}`);
+  }
+  if (!contentType.includes("application/json")) {
+    const body = await res.text();
+    throw new Error(
+      `Fetch component logs returned non-JSON (${contentType || "unknown"}): ${body.slice(0, 80)}`,
+    );
+  }
   return res.json();
 }

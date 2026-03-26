@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import threading
+import traceback
 from abc import ABC, abstractmethod
 from pathlib import Path
 from enum import Enum
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin, get_type_h
 from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
+from src.core.log_capture import get_log_store
 
 if TYPE_CHECKING:
     from src.core.graph import Graph, GraphManager
@@ -318,7 +320,12 @@ class ThreadedComponent[
             self.setup()
             self._status = Status.RUNNING
             self.run(inputs, outputs)
+        except Exception:
+            traceback.print_exc()
         finally:
+            # Registration happens in GraphManager when start() is called.
+            # Unregister here to ensure buffered partial lines are flushed.
+            get_log_store().unregister_thread()
             self._status = Status.STOPPED
 
     def start(self, inputs: I, outputs: O) -> None:
@@ -329,6 +336,9 @@ class ThreadedComponent[
             target=self._safe_run, args=(inputs, outputs), daemon=True
         )
         self._thread.start()
+
+    def get_ident(self) -> int | None:
+        return None if self._thread is None else self._thread.ident
 
     def stop(self) -> None:
         if self.status == Status.STOPPED:
