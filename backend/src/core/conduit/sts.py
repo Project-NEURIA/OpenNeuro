@@ -31,7 +31,7 @@ class STSOutputs(NamedTuple):
 
 class STS(ThreadedComponent[STSInputs, STSOutputs]):
     tags = Tag(io={"conduit"}, functionality={"audio"})
-    description = "Performs speech-to-speech conversion via WebSocket"
+    description = "Performs **speech-to-speech** conversion via *WebSocket*. Sends raw audio to a streaming STS endpoint and receives synthesized `AudioFrame` output in real time, bypassing separate ASR/LLM/TTS steps."
 
     def __init__(self, config: STSConfig) -> None:
         super().__init__()

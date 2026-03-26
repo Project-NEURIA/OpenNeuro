@@ -41,6 +41,17 @@
   --color-edge-dot: var(--edge-dot);
   --color-handle: var(--handle);
   --color-handle-border: var(--handle-border);
+  --color-tag-audio: var(--tag-audio);
+  --color-tag-video: var(--tag-video);
+  --color-tag-llm: var(--tag-llm);
+  --color-tag-image: var(--tag-image);
+  --color-tag-movement: var(--tag-movement);
+  --color-tag-misc: var(--tag-misc);
+  --color-tag-other: var(--tag-other);
+  --color-tag-nvidia: var(--tag-nvidia);
+  --color-tag-apple: var(--tag-apple);
+  --color-tag-intel: var(--tag-intel);
+  --color-tag-amd: var(--tag-amd);
 }
 
 :root {
@@ -69,6 +80,21 @@
   --source: #10b981;
   --conduit: #3b82f6;
   --sink: #f59e0b;
+
+  /* Functionality tag colors */
+  --tag-audio: #a78bfa;
+  --tag-video: #fb923c;
+  --tag-llm: #22d3ee;
+  --tag-image: #f472b6;
+  --tag-movement: #34d399;
+  --tag-misc: #94a3b8;
+  --tag-other: #6b7280;
+
+  /* GPU tag colors */
+  --tag-nvidia: #76b900;
+  --tag-apple: #a3aaae;
+  --tag-intel: #0071c5;
+  --tag-amd: #ed1c24;
 
   /* Status colors */
   --status-running: #4ade80;

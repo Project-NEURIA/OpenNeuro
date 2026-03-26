@@ -17,7 +17,7 @@ class TextDisplayOutputs(NamedTuple):
 
 
 class TextDisplay(ThreadedComponent[TextDisplayInputs, TextDisplayOutputs]):
-    description = "Displays text output in the UI"
+    description = "Displays **text output** in the node UI widget. Receives `TextFrame` input and renders it as a live text stream in the frontend."
 
     """Receives text frames and displays them in the node UI."""
 

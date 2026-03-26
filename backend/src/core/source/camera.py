@@ -16,7 +16,7 @@ class CameraConfig(VideoSourceConfig):
 
 
 class Camera(VideoSource):
-    description = "Captures video from a system camera"
+    description = "Captures live **video** from a webcam or camera device. Outputs `VideoFrame` data with configurable *source* device selection."
 
     """Captures live video from a webcam or camera device."""
 

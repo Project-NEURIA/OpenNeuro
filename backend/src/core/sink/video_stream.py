@@ -17,7 +17,7 @@ class VideoStreamOutputs(NamedTuple):
 
 
 class VideoStream(ThreadedComponent[VideoStreamInputs, VideoStreamOutputs]):
-    description = "Streams video frames to the UI"
+    description = "Streams **video frames** to the frontend UI. Receives `VideoFrame` input and encodes it as *JPEG* for real-time display in the graph node widget."
 
     """Receives video frames and streams JPEG to the frontend via UI channel."""
 
