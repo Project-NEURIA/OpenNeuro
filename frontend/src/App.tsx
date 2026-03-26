@@ -395,6 +395,12 @@ function AppInner({
     })();
   }, [components, componentMap, setNodes, setEdges, runTypeCheck, buildGraphNodeData]);
 
+  // Re-run type checking when concreteTypes finishes loading after init
+  useEffect(() => {
+    if (!initialized.current || concreteTypes.size === 0) return;
+    runTypeCheck();
+  }, [concreteTypes, runTypeCheck]);
+
   // Update node and edge data with metrics
   useEffect(() => {
     if (!initialized.current || !metrics) return;
