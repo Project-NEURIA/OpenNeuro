@@ -428,10 +428,13 @@ class GraphManager:
         return tuple(handles[k] for k in sorted(handles.keys()))
 
     def stop(self) -> None:
-        """Stop all components and senders."""
+        """Stop all components and await their threads."""
         for sender in self._sender_handles.values():
             sender._stopped = True
         for sender in self._ui_senders.values():
             sender._stopped = True
         for comp in self._components.values():
             comp.stop()
+        for comp in self._components.values():
+            if isinstance(comp, ThreadedComponent):
+                comp.join(timeout=5.0)
