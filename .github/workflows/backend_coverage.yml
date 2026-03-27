@@ -1,0 +1,68 @@
+name: Backend Coverage
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend-coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run backend tests with coverage
+        run: uv run pytest
+
+      - name: Build text coverage report
+        run: |
+          uv run coverage report -m > coverage.txt
+          {
+            echo "## Backend Coverage"
+            echo ""
+            echo '```text'
+            cat coverage.txt
+            echo '```'
+          } > ../coverage-comment.md
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage.xml
+            backend/coverage.txt
+
+      - name: Post PR coverage comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: coverage-comment.md
+
+      - name: Generate coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: uv run --with coverage-badge coverage-badge -o ../docs/backend-coverage.svg -f
+
+      - name: Commit coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: update backend coverage badge"
+          file_pattern: docs/backend-coverage.svg

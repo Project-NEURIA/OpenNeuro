@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import json
+import types
+
+import pytest
+
+from src.api.graph.node import service as node_service
+from src.api.graph.node.dto import NodeUpdateRequest
+from src.core.graph import Edge, Graph, Node
+
+
+class _FakeComp:
+    def __init__(self) -> None:
+        self.stopped = False
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class _FakeManager:
+    def __init__(self) -> None:
+        self._n1 = Node(id_="n1", type="A", init_args={}, x=1.0, y=2.0)
+        self._n2 = Node(id_="n2", type="A", init_args={}, x=3.0, y=4.0)
+        self.graph = Graph(
+            nodes={"n1": self._n1, "n2": self._n2},
+            edges=[Edge(source_node="n1", source_slot="out", target_node="n2", target_slot="inp")],
+        )
+        self._components = {"n1": _FakeComp(), "n2": _FakeComp()}
+        self.reconciled = 0
+
+    def add_node(self, node_type, init_args):
+        if node_type != "A":
+            raise ValueError("bad")
+        n = Node(id_="n3", type=node_type, init_args=init_args)
+        self.graph.nodes["n3"] = n
+        self._components["n3"] = _FakeComp()
+        return "n3", n
+
+    def add_composite_node(self, type_, sub_graph, x=0.0, y=0.0, description=""):
+        n = Node(id_="c1", type=type_, init_args={}, x=x, y=y, sub_graph=sub_graph)
+        self.graph.nodes["c1"] = n
+        self._components["c1"] = _FakeComp()
+        return "c1", n
+
+    def get_node(self, node_id):
+        return self.graph.nodes.get(node_id)
+
+    def update_node(self, node_id, x, y):
+        n = self.graph.nodes.get(node_id)
+        if n is None:
+            return None
+        n.x = x
+        n.y = y
+        return n
+
+    def delete_node(self, node_id):
+        self.graph.nodes.pop(node_id, None)
+        self._components.pop(node_id, None)
+
+    def update_node_init_args(self, node_id, init_args):
+        n = self.graph.nodes.get(node_id)
+        if n is None:
+            return None
+        n.init_args = init_args
+        return n
+
+    def components(self):
+        return self._components
+
+    def _reconcile(self):
+        self.reconciled += 1
+
+
+def test_node_service_basic_crud() -> None:
+    m = _FakeManager()
+    assert node_service.list_nodes(m)["n1"].id_ == "n1"
+    assert node_service.get_node(m, "n1").id_ == "n1"
+    assert node_service.get_node(m, "missing") is None
+    assert node_service.create_node(m, "A", {})[0] == "n3"
+    updated = node_service.update_node(m, "n1", NodeUpdateRequest(x=9, y=8))
+    assert updated.x == 9
+    node_service.delete_node(m, "n2")
+    assert "n2" not in m.graph.nodes
+    out = node_service.update_node_init_args(m, "n1", {"k": 1})
+    assert out.init_args == {"k": 1}
+
+
+def test_create_node_fallback_to_project(tmp_path, monkeypatch) -> None:
+    m = _FakeManager()
+    projects = tmp_path / "projects"
+    monkeypatch.setattr(node_service, "PROJECTS_DIR", projects)
+    p = projects / "Proj"
+    p.mkdir(parents=True)
+    g = Graph(nodes={}, edges=[])
+    (p / "graph.json").write_text(g.model_dump_json())
+    comp_id, comp_node = node_service.create_node(m, "Proj", {})
+    assert comp_id == "c1"
+    assert comp_node.sub_graph is not None
+    with pytest.raises(ValueError):
+        node_service.create_node(m, "UnknownProject", {})
+
+
+def test_subgraph_create_and_ungroup(monkeypatch) -> None:
+    m = _FakeManager()
+    cid, cnode = node_service.create_subgraph(m, ["n1", "n2"], name="G")
+    assert cid == "c1"
+    assert cnode.sub_graph is not None
+    assert "n1" not in m.graph.nodes
+    assert m.reconciled >= 1
+
+    class _Cls:
+        @classmethod
+        def from_args(cls, _args):
+            return _FakeComp()
+
+    monkeypatch.setattr("src.core.component.Component.registered_subclasses", lambda: {"A": _Cls})
+    node_service.ungroup(m, "c1")
+    assert "c1" not in m.graph.nodes
+    assert "n1" in m.graph.nodes
+
+
+def test_subgraph_validation_errors() -> None:
+    m = _FakeManager()
+    with pytest.raises(ValueError):
+        node_service.create_subgraph(m, ["missing"], name="Bad")
+    with pytest.raises(ValueError):
+        node_service.ungroup(m, "missing")
+    with pytest.raises(ValueError):
+        node_service.ungroup(m, "n1")
