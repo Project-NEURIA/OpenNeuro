@@ -2,25 +2,45 @@ name: Typecheck and Lint
 
 on:
   pull_request:
-    branches: [main]
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typecheck-lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      UV_CACHE_DIR: /home/runner/.cache/uv
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - id: setup-python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v4
 
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cache/uv
+            backend/.venv
+          key: typecheck-lint-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: |
+            typecheck-lint-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --frozen --group dev
 
       - name: Ruff format check
         run: uv run ruff format --check .

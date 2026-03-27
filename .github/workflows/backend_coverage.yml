@@ -2,16 +2,23 @@ name: Backend Coverage
 
 on:
   pull_request:
-    branches: [ A5 ]
+    branches: [ A5, main ]
   push:
-    branches: [ A5 ]
+    branches: [ A5, main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
+    env:
+      UV_CACHE_DIR: /home/runner/.cache/uv
     defaults:
       run:
         working-directory: backend
@@ -19,17 +26,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - id: setup-python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v4
 
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cache/uv
+            backend/.venv
+          key: backend-coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: |
+            backend-coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libportaudio2
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --frozen --group dev
 
       - name: Run backend tests with coverage
         run: uv run pytest
