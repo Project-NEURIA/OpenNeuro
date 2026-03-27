@@ -170,3 +170,48 @@ We implemented the top two improvements:
 | TTS TTFB | 406 ms | 427 ms | +21 ms (API variance) |
 | **TTFA** | **1,330 ms** | **1,155 ms** | **-175 ms (13%)** |
 
+---
+
+## Channel vs threading.Queue Throughput Benchmark
+
+We benchmarked our custom `Channel`/`Sender`/`Receiver` implementation against Python's `threading.Queue` using methodology adapted from the [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor) perftest suite: 100K messages per run, 7 runs per test, `gc.collect()` between runs, correctness checksums on every run.
+
+### Throughput (median of 7 runs)
+
+| Topology | Channel | Queue | Ratio |
+|----------|---------|-------|-------|
+| 1P1C (unicast) | 443K ops/s | 1,437K ops/s | Queue 3.2x faster |
+| 1P3C (multicast) | 179K ops/s | 479K ops/s | Queue 2.7x faster |
+| 3P1C (fan-in) | 229K ops/s | 1,373K ops/s | Queue 6.0x faster |
+| Pipeline (P→S1→S2→S3) | 119K ops/s | 467K ops/s | Queue 3.9x faster |
+
+Note: For 1P3C, Channel broadcasts with a single `send()` while Queue requires 3 separate `put()` calls (manual fan-out). Despite this, Queue is still faster due to lower per-message overhead.
+
+### Latency (ping-pong round-trip, best of 5 runs)
+
+| Percentile | Channel | Queue |
+|------------|---------|-------|
+| p50 | 7.0 µs | 8.8 µs |
+| p90 | 9.5 µs | 9.3 µs |
+| p99 | 11.5 µs | 11.7 µs |
+| p99.9 | 19.4 µs | 19.0 µs |
+| max | 29.6 µs | 70.4 µs |
+
+Channel has slightly lower median latency and much lower max (30µs vs 70µs).
+
+### Why Channel is slower on throughput
+
+cProfile identifies the main overhead in Channel vs Queue's simpler `put()`/`get()`:
+
+| Overhead | Per-message cost | Notes |
+|----------|-----------------|-------|
+| `_gc()` on every receive | `min(cursors.values())` + `del items[:drop]` | Dict scan + list slice on every `_wait_and_get` |
+| `notify_all()` on every send | Wakes all waiting threads | Queue uses `notify()` (wake one) |
+| `sys.getsizeof()` on every send | ~80ns | Sender tracks byte count for metrics |
+| `time.time()` on every send | ~50ns | Sender tracks `_last_send_time` for metrics |
+
+### Potential improvements
+
+1. **Batch `_gc()`**: Only run GC every N receives instead of every receive
+2. **`notify()` instead of `notify_all()`**: For single-consumer channels, wake one thread instead of all
+3. **Lazy metrics**: Only compute `sys.getsizeof` and `time.time` when metrics are actually polled, not on every send
