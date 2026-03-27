@@ -46,6 +46,8 @@ dependencies = [
 ]
 
 [tool.mypy]
+exclude = '(^tests/)'
+
 [[tool.mypy.overrides]]
 module = [
     "sounddevice", "onnxruntime", "clip", "smplx", "yaml",
@@ -104,7 +106,18 @@ pytorch-triton-rocm = [
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.1",
 ]
 cuda = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0"]
 rocm = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0", "pytorch-triton-rocm"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=100",
+]
+testpaths = ["tests"]

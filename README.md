@@ -1,4 +1,5 @@
 # OpenNeuro
+[![Backend Coverage](docs/backend-coverage.svg)](./docs/backend-coverage.svg)
 
 ## Prerequisites
 
@@ -29,3 +30,9 @@ bun tauri dev
 ```sh
 bun tauri build
 ```
+
+## Backend Test Coverage
+
+- Run locally: `cd backend && uv run pytest`
+- CI workflow: `.github/workflows/backend_coverage.yml`
+- PRs get an automatic sticky coverage comment.
