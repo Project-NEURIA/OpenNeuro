@@ -77,8 +77,12 @@ def list_components() -> list[ComponentInfo]:
                         description="",
                         tags=Tag(io={"conduit"}, functionality={"misc"}),
                         init={},
-                        inputs={k: _type_name(v) for k, v in comp.get_input_types().items()},
-                        outputs={k: _type_name(v) for k, v in comp.get_output_types().items()},
+                        inputs={
+                            k: _type_name(v) for k, v in comp.get_input_types().items()
+                        },
+                        outputs={
+                            k: _type_name(v) for k, v in comp.get_output_types().items()
+                        },
                         ui_inputs={},
                         ui_outputs={},
                         is_composite=True,

@@ -220,7 +220,6 @@ class Component[
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
 
 
-
 # ---------------------------------------------------------------------------
 # PrimitiveComponent — single component (not a subgraph)
 # ---------------------------------------------------------------------------

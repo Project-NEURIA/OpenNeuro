@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.core.component import Component, PrimitiveComponent
+from src.core.component import PrimitiveComponent
 
 
 def list_components() -> dict[str, type[PrimitiveComponent[Any, Any]]]:

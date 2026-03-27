@@ -78,9 +78,7 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         interval = self.config.key_window_interval
         return interval is not None and interval > 0 and window_index % interval == 0
 
-    def _call_vllm(
-        self, frames: list[Image.Image], prompt: str
-    ) -> tuple[str, str]:
+    def _call_vllm(self, frames: list[Image.Image], prompt: str) -> tuple[str, str]:
         """Call VLM and return (caption, objects_csv)."""
         content: list[ChatCompletionContentPartParam] = [
             {

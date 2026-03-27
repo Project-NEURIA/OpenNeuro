@@ -25,7 +25,9 @@ class ThrottleOutputs[T](NamedTuple):
 
 
 class Throttle[T](ThreadedComponent[ThrottleInputs[T], ThrottleOutputs[T]]):
-    description = "Rate-limits a stream to a fixed interval, always forwarding the newest frame"
+    description = (
+        "Rate-limits a stream to a fixed interval, always forwarding the newest frame"
+    )
     tags = Tag(io={"conduit"}, functionality={"misc"})
 
     def __init__(self, config: ThrottleConfig) -> None:

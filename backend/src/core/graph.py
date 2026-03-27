@@ -9,7 +9,12 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component, EmitOnStart, PrimitiveComponent, ThreadedComponent
+from src.core.component import (
+    Component,
+    EmitOnStart,
+    PrimitiveComponent,
+    ThreadedComponent,
+)
 from src.core.log_capture import get_log_store
 
 
@@ -328,6 +333,7 @@ class GraphManager:
             ui_output_slots = comp.get_ui_output_types()
 
             from src.core.component import CompositeComponent
+
             is_composite = isinstance(comp, CompositeComponent)
 
             input_handles: dict[str, Receiver[Any] | None] = {}
