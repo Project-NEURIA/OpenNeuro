@@ -37,14 +37,26 @@ class STS(ThreadedComponent[STSInputs, STSOutputs]):
         super().__init__()
         self.config: STSConfig = config
         self._ws: Connection | None = None
+        self._child_threads: list[threading.Thread] = []
 
     def stop(self) -> None:
-        if self._ws:
+        super().stop()
+        self._close_ws()
+        self._join_children()
+
+    def _close_ws(self) -> None:
+        ws = self._ws
+        if ws is not None:
             try:
-                self._ws.close()
+                ws.close()
             except Exception:
                 pass
-        super().stop()
+            self._ws = None
+
+    def _join_children(self, timeout: float = 2.0) -> None:
+        for t in self._child_threads:
+            t.join(timeout=timeout)
+        self._child_threads.clear()
 
     def run(self, inputs: STSInputs, outputs: STSOutputs) -> None:
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
@@ -61,50 +73,61 @@ class STS(ThreadedComponent[STSInputs, STSOutputs]):
 
         with connect(url, additional_headers=headers) as ws:
             self._ws = ws
-            ws.send(
-                json.dumps(
-                    {
-                        "type": "session.update",
-                        "session": {
-                            "modalities": ["text", "audio"],
-                            "voice": "alloy",
-                            "input_audio_format": "pcm16",
-                            "output_audio_format": "pcm16",
-                            "turn_detection": {"type": "server_vad"},
-                        },
-                    }
-                )
-            )
-
-            threading.Thread(
-                target=self._send_loop, args=(ws, inputs.audio), daemon=True
-            ).start()
-
-            if inputs.interrupt is not None:
-                interrupt_recv = inputs.interrupt
-
-                def listen_interrupts() -> None:
-                    for frame in interrupt_recv(self):
-                        if frame is None:
-                            break
-                        print(f"[STS] Interrupt received: {frame.reason}")
-                        ws.send(json.dumps({"type": "input_audio_buffer.clear"}))
-
-                threading.Thread(target=listen_interrupts, daemon=True).start()
-
-            for msg in ws:
-                if self.stop_event.is_set():
-                    break
-
-                event = json.loads(msg)
-                if event["type"] == "response.audio.delta":
-                    pcm = base64.b64decode(event["delta"])
-                    frame = AudioFrame.new(
-                        data=pcm,
-                        sample_rate=24000,
-                        channels=1,
+            try:
+                ws.send(
+                    json.dumps(
+                        {
+                            "type": "session.update",
+                            "session": {
+                                "modalities": ["text", "audio"],
+                                "voice": "alloy",
+                                "input_audio_format": "pcm16",
+                                "output_audio_format": "pcm16",
+                                "turn_detection": {"type": "server_vad"},
+                            },
+                        }
                     )
-                    outputs.audio.send(frame)
+                )
+
+                send_thread = threading.Thread(
+                    target=self._send_loop, args=(ws, inputs.audio), daemon=True
+                )
+                send_thread.start()
+                self._child_threads.append(send_thread)
+
+                if inputs.interrupt is not None:
+                    interrupt_recv = inputs.interrupt
+
+                    def listen_interrupts() -> None:
+                        for frame in interrupt_recv(self):
+                            if frame is None:
+                                break
+                            print(f"[STS] Interrupt received: {frame.reason}")
+                            ws.send(json.dumps({"type": "input_audio_buffer.clear"}))
+
+                    interrupt_thread = threading.Thread(
+                        target=listen_interrupts, daemon=True
+                    )
+                    interrupt_thread.start()
+                    self._child_threads.append(interrupt_thread)
+
+                for msg in ws:
+                    if self.stop_event.is_set():
+                        break
+
+                    event = json.loads(msg)
+                    if event["type"] == "response.audio.delta":
+                        pcm = base64.b64decode(event["delta"])
+                        frame = AudioFrame.new(
+                            data=pcm,
+                            sample_rate=24000,
+                            channels=1,
+                        )
+                        outputs.audio.send(frame)
+            finally:
+                self.stop_event.set()
+                self._close_ws()
+                self._join_children()
 
     def _send_loop(self, ws: Connection, audio: Receiver[AudioFrame]) -> None:
         from websockets.exceptions import ConnectionClosed
