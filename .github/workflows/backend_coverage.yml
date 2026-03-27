@@ -47,7 +47,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libportaudio2
 
       - name: Install dependencies
-        run: uv sync --frozen --group dev
+        run: uv sync --group dev
 
       - name: Run backend tests with coverage
         run: uv run pytest
