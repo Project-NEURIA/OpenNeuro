@@ -2,9 +2,9 @@ name: Backend Coverage
 
 on:
   pull_request:
-    branches: [main]
+    branches: [A5]
   push:
-    branches: [main]
+    branches: [A5]
 
 jobs:
   backend-coverage:
