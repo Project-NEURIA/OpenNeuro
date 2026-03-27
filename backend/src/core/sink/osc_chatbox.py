@@ -162,7 +162,7 @@ class OSCChatbox(ThreadedComponent[OSCChatboxInputs, tuple[()]]):
             self._enqueue_text(text)
 
     def _text_loop(self, text: Receiver[TextFrame]) -> None:
-        for frame in text(self):
+        for frame in text:
             if frame is None:
                 break
 
@@ -219,7 +219,7 @@ class OSCChatbox(ThreadedComponent[OSCChatboxInputs, tuple[()]]):
                     self._send_chatbox("", reset=True)
 
     def _interrupt_loop(self, interrupt: Receiver[InterruptFrame]) -> None:
-        for frame in interrupt(self):
+        for frame in interrupt:
             if frame is None:
                 break
 

@@ -55,7 +55,7 @@ class MovementTool(
         )
 
     def run(self, inputs: MovementToolInputs, outputs: MovementToolOutputs) -> None:
-        for call in inputs.tool_call(self):
+        for call in inputs.tool_call:
             if call is None:
                 break
             if call.name != "move":

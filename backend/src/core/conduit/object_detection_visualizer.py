@@ -87,12 +87,11 @@ class ObjectDetectionVisualizer(
     ) -> None:
         print("[ObjectDetectionVisualizer] Starting")
 
-        video_iter = inputs.video(self)
-        for det_frame in inputs.detections(self):
+        for det_frame in inputs.detections:
             if det_frame is None:
                 break
 
-            video = next(video_iter, None)
+            video = next(inputs.video, None)
             if video is None:
                 break
 

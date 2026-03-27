@@ -258,7 +258,7 @@ class DiscordIO(ThreadedComponent[DiscordInputs, DiscordOutputs]):
             interrupt_recv = inputs.interrupt
 
             def handle_interrupts() -> None:
-                for frame in interrupt_recv(self):
+                for frame in interrupt_recv:
                     if frame is None:
                         break
                     for b in _buffer.values():
@@ -266,7 +266,7 @@ class DiscordIO(ThreadedComponent[DiscordInputs, DiscordOutputs]):
 
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        for frame in inputs.audio(self):
+        for frame in inputs.audio:
             if frame is None:
                 break
 

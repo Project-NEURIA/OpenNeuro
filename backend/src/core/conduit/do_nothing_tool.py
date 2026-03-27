@@ -33,7 +33,7 @@ class DoNothingTool(
         )
 
     def run(self, inputs: DoNothingToolInputs, outputs: DoNothingToolOutputs) -> None:
-        for call in inputs.tool_call(self):
+        for call in inputs.tool_call:
             if call is None:
                 break
             outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))

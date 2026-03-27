@@ -55,7 +55,7 @@ class StereoToMonocularVideo(
         eye = self.config.eye
 
         print(f"[StereoToMonocularVideo] Extracting {eye} eye")
-        for stereo_frame in inputs.stereo_video(self):
+        for stereo_frame in inputs.stereo_video:
             if stereo_frame is None:
                 break
 

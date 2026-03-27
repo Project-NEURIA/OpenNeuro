@@ -125,14 +125,15 @@ class MonocularDepthEstimator(
         inputs: MonocularDepthEstimatorInputs,
         outputs: MonocularDepthEstimatorOutputs,
     ) -> None:
-        cam_iter = inputs.camera_params(self, newest=True)
+        inputs.camera_params.newest = True
 
         print("[MonocularDepthEstimator] Running inference loop")
-        for vframe in inputs.video(self, newest=True):
+        inputs.video.newest = True
+        for vframe in inputs.video:
             if vframe is None:
                 break
 
-            cam_frame = next(cam_iter, None)
+            cam_frame = next(inputs.camera_params, None)
             if cam_frame is None:
                 break
 

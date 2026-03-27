@@ -23,7 +23,7 @@ class MessagesToText(ThreadedComponent[MessagesToTextInputs, MessagesToTextOutpu
     tags = Tag(io={"conduit"}, functionality={"misc"})
 
     def run(self, inputs: MessagesToTextInputs, outputs: MessagesToTextOutputs) -> None:
-        for frame in inputs.messages(self):
+        for frame in inputs.messages:
             if frame is None:
                 break
             text = "\n".join(f"{m.role}: {m.content}" for m in frame)

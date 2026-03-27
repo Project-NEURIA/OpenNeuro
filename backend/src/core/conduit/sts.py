@@ -84,7 +84,7 @@ class STS(ThreadedComponent[STSInputs, STSOutputs]):
                 interrupt_recv = inputs.interrupt
 
                 def listen_interrupts() -> None:
-                    for frame in interrupt_recv(self):
+                    for frame in interrupt_recv:
                         if frame is None:
                             break
                         print(f"[STS] Interrupt received: {frame.reason}")
@@ -109,7 +109,7 @@ class STS(ThreadedComponent[STSInputs, STSOutputs]):
     def _send_loop(self, ws: Connection, audio: Receiver[AudioFrame]) -> None:
         from websockets.exceptions import ConnectionClosed
 
-        for frame in audio(self):
+        for frame in audio:
             if frame is None:
                 break
 

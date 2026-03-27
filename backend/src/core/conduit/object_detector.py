@@ -177,7 +177,7 @@ class ObjectDetector(ThreadedComponent[ObjectDetectorInputs, ObjectDetectorOutpu
 
     def _prompt_listener(self, inputs: ObjectDetectorInputs) -> None:
         """Daemon thread: consume prompt updates and reinitialize session."""
-        for frame in inputs.prompts(self):
+        for frame in inputs.prompts:
             if frame is None:
                 break
             new_prompts = [p.strip() for p in frame.text.split(",") if p.strip()]
@@ -199,7 +199,8 @@ class ObjectDetector(ThreadedComponent[ObjectDetectorInputs, ObjectDetectorOutpu
         prompt_thread.start()
 
         print("[ObjectDetector] Running inference loop")
-        for frame in inputs.video(self, newest=True):
+        inputs.video.newest = True
+        for frame in inputs.video:
             if frame is None:
                 break
 

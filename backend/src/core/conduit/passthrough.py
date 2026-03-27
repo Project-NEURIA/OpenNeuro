@@ -19,7 +19,7 @@ class Passthrough[T](ThreadedComponent[PassthroughInputs[T], PassthroughOutputs[
     description = "Passes data through unchanged"
 
     def run(self, inputs: PassthroughInputs[T], outputs: PassthroughOutputs[T]) -> None:
-        for item in inputs.data(self):
+        for item in inputs.data:
             if item is None:
                 break
             outputs.data.send(item)

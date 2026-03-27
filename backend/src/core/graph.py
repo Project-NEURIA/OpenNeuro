@@ -308,6 +308,8 @@ class GraphManager:
     def run(self) -> None:
         """Stop all running components, then start each with wired handles."""
         self.stop()
+        for sender in self._sender_handles.values():
+            sender._stopped = False
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
@@ -364,6 +366,12 @@ class GraphManager:
                 # Server keeps a Receiver to read from
                 self._ui_receivers[(node_id, slot)] = Receiver(ch)
 
+            # Wire all receivers (registers cursors before EmitOnStart)
+            if isinstance(comp, ThreadedComponent):
+                for handle in input_handles.values():
+                    if isinstance(handle, Receiver):
+                        handle._wire(comp.stop_event)
+
             inputs = self._build_tuple(input_type, input_handles)
             outputs = self._build_tuple(output_type, output_handles)
 
@@ -401,6 +409,10 @@ class GraphManager:
         return tuple(handles[k] for k in sorted(handles.keys()))
 
     def stop(self) -> None:
-        """Stop all components."""
+        """Stop all components and senders."""
+        for sender in self._sender_handles.values():
+            sender._stopped = True
+        for sender in self._ui_senders.values():
+            sender._stopped = True
         for comp in self._components.values():
             comp.stop()

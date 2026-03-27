@@ -204,7 +204,7 @@ class Mem0(ThreadedComponent[Mem0Inputs, Mem0Outputs]):
     def run(self, inputs: Mem0Inputs, outputs: Mem0Outputs) -> None:
         print("[Mem0] Starting Memory component")
 
-        for frame in inputs.messages(self):
+        for frame in inputs.messages:
             if frame is None:
                 break
             if not frame:

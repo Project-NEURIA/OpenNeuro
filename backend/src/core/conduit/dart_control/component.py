@@ -743,16 +743,12 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         current_goal: torch.Tensor | None = None
 
         # Set up non-blocking generators for input channels
-        goal_gen = (
-            inputs.goal(self, newest=True, no_block=True)
-            if inputs.goal is not None
-            else None
-        )
-        instruction_gen = (
-            inputs.instruction(self, newest=True, no_block=True)
-            if inputs.instruction is not None
-            else None
-        )
+        if inputs.goal is not None:
+            inputs.goal.newest = True
+            inputs.goal.blocking = False
+        if inputs.instruction is not None:
+            inputs.instruction.newest = True
+            inputs.instruction.blocking = False
 
         print("[DartControl] Idle, waiting for instruction...")
         frame_interval = 1.0 / self.config.fps
@@ -764,8 +760,8 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         while not self.stop_event.is_set():
             try:
                 # Poll instruction channel (non-blocking)
-                if instruction_gen is not None:
-                    instr_frame = next(instruction_gen)
+                if inputs.instruction is not None:
+                    instr_frame = next(inputs.instruction)
                     if instr_frame is not None and isinstance(instr_frame, TextFrame):
                         new_instruction = instr_frame.get()
                         if new_instruction and new_instruction != instruction:
@@ -787,8 +783,8 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                     continue
 
                 # Poll goal channel (non-blocking)
-                if goal_gen is not None:
-                    goal_frame = next(goal_gen)
+                if inputs.goal is not None:
+                    goal_frame = next(inputs.goal)
                     if goal_frame is not None and isinstance(goal_frame, GoalFrame):
                         current_goal = torch.tensor(
                             [[-goal_frame.x, -goal_frame.z, goal_frame.y]],
