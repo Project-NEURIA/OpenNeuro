@@ -136,6 +136,7 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
             input_features = features.input_features.squeeze(0).astype(np.float32)
             input_features = np.expand_dims(input_features, axis=0)
 
+            assert self._smart_turn_session is not None
             results = self._smart_turn_session.run(
                 None, {"input_features": input_features}
             )
