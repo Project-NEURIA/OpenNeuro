@@ -2,78 +2,36 @@
 
 ## Overview
 
-We profiled the **Time to First Audio (TTFA)** of our voice agent pipeline:
+We profiled 5 important functions in our voice agent pipeline using Python's `cProfile` module:
 
-```
-Microphone → VAD → ASR → LLM → TTS → Speaker
-```
+| # | Function | Component | What it does |
+|---|----------|-----------|-------------|
+| 1 | `VAD._process_audio_frame` | Voice Activity Detection | Runs Silero VAD inference on each 20ms audio chunk to detect speech |
+| 2 | `ASR._transcribe_audio` | Speech-to-Text | Sends audio to Groq Whisper API for transcription |
+| 3 | `LLM` TTFT via `litellm.completion` | Language Model | Calls Groq LLM API and streams tokens back |
+| 4 | `TTS` TTFB via `requests.post` | Text-to-Speech | Calls Inworld TTS API and streams audio back |
+| 5 | `Channel.send` / `Channel._wait_and_get` | Inter-thread messaging | Passes data (frames) between pipeline components |
 
-TTFA is the end-to-end latency from the user finishing speaking to the first byte of agent audio reaching the speaker. It is the primary quality metric for voice agents — humans expect responses within ~300ms; above ~800ms the conversation feels broken.
+Functions 1–4 form the audio pipeline that determines **Time to First Audio (TTFA)** — the latency from end-of-speech to first agent audio. Function 5 is the glue that connects them.
 
-We profiled 4 key functions using Python's `cProfile` module. The profiler has two modes:
-- **Sequential mode**: Runs each component one-at-a-time, feeding output → input. Each function gets its own dedicated `cProfile` session with no contention.
-- **Pipeline mode**: Runs the full pipeline in parallel with wall-clock `time.perf_counter()` timestamps to measure real TTFA.
-
+We first profile each audio pipeline function individually with cProfile (Section 1), then measure end-to-end TTFA in the full parallel pipeline (Section 2). Finally, we benchmark the Channel throughput against `threading.Queue` (Section 3).
 
 ### Test Setup
 
 - **Audio input**: Synthetic speech generated via macOS `say` (4.4s, 48kHz mono)
-- **Pipeline**: FileSource → VAD → ASR → LLM → TTS → NullSink
 - **ASR**: Groq Whisper API (`whisper-large-v3-turbo`)
 - **LLM**: Groq `llama-3.3-70b-versatile` (default), also tested OpenAI `gpt-5.4`
 - **TTS**: Inworld TTS API (`inworld-tts-1.5-max`)
 
 ---
 
-## TTFA Results
+## 1. cProfile Analysis (per-function)
 
-| Metric | Value |
-|--------|-------|
-| **TTFA (VAD-end → first TTS audio)** | **1,330 ms** (avg over 10 runs) |
+Each function was profiled individually with its own `cProfile` session, running components one at a time and feeding output → input sequentially.
 
-TTFA is measured from the moment VAD finalizes the user's speech segment (end-of-utterance) to the first TTS audio chunk arriving at the sink. Each run is a separate process to avoid caching effects.
+### 1.1 `VAD._process_audio_frame` — 219 calls, 81ms total (0.4ms/call)
 
-### TTFA Breakdown (averaged over 10 pipeline runs)
-
-Each stage is measured independently — no overlap or double-counting:
-
-| Stage | Avg | Min | Max | What it measures |
-|-------|-----|-----|-----|-----------------|
-| ASR (speech-to-text) | 310 ms | 169 ms | 820 ms | VAD-end → ASR transcription complete |
-| LLM TTFT (first token) | 613 ms | 453 ms | 732 ms | ASR-done → first LLM token streamed |
-| TTS TTFB (first audio) | 406 ms | 305 ms | 589 ms | First LLM token → first TTS audio chunk |
-| **TTFA** | **1,330 ms** | **1,033 ms** | **1,873 ms** | **VAD-end → first TTS audio (sum of above)** |
-
-### Pipeline Hop Analysis
-
-Using `pipeline_hop_test.py`, we confirmed there is no hidden overhead in the channel/thread infrastructure:
-
-| Hop | Latency |
-|-----|---------|
-| VAD finalize (segment concat) | 1 ms |
-| VAD → ASR channel transit | 0 ms |
-| ASR → Adapter → LLM channel transit | 0 ms |
-
-
-### LLM TTFT Comparison (Isolated)
-
-Using `llm_ttft_test.py`, we measured raw LLM TTFT with no pipeline overhead:
-
-| Model | Avg TTFT | Min | Max |
-|-------|----------|-----|-----|
-| Groq `llama-3.3-70b-versatile` | 390 ms | 257 ms | 646 ms |
-| OpenAI `gpt-5.4` | 875 ms | 458 ms | 1,566 ms |
-| OpenAI `gpt-4.1-nano` | 1,157 ms | 924 ms | 1,437 ms |
-
-Groq is the fastest due to their custom LPU inference hardware. OpenAI models show higher variance.
-
----
-
-## cProfile Analysis
-
-### 1. `VAD._process_audio_frame` — 219 calls, 81ms total (0.4ms/call)
-
-The VAD processes every 20ms audio chunk. Without Smart Turn (which only triggers during silence in the full pipeline), the hot path is Silero VAD inference:
+The VAD processes every 20ms audio chunk. The hot path is Silero VAD inference:
 
 | Function | Cumulative Time | Notes |
 |----------|----------------|-------|
@@ -82,9 +40,9 @@ The VAD processes every 20ms audio chunk. Without Smart Turn (which only trigger
 | `torch.tensor` | 4 ms | Converting audio chunks for Silero |
 | `deque.popleft` | 3 ms | VAD buffer management |
 
-In the pipeline, Smart Turn ONNX inference adds significant overhead when it runs during silence detection (~13ms per chunk), but the core VAD loop itself is very fast.
+In the pipeline, Smart Turn ONNX inference adds ~13ms per chunk during silence detection, but the core VAD loop itself is very fast.
 
-### 2. `ASR._transcribe_audio` — 1 call, 553ms
+### 1.2 `ASR._transcribe_audio` — 1 call, 553ms
 
 Dominated entirely by the Groq Whisper HTTP API call:
 
@@ -97,7 +55,7 @@ Dominated entirely by the Groq Whisper HTTP API call:
 
 99% of time is network I/O.
 
-### 3. `LLM` TTFT (`litellm.completion` → first token) — 540ms
+### 1.3 `LLM` TTFT (`litellm.completion` → first token) — 540ms
 
 cProfile captures the full `litellm.completion()` call up to the first streaming token:
 
@@ -110,7 +68,7 @@ cProfile captures the full `litellm.completion()` call up to the first streaming
 
 **Key finding**: 312ms (58%) of the TTFT is litellm's tokenizer initialization (`from_pretrained`), not the actual API call. On subsequent calls this is cached and the real TTFT drops to ~200ms.
 
-### 4. `TTS` `requests.post` (Inworld API) — 522ms
+### 1.4 `TTS` `requests.post` (Inworld API) — 522ms
 
 Profiles the Inworld TTS API call including streaming audio response:
 
@@ -126,42 +84,81 @@ TLS handshake (122ms) is a significant fixed cost per request.
 
 ---
 
-## Improvement Suggestions
+## 2. End-to-End Pipeline TTFA
 
-### 1. `LLM` TTFT — Warm up tokenizer (613ms, 46% of TTFA)
+After profiling each function individually, we ran the full pipeline in parallel to measure real TTFA:
 
-**Problem**: LLM TTFT is the single largest contributor to TTFA. cProfile reveals 312ms of the 540ms is litellm loading the tokenizer via `from_pretrained`. The actual API call is only ~200ms.
+```
+FileSource → VAD → ASR → LLM → TTS → NullSink
+```
 
-**Improvement**: Call `litellm.completion()` once at startup (with a dummy prompt) so the tokenizer is cached before real requests.
+TTFA is measured from the moment VAD finalizes the user's speech segment (end-of-utterance) to the first TTS audio chunk arriving at the sink. Each run is a separate process to avoid caching effects.
 
-### 2. `TTS` `requests.post` — Pre-warm TLS connection (406ms, 31% of TTFA)
+### TTFA Breakdown (averaged over 10 pipeline runs)
+
+| Stage | Avg | Min | Max | What it measures |
+|-------|-----|-----|-----|-----------------|
+| ASR (speech-to-text) | 310 ms | 169 ms | 820 ms | VAD-end → ASR transcription complete |
+| LLM TTFT (first token) | 613 ms | 453 ms | 732 ms | ASR-done → first LLM token streamed |
+| TTS TTFB (first audio) | 406 ms | 305 ms | 589 ms | First LLM token → first TTS audio chunk |
+| **TTFA** | **1,330 ms** | **1,033 ms** | **1,873 ms** | **VAD-end → first TTS audio (sum of above)** |
+
+### Pipeline Hop Analysis
+
+We confirmed there is no hidden overhead in the channel/thread infrastructure:
+
+| Hop | Latency |
+|-----|---------|
+| VAD finalize (segment concat) | 1 ms |
+| VAD → ASR channel transit | 0 ms |
+| ASR → Adapter → LLM channel transit | 0 ms |
+
+### LLM TTFT Comparison (Isolated)
+
+We measured raw LLM TTFT with no pipeline overhead:
+
+| Model | Avg TTFT | Min | Max |
+|-------|----------|-----|-----|
+| Groq `llama-3.3-70b-versatile` | 390 ms | 257 ms | 646 ms |
+| OpenAI `gpt-5.4` | 875 ms | 458 ms | 1,566 ms |
+| OpenAI `gpt-4.1-nano` | 1,157 ms | 924 ms | 1,437 ms |
+
+Groq is the fastest due to their custom LPU inference hardware.
+
+### Improvement Suggestions
+
+#### 1. `LLM` TTFT — Warm up tokenizer (613ms, 46% of TTFA)
+
+**Problem**: cProfile reveals 312ms of the 540ms is litellm loading the tokenizer via `from_pretrained`.
+
+**Improvement**: Call `litellm.completion()` once at startup so the tokenizer is cached before real requests.
+
+#### 2. `TTS` `requests.post` — Pre-warm TLS connection (406ms, 31% of TTFA)
 
 **Problem**: TLS handshake to Inworld costs 122ms per request. Each TTS sentence creates a new connection.
 
-**Improvement**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests, eliminating the 122ms handshake after the first call.
+**Improvement**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests.
 
-### 3. `ASR._transcribe_audio` — Use streaming ASR (310ms, 23% of TTFA)
+#### 3. `ASR._transcribe_audio` — Use streaming ASR (310ms, 23% of TTFA)
 
-**Problem**: Each API call to Groq Whisper takes ~550ms, and it processes the entire segment at once (batch, not streaming).
+**Problem**: Each API call to Groq Whisper takes ~550ms and processes the entire segment at once.
 
-**Improvement**: Use a WebSocket-based ASR service (e.g., Deepgram, AssemblyAI) that transcribes incrementally as audio arrives, eliminating the segment-level batch delay.
+**Improvement**: Use a WebSocket-based ASR service (e.g., Deepgram) that transcribes incrementally as audio arrives.
 
-### 4. `VAD._process_audio_frame` — Reduce Smart Turn frequency (<5ms/chunk, minimal TTFA impact)
+#### 4. `VAD._process_audio_frame` — Reduce Smart Turn frequency (<5ms/chunk, minimal TTFA impact)
 
-**Problem**: In the pipeline, `_check_smart_turn()` runs ONNX inference (~13ms each) on every audio chunk during silence detection. This doesn't directly affect TTFA (it runs before end-of-utterance), but it wastes CPU.
+**Problem**: `_check_smart_turn()` runs ONNX inference (~13ms) on every audio chunk during silence detection.
 
-**Improvement**: Only run Smart Turn every N chunks (e.g., every 200ms instead of every 20ms). The turn detection doesn't need 50Hz resolution — checking 5x/second is sufficient. This would reduce Smart Turn overhead by ~10x.
+**Improvement**: Only run Smart Turn every 200ms instead of every 20ms. 5x/second is sufficient for turn detection.
 
----
-
-## Results After Implementing Improvements 1 & 2
+### Results After Implementing Improvements 1 & 2
 
 We implemented the top two improvements:
 
-1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt, pre-loading the tokenizer.
-2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`, reusing the TLS connection across requests.
+1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt.
+2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`.
 
-### Before vs After (averaged over 10 pipeline runs, separate processes)
+#### Before vs After (averaged over 10 pipeline runs, separate processes)
 
 | Stage | Before (avg) | After (avg) | Improvement |
 |-------|-------------|-------------|-------------|
@@ -172,9 +169,9 @@ We implemented the top two improvements:
 
 ---
 
-## Channel vs threading.Queue Throughput Benchmark
+## 3. Channel vs threading.Queue Throughput Benchmark
 
-We benchmarked our custom `Channel`/`Sender`/`Receiver` implementation against Python's `threading.Queue` using methodology adapted from the [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor) perftest suite: 100K messages per run, 7 runs per test, `gc.collect()` between runs, correctness checksums on every run.
+We benchmarked our custom `Channel`/`Sender`/`Receiver` (function 5) against Python's `threading.Queue` using methodology adapted from the [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor) perftest suite: 100K messages per run, 7 runs per test, `gc.collect()` between runs, correctness checksums on every run.
 
 ### Throughput (median of 7 runs)
 
