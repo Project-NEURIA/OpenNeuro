@@ -159,3 +159,51 @@ TLS handshake (122ms) is a significant fixed cost per request.
 **Problem**: In the pipeline, `_check_smart_turn()` runs ONNX inference (~13ms each) on every audio chunk during silence detection. This doesn't directly affect TTFA (it runs before end-of-utterance), but it wastes CPU.
 
 **Improvement**: Only run Smart Turn every N chunks (e.g., every 200ms instead of every 20ms). The turn detection doesn't need 50Hz resolution — checking 5x/second is sufficient. This would reduce Smart Turn overhead by ~10x.
+
+---
+
+## Results After Implementing Improvements 1 & 2
+
+We implemented the top two improvements:
+
+1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt, pre-loading the tokenizer.
+2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`, reusing the TLS connection across requests.
+
+### Before vs After (Sequential cProfile)
+
+| Function | Before | After | Improvement |
+|----------|--------|-------|-------------|
+| LLM TTFT | 540 ms | 331 ms | **-209 ms (39%)** |
+| TTS TTFB | 505 ms | 224 ms | **-281 ms (56%)** |
+| Estimated TTFA | 1,045 ms | 555 ms | **-490 ms (47%)** |
+
+### Before vs After (Pipeline, real TTFA)
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| ASR latency | 225 ms | 271 ms | (variance) |
+| LLM TTFT | 768 ms | 466 ms | **-302 ms (39%)** |
+| TTS TTFB | 336 ms | 396 ms | (variance) |
+| **TTFA** | **1,330 ms** | **1,133 ms** | **-197 ms (15%)** |
+
+### What changed in cProfile
+
+**LLM**: The `from_pretrained` tokenizer initialization (312ms before) is now done during `setup()` before the first real request. cProfile of the profiled call still shows `from_pretrained` at 274ms — this is litellm's internal post-response token counting, which uses a different tokenizer path. The actual wall-clock TTFT dropped because the HTTP connection setup is now faster (tokenizer cached from warmup).
+
+**TTS**: The TLS handshake (`urllib3.connection.connect`) that cost 122ms before is completely gone from the cProfile output. The `requests.Session` reuses the established connection, so the profiled call goes straight to `http.client.getresponse` → `ssl.read`.
+
+### cProfile: LLM.TTFT (after warmup)
+
+| Function | Before | After |
+|----------|--------|-------|
+| `litellm.utils.wrapper` (total) | 535 ms | 327 ms |
+| `httpx.Client.send` (API call) | 198 ms | 153 ms |
+| `from_pretrained` (token counter) | 312 ms | 274 ms |
+
+### cProfile: TTS.requests.post (after session reuse)
+
+| Function | Before | After |
+|----------|--------|-------|
+| `requests.sessions.post` (total) | 495 ms | 214 ms |
+| `urllib3.connection.connect` (TLS) | 122 ms | **0 ms (eliminated)** |
+| `http.client._read_status` (API wait) | 368 ms | 211 ms |

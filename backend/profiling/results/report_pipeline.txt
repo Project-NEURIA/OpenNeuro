@@ -2,12 +2,12 @@
 PIPELINE TTFA REPORT
 ================================================================================
 
-  ASR latency (VAD-end → ASR done):    225ms
-  LLM TTFT (ASR done → first token):   768ms
-  TTS TTFB (first token → first audio): 336ms
-  TTFA (VAD-end → first audio):         1330ms
+  ASR latency (VAD-end → ASR done):    271ms
+  LLM TTFT (ASR done → first token):   466ms
+  TTS TTFB (first token → first audio): 396ms
+  TTFA (VAD-end → first audio):         1133ms
 
   Component                       Calls   Avg (ms)
   ------------------------------ ------ ----------
-  VAD._process_audio_frame          220      3.4ms
-  ASR._transcribe_audio               2    194.1ms
+  VAD._process_audio_frame          220      3.3ms
+  ASR._transcribe_audio               2    280.6ms

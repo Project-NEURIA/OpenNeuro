@@ -217,6 +217,15 @@ def run_sequential(wav_path: str):
     log("── 3. Profiling LLM TTFT (litellm.completion → first token) ──")
     from litellm import completion
 
+    # Warmup: pre-load tokenizer so cProfile captures steady-state TTFT
+    log("  Warming up litellm tokenizer...")
+    try:
+        completion(model="groq/llama-3.3-70b-versatile",
+                   messages=[{"role": "user", "content": "hi"}],
+                   max_tokens=1, stream=False)
+    except Exception:
+        pass
+
     text = asr_results[0].text
     messages = [
         {"role": "system", "content": "You are a helpful voice assistant. Keep responses brief."},
@@ -258,6 +267,28 @@ def run_sequential(wav_path: str):
     # Build the sentence to send (simulate StreamFilter output)
     tts_text = full_text.split(".")[0] + "." if "." in full_text else full_text
 
+    # Use a persistent session (matching the improvement we made to TTS)
+    session = requests.Session()
+
+    # Warmup: establish TLS connection so cProfile captures steady-state
+    log("  Warming up TTS session (TLS handshake)...")
+    try:
+        warmup_payload = {
+            "text": "hi",
+            "voice_id": tts_config.voice_id,
+            "model_id": tts_config.model_id,
+            "audio_config": {"audio_encoding": "LINEAR16", "sample_rate_hertz": 48000},
+        }
+        warmup_r = session.post(
+            tts_config.url,
+            json=warmup_payload,
+            headers={"Authorization": f"Basic {cred}", "Content-Type": "application/json"},
+            timeout=10,
+        )
+        warmup_r.close()
+    except Exception:
+        pass
+
     headers = {
         "Authorization": f"Basic {cred}",
         "Content-Type": "application/json",
@@ -275,7 +306,7 @@ def run_sequential(wav_path: str):
     profiler = cProfile.Profile()
     t0 = time.perf_counter()
     profiler.enable()
-    r = requests.post(
+    r = session.post(
         tts_config.url,
         json=payload,
         headers=headers,

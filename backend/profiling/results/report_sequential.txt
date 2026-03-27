@@ -1,20 +1,22 @@
 ── 1. Profiling VAD._process_audio_frame ──
-  219 chunks processed in 82ms (0.4ms/chunk)
+  219 chunks processed in 65ms (0.3ms/chunk)
   VAD output: 1 audio segment(s)
 
 ── 2. Profiling ASR._transcribe_audio ──
-  1 segment(s) transcribed in 554ms (554ms/segment)
+  1 segment(s) transcribed in 384ms (384ms/segment)
   Transcription: 'Hello, how are you doing today? I would like to know more about your project.'
 
 ── 3. Profiling LLM TTFT (litellm.completion → first token) ──
-  TTFT: 540ms
-  Total generation: 553ms, 140 chars
-  Response: 'I'm doing well. I'm a voice assistant, and my project is to assist users with in...'
+  Warming up litellm tokenizer...
+  TTFT: 331ms
+  Total generation: 347ms, 170 chars
+  Response: 'I'm doing well, thanks. I'm an AI designed to assist and provide information. My...'
 
 ── 4. Profiling TTS requests.post (Inworld API) ──
-  TTS TTFB: 505ms
-  Total: 522ms, 3 audio chunks
-  Input text: 'I'm doing well.'
+  Warming up TTS session (TLS handshake)...
+  TTS TTFB: 224ms
+  Total: 377ms, 3 audio chunks
+  Input text: 'I'm doing well, thanks.'
 
 ================================================================================
 SEQUENTIAL PROFILING SUMMARY
@@ -22,45 +24,45 @@ SEQUENTIAL PROFILING SUMMARY
 
   Function                          Wall Time
   ------------------------------ ------------
-  VAD._process_audio_frame              522ms
-  VAD._process_audio_frame               81ms (cProfile)
-  ASR._transcribe_audio                 553ms (cProfile)
-  LLM.TTFT                              540ms (cProfile)
-  TTS.requests.post                     522ms (cProfile)
+  VAD._process_audio_frame              377ms
+  VAD._process_audio_frame               64ms (cProfile)
+  ASR._transcribe_audio                 382ms (cProfile)
+  LLM.TTFT                              331ms (cProfile)
+  TTS.requests.post                     377ms (cProfile)
 
   Estimated TTFA = ASR + LLM TTFT + TTS TTFB
-                ≈ 0 + 540 + 505 = 1045ms
+                ≈ 0 + 331 + 224 = 555ms
 
 ================================================================================
 cProfile: VAD._process_audio_frame
 ================================================================================
   Saved: /Users/kevin/PycharmProjects/OpenNeuro/backend/profiling/results/VAD__process_audio_frame.prof
-         85188 function calls (84698 primitive calls) in 0.081 seconds
+         85188 function calls (84698 primitive calls) in 0.064 seconds
 
    Ordered by: cumulative time
    List reduced from 85 to 20 due to restriction <20>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-      137    0.000    0.000    0.060    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1775(_wrapped_call_impl)
-      137    0.059    0.000    0.060    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1783(_call_impl)
+      137    0.000    0.000    0.044    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1775(_wrapped_call_impl)
+      137    0.043    0.000    0.043    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py:1783(_call_impl)
       440    0.001    0.000    0.004    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/frames.py:109(get)
       137    0.004    0.000    0.004    0.000 {built-in method torch.tensor}
     70144    0.003    0.000    0.003    0.000 {method 'popleft' of 'collections.deque' objects}
       220    0.000    0.000    0.002    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py:1538(interp)
-      220    0.002    0.000    0.002    0.000 {built-in method numpy._core._multiarray_umath.interp}
       220    0.001    0.000    0.001    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/numpy/_core/function_base.py:27(linspace)
+      220    0.001    0.000    0.001    0.000 {built-in method numpy._core._multiarray_umath.interp}
         1    0.000    0.000    0.001    0.001 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/conduit/vad.py:203(_finalize_segment)
         1    0.001    0.001    0.001    0.001 /Users/kevin/.cache/torch/hub/snakers4_silero-vad_master/src/silero_vad/utils_vad.py:499(reset_states)
       221    0.000    0.000    0.001    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/frames.py:50(new)
-    219/1    0.006    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/conduit/vad.py:142(_process_audio_frame)
       220    0.000    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/numpy/_core/shape_base.py:378(stack)
       220    0.000    0.000    0.000    0.000 {method 'tolist' of 'numpy.ndarray' objects}
-        1    0.000    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/jit/_script.py:843(__getattr__)
-      137    0.000    0.000    0.000    0.000 {method 'item' of 'torch._C.TensorBase' objects}
-      441    0.000    0.000    0.000    0.000 {method 'astype' of 'numpy.ndarray' objects}
-      274    0.000    0.000    0.000    0.000 {method 'dim' of 'torch._C.TensorBase' objects}
       715    0.000    0.000    0.000    0.000 {built-in method builtins.len}
+      441    0.000    0.000    0.000    0.000 {method 'astype' of 'numpy.ndarray' objects}
       440    0.000    0.000    0.000    0.000 {built-in method numpy.arange}
+      137    0.000    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/utils/_contextlib.py:154(clone)
+      274    0.000    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/autograd/grad_mode.py:184(__init__)
+      220    0.000    0.000    0.000    0.000 {method 'extend' of 'collections.deque' objects}
+      137    0.000    0.000    0.000    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/torch/autograd/grad_mode.py:84(__exit__)
 
 
 
@@ -68,32 +70,32 @@ cProfile: VAD._process_audio_frame
 cProfile: ASR._transcribe_audio
 ================================================================================
   Saved: /Users/kevin/PycharmProjects/OpenNeuro/backend/profiling/results/ASR__transcribe_audio.prof
-         6596 function calls (6344 primitive calls) in 0.553 seconds
+         6596 function calls (6344 primitive calls) in 0.382 seconds
 
    Ordered by: cumulative time
    List reduced from 739 to 20 due to restriction <20>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-        1    0.000    0.000    0.553    0.553 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/conduit/asr.py:91(_transcribe_audio)
-        1    0.000    0.000    0.550    0.550 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:103(post)
-        1    0.000    0.000    0.550    0.550 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:14(request)
-        1    0.000    0.000    0.550    0.550 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:503(request)
-        1    0.000    0.000    0.549    0.549 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:676(send)
-        1    0.000    0.000    0.548    0.548 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/adapters.py:591(send)
-        1    0.000    0.000    0.547    0.547 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:592(urlopen)
-        1    0.000    0.000    0.547    0.547 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:377(_make_request)
-        1    0.000    0.000    0.467    0.467 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:540(getresponse)
-        1    0.000    0.000    0.466    0.466 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:1384(getresponse)
-        1    0.000    0.000    0.466    0.466 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:324(begin)
-       26    0.000    0.000    0.465    0.018 {method 'readline' of '_io.BufferedReader' objects}
-        2    0.000    0.000    0.465    0.233 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/socket.py:706(readinto)
-        1    0.000    0.000    0.465    0.465 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:291(_read_status)
-        2    0.000    0.000    0.465    0.233 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1289(recv_into)
-        2    0.000    0.000    0.465    0.233 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1129(read)
-        2    0.465    0.233    0.465    0.233 {method 'read' of '_ssl._SSLSocket' objects}
-        1    0.000    0.000    0.072    0.072 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:1085(_validate_conn)
-        1    0.000    0.000    0.072    0.072 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:724(connect)
-        1    0.000    0.000    0.051    0.051 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:198(_new_conn)
+        1    0.000    0.000    0.382    0.382 /Users/kevin/PycharmProjects/OpenNeuro/backend/src/core/conduit/asr.py:91(_transcribe_audio)
+        1    0.000    0.000    0.379    0.379 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:103(post)
+        1    0.000    0.000    0.379    0.379 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:14(request)
+        1    0.000    0.000    0.378    0.378 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:503(request)
+        1    0.000    0.000    0.377    0.377 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:676(send)
+        1    0.000    0.000    0.376    0.376 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/adapters.py:591(send)
+        1    0.000    0.000    0.375    0.375 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:592(urlopen)
+        1    0.000    0.000    0.375    0.375 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:377(_make_request)
+        1    0.000    0.000    0.339    0.339 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:540(getresponse)
+        1    0.000    0.000    0.338    0.338 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:1384(getresponse)
+        1    0.000    0.000    0.338    0.338 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:324(begin)
+       26    0.000    0.000    0.337    0.013 {method 'readline' of '_io.BufferedReader' objects}
+        2    0.000    0.000    0.337    0.168 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/socket.py:706(readinto)
+        1    0.000    0.000    0.337    0.337 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:291(_read_status)
+        2    0.000    0.000    0.337    0.168 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1289(recv_into)
+        2    0.000    0.000    0.337    0.168 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1129(read)
+        2    0.337    0.168    0.337    0.168 {method 'read' of '_ssl._SSLSocket' objects}
+        1    0.000    0.000    0.027    0.027 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:1085(_validate_conn)
+        1    0.000    0.000    0.027    0.027 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:724(connect)
+        1    0.000    0.000    0.018    0.018 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:901(_ssl_wrap_socket_and_match_hostname)
 
 
 
@@ -101,32 +103,32 @@ cProfile: ASR._transcribe_audio
 cProfile: LLM.TTFT
 ================================================================================
   Saved: /Users/kevin/PycharmProjects/OpenNeuro/backend/profiling/results/LLM_TTFT.prof
-         666326 function calls (664097 primitive calls) in 0.540 seconds
+         29785 function calls (29018 primitive calls) in 0.331 seconds
 
    Ordered by: cumulative time
-   List reduced from 1412 to 20 due to restriction <20>
+   List reduced from 1225 to 20 due to restriction <20>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-        1    0.000    0.000    0.535    0.535 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:1425(wrapper)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/llm_response_utils/response_metadata.py:174(update_response_metadata)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/llm_response_utils/response_metadata.py:36(set_hidden_params)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/litellm_logging.py:1429(_response_cost_calculator)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/cost_calculator.py:1645(response_cost_calculator)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/cost_calculator.py:1011(completion_cost)
-        1    0.000    0.000    0.314    0.314 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2291(token_counter)
-        1    0.000    0.000    0.312    0.312 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/token_counter.py:349(token_counter)
-        1    0.000    0.000    0.312    0.312 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/token_counter.py:518(_get_count_function)
-        1    0.000    0.000    0.312    0.312 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2163(_select_tokenizer)
-        1    0.000    0.000    0.312    0.312 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2176(_select_tokenizer_helper)
-        1    0.000    0.000    0.312    0.312 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2196(_return_huggingface_tokenizer)
-        1    0.171    0.171    0.312    0.312 {built-in method from_pretrained}
-        1    0.000    0.000    0.217    0.217 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/main.py:1048(completion)
-        4    0.000    0.000    0.198    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:879(send)
-        4    0.000    0.000    0.197    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:930(_send_handling_auth)
-        4    0.000    0.000    0.197    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:964(_send_handling_redirects)
-        4    0.000    0.000    0.196    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:1001(_send_single_request)
-        4    0.000    0.000    0.195    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_transports/default.py:230(handle_request)
-        4    0.000    0.000    0.195    0.049 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py:199(handle_request)
+        1    0.000    0.000    0.327    0.327 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:1425(wrapper)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/llm_response_utils/response_metadata.py:174(update_response_metadata)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/llm_response_utils/response_metadata.py:36(set_hidden_params)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/litellm_logging.py:1429(_response_cost_calculator)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/cost_calculator.py:1645(response_cost_calculator)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/cost_calculator.py:1011(completion_cost)
+        1    0.000    0.000    0.275    0.275 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2291(token_counter)
+        1    0.000    0.000    0.274    0.274 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/token_counter.py:349(token_counter)
+        1    0.000    0.000    0.274    0.274 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/litellm_core_utils/token_counter.py:518(_get_count_function)
+        1    0.000    0.000    0.274    0.274 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2163(_select_tokenizer)
+        1    0.000    0.000    0.274    0.274 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2176(_select_tokenizer_helper)
+        1    0.000    0.000    0.274    0.274 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/litellm/utils.py:2196(_return_huggingface_tokenizer)
+        1    0.152    0.152    0.274    0.274 {built-in method from_pretrained}
+        4    0.000    0.000    0.153    0.038 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:879(send)
+        4    0.000    0.000    0.152    0.038 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:930(_send_handling_auth)
+        4    0.000    0.000    0.152    0.038 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:964(_send_handling_redirects)
+        4    0.000    0.000    0.151    0.038 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_client.py:1001(_send_single_request)
+        4    0.000    0.000    0.150    0.037 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpx/_transports/default.py:230(handle_request)
+        4    0.000    0.000    0.149    0.037 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py:199(handle_request)
+        4    0.000    0.000    0.149    0.037 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/httpcore/_sync/connection.py:69(handle_request)
 
 
 
@@ -134,31 +136,31 @@ cProfile: LLM.TTFT
 cProfile: TTS.requests.post
 ================================================================================
   Saved: /Users/kevin/PycharmProjects/OpenNeuro/backend/profiling/results/TTS_requests_post.prof
-         9203 function calls (9092 primitive calls) in 0.522 seconds
+         8374 function calls (8281 primitive calls) in 0.377 seconds
 
    Ordered by: cumulative time
-   List reduced from 669 to 20 due to restriction <20>
+   List reduced from 425 to 20 due to restriction <20>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-      2/1    0.000    0.000    0.495    0.495 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:103(post)
-        1    0.000    0.000    0.495    0.495 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/api.py:14(request)
-        1    0.000    0.000    0.495    0.495 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:503(request)
-        1    0.000    0.000    0.493    0.493 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:676(send)
-        1    0.000    0.000    0.493    0.493 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/adapters.py:591(send)
-        1    0.000    0.000    0.492    0.492 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:592(urlopen)
-        1    0.000    0.000    0.492    0.492 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:377(_make_request)
-      117    0.000    0.000    0.371    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/socket.py:706(readinto)
-      117    0.000    0.000    0.371    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1289(recv_into)
-      117    0.000    0.000    0.370    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1129(read)
-      117    0.370    0.003    0.370    0.003 {method 'read' of '_ssl._SSLSocket' objects}
-        1    0.000    0.000    0.370    0.370 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:540(getresponse)
-        1    0.000    0.000    0.369    0.369 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:1384(getresponse)
-        1    0.000    0.000    0.369    0.369 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:324(begin)
-       27    0.000    0.000    0.368    0.014 {method 'readline' of '_io.BufferedReader' objects}
-        1    0.000    0.000    0.368    0.368 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:291(_read_status)
-        1    0.000    0.000    0.122    0.122 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:1085(_validate_conn)
-        1    0.000    0.000    0.122    0.122 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:724(connect)
-        1    0.000    0.000    0.074    0.074 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:198(_new_conn)
-        1    0.000    0.000    0.074    0.074 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/util/connection.py:27(create_connection)
+      134    0.000    0.000    0.357    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/socket.py:706(readinto)
+      134    0.000    0.000    0.357    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1289(recv_into)
+      134    0.000    0.000    0.357    0.003 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/ssl.py:1129(read)
+      134    0.357    0.003    0.357    0.003 {method 'read' of '_ssl._SSLSocket' objects}
+       28    0.000    0.000    0.342    0.012 {method 'readline' of '_io.BufferedReader' objects}
+        1    0.000    0.000    0.214    0.214 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:629(post)
+        1    0.000    0.000    0.214    0.214 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:503(request)
+        1    0.000    0.000    0.213    0.213 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/sessions.py:676(send)
+        1    0.000    0.000    0.213    0.213 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/adapters.py:591(send)
+        1    0.000    0.000    0.212    0.212 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:592(urlopen)
+        1    0.000    0.000    0.212    0.212 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py:377(_make_request)
+        1    0.000    0.000    0.212    0.212 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/connection.py:540(getresponse)
+        1    0.000    0.000    0.212    0.212 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:1384(getresponse)
+        1    0.000    0.000    0.212    0.212 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:324(begin)
+        1    0.000    0.000    0.211    0.211 /Users/kevin/.local/share/uv/python/cpython-3.13.1-macos-aarch64-none/lib/python3.13/http/client.py:291(_read_status)
+        4    0.001    0.000    0.161    0.040 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/models.py:859(iter_lines)
+      356    0.000    0.000    0.148    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/requests/models.py:818(generate)
+      356    0.000    0.000    0.148    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/response.py:1231(stream)
+      356    0.001    0.000    0.148    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/response.py:1368(read_chunked)
+      356    0.000    0.000    0.131    0.000 /Users/kevin/PycharmProjects/OpenNeuro/backend/.venv/lib/python3.13/site-packages/urllib3/response.py:1328(_update_chunk_length)
 
 
