@@ -197,10 +197,10 @@ class GraphManager:
         return self._ui_receivers
 
     def get_node_output(self, node_id: str) -> dict[str, type]:
-        return type(self._components[node_id]).get_output_types()
+        return self._components[node_id].get_output_types()
 
     def get_node_input(self, node_id: str) -> dict[str, type]:
-        return type(self._components[node_id]).get_input_types()
+        return self._components[node_id].get_input_types()
 
     def reset(self, graph: Graph) -> None:
         """Stop everything and replace with a new graph + components."""
@@ -327,6 +327,9 @@ class GraphManager:
             ui_input_slots = comp.get_ui_input_types()
             ui_output_slots = comp.get_ui_output_types()
 
+            from src.core.component import CompositeComponent
+            is_composite = isinstance(comp, CompositeComponent)
+
             input_handles: dict[str, Receiver[Any] | None] = {}
             for slot, slot_type in input_slots.items():
                 rkey: ReceiverKey = (node_id, slot)
@@ -372,12 +375,16 @@ class GraphManager:
                     if isinstance(handle, Receiver):
                         handle._wire(comp.stop_event)
 
-            inputs = self._build_tuple(input_type, input_handles)
-            outputs = self._build_tuple(output_type, output_handles)
+            if is_composite:
+                built_inputs: Any = input_handles
+                built_outputs: Any = output_handles
+            else:
+                built_inputs = self._build_tuple(input_type, input_handles)
+                built_outputs = self._build_tuple(output_type, output_handles)
 
             if isinstance(comp, EmitOnStart):
-                comp.emit(outputs)
-            start_queue.append((node_id, comp, inputs, outputs))
+                comp.emit(built_outputs)
+            start_queue.append((node_id, comp, built_inputs, built_outputs))
 
         # Start all components after all emits are done
         for node_id, comp, inputs, outputs in start_queue:

@@ -16,3 +16,5 @@ class ComponentInfo(BaseModel):
     outputs: dict[str, str]
     ui_inputs: dict[str, str]
     ui_outputs: dict[str, str]
+    is_composite: bool = False
+    has_thumbnail: bool = False

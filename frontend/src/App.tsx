@@ -750,7 +750,7 @@ function AppInner({
                 onNodeContextMenu={onNodeContextMenu}
                 onPaneClick={() => setContextMenu(null)}
             />
-            <NodeSidebar components={components} projects={projects} currentProject={projectName}/>
+            <NodeSidebar components={components} currentProject={projectName}/>
 
             {/* Context menu */}
             {contextMenu && (
