@@ -14,7 +14,6 @@ We profiled 4 key functions using Python's `cProfile` module. The profiler has t
 - **Sequential mode**: Runs each component one-at-a-time, feeding output → input. Each function gets its own dedicated `cProfile` session with no contention.
 - **Pipeline mode**: Runs the full pipeline in parallel with wall-clock `time.perf_counter()` timestamps to measure real TTFA.
 
-All profiling was done via monkey-patching — no existing source code was modified.
 
 ### Test Setup
 
@@ -129,30 +128,16 @@ TLS handshake (122ms) is a significant fixed cost per request.
 
 ## Improvement Suggestions
 
-### 1. `VAD._process_audio_frame` — Reduce Smart Turn frequency
+### 1. `LLM` TTFT — Warm up tokenizer and use prompt caching (768ms, 58% of TTFA)
 
-**Problem**: In the pipeline, `_check_smart_turn()` runs ONNX inference (~13ms each) on every audio chunk during silence detection.
-
-**Improvement**: Only run Smart Turn every N chunks (e.g., every 200ms instead of every 20ms). The turn detection doesn't need 50Hz resolution — checking 5x/second is sufficient. This would reduce Smart Turn overhead by ~10x.
-
-### 2. `ASR._transcribe_audio` — Use streaming ASR or local model
-
-**Problem**: Each API call to Groq Whisper takes ~550ms, and it processes the entire segment at once (batch, not streaming).
+**Problem**: LLM TTFT is the single largest contributor to TTFA. cProfile reveals 312ms of the 540ms is litellm loading the tokenizer via `from_pretrained`. The actual API call is only ~200ms.
 
 **Improvement options**:
-- **Streaming ASR**: Use a WebSocket-based ASR service (e.g., Deepgram, AssemblyAI) that transcribes incrementally as audio arrives, eliminating the segment-level batch delay.
-- **Local Whisper**: Run `whisper.cpp` or `faster-whisper` locally. For short utterances (<3s), local inference on Apple Silicon can be faster than a network round-trip.
-
-### 3. `LLM` TTFT — Warm up tokenizer and use prompt caching
-
-**Problem**: 312ms of the 540ms TTFT is litellm loading the tokenizer via `from_pretrained`. The actual API call is only ~200ms.
-
-**Improvement options**:
-- **Warm up tokenizer**: Call `litellm.completion()` once at startup (with a dummy prompt) so the tokenizer is cached before real requests.
+- **Warm up tokenizer**: Call `litellm.completion()` once at startup (with a dummy prompt) so the tokenizer is cached before real requests. This alone saves ~312ms on the first call.
 - **Prompt caching**: Groq and OpenAI support prompt caching for repeated system prompts. The system message is identical every turn — caching avoids re-processing it.
 - **Smaller model**: `llama-3.1-8b` on Groq has ~100ms TTFT vs ~390ms for 70b.
 
-### 4. `TTS` `requests.post` — Pre-warm TLS connection
+### 2. `TTS` `requests.post` — Pre-warm TLS connection (336ms, 25% of TTFA)
 
 **Problem**: TLS handshake to Inworld costs 122ms per request. Each TTS sentence creates a new connection.
 
@@ -160,3 +145,17 @@ TLS handshake (122ms) is a significant fixed cost per request.
 - **Persistent connection**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests, eliminating the 122ms handshake after the first call.
 - **Smaller chunk threshold**: Send to TTS after a clause boundary (comma, dash) or after N tokens, not just sentence boundaries. This trades naturalness for speed.
 - **Filler audio**: Play a brief filler sound ("Let me think...") immediately while waiting for the first real TTS chunk.
+
+### 3. `ASR._transcribe_audio` — Use streaming ASR or local model (225ms, 17% of TTFA)
+
+**Problem**: Each API call to Groq Whisper takes ~550ms, and it processes the entire segment at once (batch, not streaming).
+
+**Improvement options**:
+- **Streaming ASR**: Use a WebSocket-based ASR service (e.g., Deepgram, AssemblyAI) that transcribes incrementally as audio arrives, eliminating the segment-level batch delay.
+- **Local Whisper**: Run `whisper.cpp` or `faster-whisper` locally. For short utterances (<3s), local inference on Apple Silicon can be faster than a network round-trip.
+
+### 4. `VAD._process_audio_frame` — Reduce Smart Turn frequency (<5ms/chunk, minimal TTFA impact)
+
+**Problem**: In the pipeline, `_check_smart_turn()` runs ONNX inference (~13ms each) on every audio chunk during silence detection. This doesn't directly affect TTFA (it runs before end-of-utterance), but it wastes CPU.
+
+**Improvement**: Only run Smart Turn every N chunks (e.g., every 200ms instead of every 20ms). The turn detection doesn't need 50Hz resolution — checking 5x/second is sufficient. This would reduce Smart Turn overhead by ~10x.
