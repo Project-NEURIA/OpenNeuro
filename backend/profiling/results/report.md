@@ -211,8 +211,3 @@ Note: For 1P3C, Channel broadcasts with a single `send()` while Queue requires 3
 
 Channel has slightly lower median latency and much lower max (30µs vs 70µs).
 
-### Potential improvements
-
-1. **Batch `_gc()`**: Only run GC every N receives instead of every receive
-2. **`notify()` instead of `notify_all()`**: For single-consumer channels, wake one thread instead of all
-3. **Lazy metrics**: Only compute `sys.getsizeof` and `time.time` when metrics are actually polled, not on every send
