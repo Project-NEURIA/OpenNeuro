@@ -119,6 +119,16 @@ def test_subgraph_create_and_ungroup(monkeypatch) -> None:
     assert "c1" not in m.graph.nodes
     assert "n1" in m.graph.nodes
 
+    # Exercise fallback rewiring branches when slot names do not contain dots.
+    c2, _ = m.add_composite_node("C2", Graph(nodes={"n1": m.graph.nodes["n1"]}, edges=[]))
+    m.graph.edges.append(
+        Edge(source_node="outside", source_slot="out", target_node=c2, target_slot="plain")
+    )
+    m.graph.edges.append(
+        Edge(source_node=c2, source_slot="plain", target_node="outside", target_slot="in")
+    )
+    node_service.ungroup(m, c2)
+
 
 def test_subgraph_validation_errors() -> None:
     m = _FakeManager()

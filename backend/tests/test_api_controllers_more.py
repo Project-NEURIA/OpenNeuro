@@ -20,6 +20,7 @@ from src.api.graph.node.dto import (
 )
 from src.api.graph.edge.dto import EdgeCreateRequest
 from src.core.graph import Graph, Node
+from src.core.component import CompositeComponent
 from src.core.channel import Channel, Receiver, Sender
 from src.core.frames import TextFrame
 
@@ -139,6 +140,14 @@ def test_node_controller_paths(monkeypatch) -> None:
         node_controller.ungroup_node("n1", manager)
 
 
+def test_node_controller_composite_response(monkeypatch) -> None:
+    node = Node(id_="n1", type="A", init_args={}, sub_graph=Graph(nodes={}, edges=[]))
+    comp = CompositeComponent("C", Graph(nodes={}, edges=[]))
+    manager = types.SimpleNamespace(component=lambda _nid: comp)
+    out = node_controller._node_response("n1", node, manager)
+    assert out.is_composite is True
+
+
 def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
     manager = _Manager()
 
@@ -162,6 +171,8 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
         agen = metrics_controller._stream(manager)
         first = await anext(agen)
         assert isinstance(first, str)
+        second = await anext(agen)
+        assert isinstance(second, str)
         await agen.aclose()
 
     asyncio.run(run_metrics())
