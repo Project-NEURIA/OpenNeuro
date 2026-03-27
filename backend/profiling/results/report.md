@@ -82,6 +82,21 @@ Profiles the Inworld TTS API call including streaming audio response:
 
 TLS handshake (122ms) is a significant fixed cost per request.
 
+### 1.5 `Channel.send` / `Channel._wait_and_get` — 100K calls, 346ms total (3.5µs/call)
+
+cProfile of the send path in a 1P1C throughput test (100K messages):
+
+| Function | Cumulative Time | Notes |
+|----------|----------------|-------|
+| `Sender.send` | 262 ms | Entry point — iterates channels, tracks metrics |
+| `Channel._send` | 125 ms | Appends item + `notify_all()` under Condition lock |
+| `Channel._gc` | 56 ms | `min(cursors.values())` + `del items[:drop]` on every receive |
+| `threading.notify_all` | 40 ms | Wakes all waiting threads (Queue uses `notify` — wake one) |
+| `sys.getsizeof` | 8 ms | Byte count tracking on every send |
+| `time.time` | — | `_last_send_time` tracking on every send |
+
+The main overhead vs `threading.Queue`: `_gc()` runs on every receive (dict scan + list slice), and `notify_all()` wakes all threads instead of one. Queue's `put()`/`get()` is simpler: acquire lock → append to deque → notify one → release.
+
 ---
 
 ## 2. End-to-End Pipeline TTFA
@@ -195,17 +210,6 @@ Note: For 1P3C, Channel broadcasts with a single `send()` while Queue requires 3
 | max | 29.6 µs | 70.4 µs |
 
 Channel has slightly lower median latency and much lower max (30µs vs 70µs).
-
-### Why Channel is slower on throughput
-
-cProfile identifies the main overhead in Channel vs Queue's simpler `put()`/`get()`:
-
-| Overhead | Per-message cost | Notes |
-|----------|-----------------|-------|
-| `_gc()` on every receive | `min(cursors.values())` + `del items[:drop]` | Dict scan + list slice on every `_wait_and_get` |
-| `notify_all()` on every send | Wakes all waiting threads | Queue uses `notify()` (wake one) |
-| `sys.getsizeof()` on every send | ~80ns | Sender tracks byte count for metrics |
-| `time.time()` on every send | ~50ns | Sender tracks `_last_send_time` for metrics |
 
 ### Potential improvements
 
