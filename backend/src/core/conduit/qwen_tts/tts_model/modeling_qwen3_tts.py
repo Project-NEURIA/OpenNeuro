@@ -1077,9 +1077,6 @@ class Qwen3TTSTalkerCodePredictorModel(Qwen3TTSPreTrainedModel):
         if not isinstance(past_key_values, (type(None), Cache)):
             raise ValueError("The `past_key_values` should be either a `Cache` object or `None`.")
 
-        if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
-
         if use_cache and past_key_values is None:
             past_key_values = DynamicCache()
 
