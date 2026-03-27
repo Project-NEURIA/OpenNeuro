@@ -634,7 +634,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         else:
             print(
                 f"[OBS] pelvis=({-global_pelvis[0, 0]:.2f}, {global_pelvis[0, 2]:.2f}, {-global_pelvis[0, 1]:.2f}), "
-                f"heading_goal={math.degrees(goal_heading):.0f}°, "
+                f"heading_goal={math.degrees(goal_heading) if goal_heading is not None else 'N/A'}°, "
                 f"local_dir=({local_goal_dir[0, 0]:.2f}, {local_goal_dir[0, 1]:.2f}, {local_goal_dir[0, 2]:.2f})"
             )
 
@@ -816,7 +816,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
 
         # Pipeline: generate next batch while emitting current batch
         gen_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dart-gen")
-        pending_future: Future[torch.Tensor] | None = None
+        pending_future: (
+            Future[tuple[torch.Tensor, float | None, float | None]] | None
+        ) = None
 
         while not self.stop_event.is_set():
             try:
