@@ -2,9 +2,9 @@ name: Backend Coverage
 
 on:
   pull_request:
-    branches: [A5]
+    branches: [ A5 ]
   push:
-    branches: [A5]
+    branches: [ A5 ]
 
 jobs:
   backend-coverage:
@@ -24,6 +24,9 @@ jobs:
           python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
 
       - name: Install dependencies
         run: uv sync --group dev
