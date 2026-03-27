@@ -591,7 +591,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                 dtype=torch.float32,
             )
             cos_hdiff = torch.einsum("bi,bi->b", moving_dir, heading_dir)
-            self._last_heading_diff = math.degrees(math.acos(float(cos_hdiff[0].clip(-1, 1))))
+            self._last_heading_diff = math.degrees(
+                math.acos(float(cos_hdiff[0].clip(-1, 1)))
+            )
         else:
             self._last_heading_diff = float("inf")
 
@@ -701,7 +703,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         noise: torch.Tensor | None = None
         goal_dist_scalar: float | None = None
         heading_diff_scalar: float | None = None
-        if policy is not None and (current_goal is not None or current_goal_heading is not None):
+        if policy is not None and (
+            current_goal is not None or current_goal_heading is not None
+        ):
             obs = self._compute_observation(
                 putil, current_goal, text_embedding, current_goal_heading
             )
@@ -824,14 +828,22 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                     pending_future = None
 
                     # Position goal reached
-                    if current_goal is not None and goal_dist is not None and goal_dist < self.config.goal_reach_threshold:
+                    if (
+                        current_goal is not None
+                        and goal_dist is not None
+                        and goal_dist < self.config.goal_reach_threshold
+                    ):
                         if current_goal_heading is not None:
                             # Position reached but heading goal remains — transition to heading phase
-                            print(f"[DartControl] Position reached (dist={goal_dist:.2f}), turning to heading")
+                            print(
+                                f"[DartControl] Position reached (dist={goal_dist:.2f}), turning to heading"
+                            )
                             current_goal = None
                         else:
                             # Position only — done, switch to stand
-                            print(f"[DartControl] Goal reached (dist={goal_dist:.2f}), switching to stand")
+                            print(
+                                f"[DartControl] Goal reached (dist={goal_dist:.2f}), switching to stand"
+                            )
                             current_goal = None
                             instruction = "stand"
                             text_embedding = engine.encode_text(["stand"]).expand(
@@ -839,8 +851,15 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                             )
 
                     # Heading goal reached (heading-only or after position phase)
-                    elif current_goal is None and current_goal_heading is not None and heading_diff is not None and heading_diff < self.config.heading_reach_threshold:
-                        print(f"[DartControl] Heading reached (diff={heading_diff:.1f}°), switching to stand")
+                    elif (
+                        current_goal is None
+                        and current_goal_heading is not None
+                        and heading_diff is not None
+                        and heading_diff < self.config.heading_reach_threshold
+                    ):
+                        print(
+                            f"[DartControl] Heading reached (diff={heading_diff:.1f}°), switching to stand"
+                        )
                         current_goal_heading = None
                         instruction = "stand"
                         text_embedding = engine.encode_text(["stand"]).expand(
@@ -892,7 +911,11 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                 # Generate if no pending result from above
                 if world_features is None:
                     world_features, goal_dist, heading_diff = self._generate_primitive(
-                        engine, putil, text_embedding, policy, current_goal,
+                        engine,
+                        putil,
+                        text_embedding,
+                        policy,
+                        current_goal,
                         current_goal_heading,
                     )
 
