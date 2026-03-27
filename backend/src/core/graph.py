@@ -9,7 +9,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component, EmitOnStart, ThreadedComponent
+from src.core.component import Component, EmitOnStart, PrimitiveComponent, ThreadedComponent
 from src.core.log_capture import get_log_store
 
 
@@ -60,7 +60,7 @@ class GraphManager:
     # --- node CRUD ---
 
     def add_node(self, node_type: str, init_args: dict[str, Any]) -> tuple[str, Node]:
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(node_type)
         if cls is None:
             raise ValueError(f"Unknown node type: {node_type}")
@@ -110,7 +110,7 @@ class GraphManager:
         if node is None:
             return None
 
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(node.type)
         if cls is None:
             return None
@@ -214,7 +214,7 @@ class GraphManager:
         self._ui_senders.clear()
         self._ui_receivers.clear()
 
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
             if node.sub_graph is not None:
                 from src.core.component import CompositeComponent

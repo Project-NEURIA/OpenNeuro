@@ -6,4 +6,4 @@ from src.core.component import Component, PrimitiveComponent
 
 
 def list_components() -> dict[str, type[PrimitiveComponent[Any, Any]]]:
-    return Component.registered_subclasses()
+    return PrimitiveComponent.registered_subclasses()

@@ -128,17 +128,17 @@ class Component[
         origin = get_origin(t) or t
         return isinstance(origin, type) and issubclass(origin, UIReceiver)
 
-    def get_input_types(self) -> dict[str, type]:
-        return {}
+    @abstractmethod
+    def get_input_types(self) -> dict[str, type]: ...
 
-    def get_output_types(self) -> dict[str, type]:
-        return {}
+    @abstractmethod
+    def get_output_types(self) -> dict[str, type]: ...
 
-    def get_ui_input_types(self) -> dict[str, type]:
-        return {}
+    @abstractmethod
+    def get_ui_input_types(self) -> dict[str, type]: ...
 
-    def get_ui_output_types(self) -> dict[str, type]:
-        return {}
+    @abstractmethod
+    def get_ui_output_types(self) -> dict[str, type]: ...
 
     @classmethod
     def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -219,32 +219,6 @@ class Component[
                     kwargs[k] = raw
         return cls(**kwargs) if kwargs else cls()  # type: ignore[call-arg]
 
-    @classmethod
-    def registered_subclasses(cls) -> dict[str, type[PrimitiveComponent[Any, Any]]]:
-        """Returns all concrete subclasses as {name: class}, walking from PrimitiveComponent."""
-        from src.core import source, sink, conduit  # noqa: F401
-
-        result: dict[str, type[PrimitiveComponent[Any, Any]]] = {}
-
-        skip = {
-            PrimitiveComponent,
-            ThreadedComponent,
-            EmitOnStart,
-        }
-
-        def walk(subclass: type[PrimitiveComponent[Any, Any]]) -> None:
-            if (
-                subclass not in skip
-                and not inspect.isabstract(subclass)
-                and getattr(subclass, "_registerable", True)
-            ):
-                result[subclass.__name__] = subclass
-            for child in subclass.__subclasses__():
-                walk(child)  # type: ignore[arg-type]
-
-        walk(PrimitiveComponent)
-
-        return result
 
 
 # ---------------------------------------------------------------------------
@@ -308,6 +282,32 @@ class PrimitiveComponent[
 
     def get_ui_output_types(self) -> dict[str, type]:
         return type(self)._class_ui_output_types()
+
+    @classmethod
+    def registered_subclasses(cls) -> dict[str, type[PrimitiveComponent[Any, Any]]]:
+        """Returns all concrete subclasses as {name: class}, walking from PrimitiveComponent."""
+        from src.core import source, sink, conduit  # noqa: F401
+
+        result: dict[str, type[PrimitiveComponent[Any, Any]]] = {}
+
+        skip = {
+            PrimitiveComponent,
+            ThreadedComponent,
+            EmitOnStart,
+        }
+
+        def walk(subclass: type[PrimitiveComponent[Any, Any]]) -> None:
+            if (
+                subclass not in skip
+                and not inspect.isabstract(subclass)
+                and getattr(subclass, "_registerable", True)
+            ):
+                result[subclass.__name__] = subclass
+            for child in subclass.__subclasses__():
+                walk(child)  # type: ignore[arg-type]
+
+        walk(PrimitiveComponent)
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -427,12 +427,13 @@ class CompositeComponent(Component[Any, Any]):
             connected_inputs.add((edge.target_node, edge.target_slot))
             connected_outputs.add((edge.source_node, edge.source_slot))
 
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         ext_inputs: dict[str, tuple[str, str]] = {}
         ext_outputs: dict[str, tuple[str, str]] = {}
         for node_id, node in self._sub_graph.nodes.items():
             cls = classes.get(node.type)
             if cls is None:
+                # Node is a CompositeComponent — nested composites not yet supported
                 continue
             for slot in cls._class_input_types():
                 if (node_id, slot) not in connected_inputs:
@@ -443,7 +444,7 @@ class CompositeComponent(Component[Any, Any]):
         return ext_inputs, ext_outputs
 
     def get_input_types(self) -> dict[str, type]:
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         result: dict[str, type] = {}
         for ext_name, (node_id, slot) in self._ext_inputs.items():
             node = self._sub_graph.nodes[node_id]
@@ -455,7 +456,7 @@ class CompositeComponent(Component[Any, Any]):
         return result
 
     def get_output_types(self) -> dict[str, type]:
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         result: dict[str, type] = {}
         for ext_name, (node_id, slot) in self._ext_outputs.items():
             node = self._sub_graph.nodes[node_id]
@@ -465,6 +466,12 @@ class CompositeComponent(Component[Any, Any]):
                 if slot in slot_types:
                     result[ext_name] = slot_types[slot]
         return result
+
+    def get_ui_input_types(self) -> dict[str, type]:
+        return {}
+
+    def get_ui_output_types(self) -> dict[str, type]:
+        return {}
 
     def start(self, inputs: Any, outputs: Any) -> None:
         if self.status == Status.RUNNING:
