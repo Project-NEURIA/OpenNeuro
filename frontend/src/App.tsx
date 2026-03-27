@@ -56,20 +56,20 @@ import {
 } from "@/lib/types";
 import {checkTypes, collectLeafNames, typeToString, warmSubtypeCache} from "@/lib/typecheck";
 
-function parseSlot(handleId: string | null | undefined): string {
+export function parseSlot(handleId: string | null | undefined): string {
     if (!handleId) return "";
     const parts = handleId.split("-");
     return parts.slice(1).join("-");
 }
 
-function deleteEdgeFromReactFlow(edge: Edge) {
+export function deleteEdgeFromReactFlow(edge: Edge) {
     const sourceSlot = parseSlot(edge.sourceHandle);
     const targetSlot = parseSlot(edge.targetHandle);
     apiDeleteEdge(edge.source, sourceSlot, edge.target, targetSlot).catch(console.error);
 }
 
 /** Build a ReactFlow node from a backend NodeResponse. */
-function toReactFlowNode(
+export function toReactFlowNode(
     n: NodeResponse,
     position: { x: number; y: number },
     componentMap: Record<string, ComponentInfo>,
@@ -117,7 +117,7 @@ function toReactFlowNode(
     };
 }
 
-function AppInner({
+export function AppInner({
                       projectName,
                       onGoHome,
                   }: {

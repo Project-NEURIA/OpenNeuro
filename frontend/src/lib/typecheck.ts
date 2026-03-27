@@ -378,3 +378,19 @@ export function checkTypes(
 
   return { types, errors };
 }
+
+export const __test__ = {
+  flattenUnion,
+  typesEqual,
+  dedup,
+  isSubtype,
+  join,
+  splitTopLevel,
+  parseType,
+  slotType,
+  getBounds,
+  typeKey,
+  constrain,
+  applySubst,
+  coalesce,
+};
