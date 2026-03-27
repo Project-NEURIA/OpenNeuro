@@ -24,7 +24,14 @@ class _FakeManager:
         self._n2 = Node(id_="n2", type="A", init_args={}, x=3.0, y=4.0)
         self.graph = Graph(
             nodes={"n1": self._n1, "n2": self._n2},
-            edges=[Edge(source_node="n1", source_slot="out", target_node="n2", target_slot="inp")],
+            edges=[
+                Edge(
+                    source_node="n1",
+                    source_slot="out",
+                    target_node="n2",
+                    target_slot="inp",
+                )
+            ],
         )
         self._components = {"n1": _FakeComp(), "n2": _FakeComp()}
         self.reconciled = 0
@@ -114,18 +121,29 @@ def test_subgraph_create_and_ungroup(monkeypatch) -> None:
         def from_args(cls, _args):
             return _FakeComp()
 
-    monkeypatch.setattr("src.core.component.Component.registered_subclasses", lambda: {"A": _Cls})
+    monkeypatch.setattr(
+        "src.core.component.Component.registered_subclasses", lambda: {"A": _Cls}
+    )
     node_service.ungroup(m, "c1")
     assert "c1" not in m.graph.nodes
     assert "n1" in m.graph.nodes
 
     # Exercise fallback rewiring branches when slot names do not contain dots.
-    c2, _ = m.add_composite_node("C2", Graph(nodes={"n1": m.graph.nodes["n1"]}, edges=[]))
-    m.graph.edges.append(
-        Edge(source_node="outside", source_slot="out", target_node=c2, target_slot="plain")
+    c2, _ = m.add_composite_node(
+        "C2", Graph(nodes={"n1": m.graph.nodes["n1"]}, edges=[])
     )
     m.graph.edges.append(
-        Edge(source_node=c2, source_slot="plain", target_node="outside", target_slot="in")
+        Edge(
+            source_node="outside",
+            source_slot="out",
+            target_node=c2,
+            target_slot="plain",
+        )
+    )
+    m.graph.edges.append(
+        Edge(
+            source_node=c2, source_slot="plain", target_node="outside", target_slot="in"
+        )
     )
     node_service.ungroup(m, c2)
 
@@ -137,53 +155,85 @@ def test_subgraph_rewires_boundary_edges(monkeypatch) -> None:
     m._components["outside"] = _FakeComp()
     m.graph.edges.extend(
         [
-            Edge(source_node="outside", source_slot="in", target_node="n1", target_slot="plain"),
-            Edge(source_node="n2", source_slot="out", target_node="outside", target_slot="sink"),
-            Edge(source_node="outside", source_slot="keep", target_node="outside", target_slot="stay"),
+            Edge(
+                source_node="outside",
+                source_slot="in",
+                target_node="n1",
+                target_slot="plain",
+            ),
+            Edge(
+                source_node="n2",
+                source_slot="out",
+                target_node="outside",
+                target_slot="sink",
+            ),
+            Edge(
+                source_node="outside",
+                source_slot="keep",
+                target_node="outside",
+                target_slot="stay",
+            ),
         ]
     )
 
     cid, cnode = node_service.create_subgraph(m, ["n1", "n2"], name="G")
     assert cid == "c1"
     assert cnode.x == 2.0 and cnode.y == 3.0
-    assert Edge(
-        source_node="outside",
-        source_slot="in",
-        target_node=cid,
-        target_slot="n1.plain",
-    ) in m.graph.edges
-    assert Edge(
-        source_node=cid,
-        source_slot="n2.out",
-        target_node="outside",
-        target_slot="sink",
-    ) in m.graph.edges
-    assert Edge(
-        source_node="outside",
-        source_slot="keep",
-        target_node="outside",
-        target_slot="stay",
-    ) in m.graph.edges
+    assert (
+        Edge(
+            source_node="outside",
+            source_slot="in",
+            target_node=cid,
+            target_slot="n1.plain",
+        )
+        in m.graph.edges
+    )
+    assert (
+        Edge(
+            source_node=cid,
+            source_slot="n2.out",
+            target_node="outside",
+            target_slot="sink",
+        )
+        in m.graph.edges
+    )
+    assert (
+        Edge(
+            source_node="outside",
+            source_slot="keep",
+            target_node="outside",
+            target_slot="stay",
+        )
+        in m.graph.edges
+    )
 
     class _Cls:
         @classmethod
         def from_args(cls, _args):
             return _FakeComp()
 
-    monkeypatch.setattr("src.core.component.Component.registered_subclasses", lambda: {"A": _Cls})
+    monkeypatch.setattr(
+        "src.core.component.Component.registered_subclasses", lambda: {"A": _Cls}
+    )
     node_service.ungroup(m, cid)
-    assert Edge(
-        source_node="outside",
-        source_slot="in",
-        target_node="n1",
-        target_slot="plain",
-    ) in m.graph.edges
-    assert Edge(
-        source_node="n2",
-        source_slot="out",
-        target_node="outside",
-        target_slot="sink",
-    ) in m.graph.edges
+    assert (
+        Edge(
+            source_node="outside",
+            source_slot="in",
+            target_node="n1",
+            target_slot="plain",
+        )
+        in m.graph.edges
+    )
+    assert (
+        Edge(
+            source_node="n2",
+            source_slot="out",
+            target_node="outside",
+            target_slot="sink",
+        )
+        in m.graph.edges
+    )
 
 
 def test_subgraph_validation_errors() -> None:

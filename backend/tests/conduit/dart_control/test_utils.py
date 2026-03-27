@@ -37,7 +37,10 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
     assert ll.shape == x.shape
 
     silu = nn_mod.SiLU()
-    assert torch.allclose(silu(torch.tensor([0.0, 1.0])), torch.tensor([0.0, torch.sigmoid(torch.tensor(1.0)).item()]))
+    assert torch.allclose(
+        silu(torch.tensor([0.0, 1.0])),
+        torch.tensor([0.0, torch.sigmoid(torch.tensor(1.0)).item()]),
+    )
 
     gn = nn_mod.GroupNorm32(1, 1)
     x32 = gn(torch.ones((1, 1, 2), dtype=torch.float16))
@@ -79,7 +82,9 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
     assert emb_odd.shape == (2, 5)
 
     x_in = torch.tensor([2.0], requires_grad=True)
-    assert torch.allclose(nn_mod.checkpoint(lambda t: t + 1, [x_in], [], False), torch.tensor([3.0]))
+    assert torch.allclose(
+        nn_mod.checkpoint(lambda t: t + 1, [x_in], [], False), torch.tensor([3.0])
+    )
     out = nn_mod.checkpoint(lambda t: t * t, [x_in], [], True)
     out.sum().backward()
     assert torch.allclose(x_in.grad, torch.tensor([4.0]))
@@ -95,7 +100,10 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
     monkeypatch.setattr(
         respace_mod.GaussianDiffusion,
         "p_mean_variance",
-        lambda self, model, *args, **kwargs: ("wrapped", isinstance(model, respace_mod._WrappedModel)),
+        lambda self, model, *args, **kwargs: (
+            "wrapped",
+            isinstance(model, respace_mod._WrappedModel),
+        ),
     )
     spaced = respace_mod.SpacedDiffusion(
         use_timesteps={0, 2},
@@ -105,6 +113,7 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
         loss_type=LossType.MSE,
         rescale_timesteps=True,
     )
+
     class _WrappedBase(nn.Module):
         def __init__(self):
             super().__init__()
@@ -159,7 +168,10 @@ def test_rotation_conversions() -> None:
     matrix_xyz = rot_mod.euler_angles_to_matrix(euler, "XYZ")
     assert matrix_xyz.shape == (1, 3, 3)
     assert rot_mod.matrix_to_euler_angles(matrix_xyz, "XYZ").shape == (1, 3)
-    assert rot_mod.matrix_to_euler_angles(torch.eye(3).unsqueeze(0), "ZXZ").shape == (1, 3)
+    assert rot_mod.matrix_to_euler_angles(torch.eye(3).unsqueeze(0), "ZXZ").shape == (
+        1,
+        3,
+    )
 
     with pytest.raises(ValueError):
         rot_mod.matrix_to_euler_angles(torch.eye(3), "XXZ")
@@ -182,8 +194,12 @@ def test_rotation_conversions() -> None:
         torch.tensor([[1.0, -1.0, 0.0, 0.0]]),
     )
 
-    qx = rot_mod.axis_angle_to_quaternion(torch.tensor([[np.pi / 2, 0.0, 0.0]], dtype=torch.float32))
-    qy = rot_mod.axis_angle_to_quaternion(torch.tensor([[0.0, np.pi / 2, 0.0]], dtype=torch.float32))
+    qx = rot_mod.axis_angle_to_quaternion(
+        torch.tensor([[np.pi / 2, 0.0, 0.0]], dtype=torch.float32)
+    )
+    qy = rot_mod.axis_angle_to_quaternion(
+        torch.tensor([[0.0, np.pi / 2, 0.0]], dtype=torch.float32)
+    )
     assert rot_mod.quaternion_raw_multiply(qx, qy).shape == (1, 4)
     assert rot_mod.quaternion_multiply(qx, qy).shape == (1, 4)
     assert rot_mod.quaternion_invert(qx).shape == (1, 4)
@@ -198,10 +214,14 @@ def test_rotation_conversions() -> None:
     aa_matrix = rot_mod.axis_angle_to_matrix(axis_angle)
     assert aa_matrix.shape == (1, 3, 3)
     assert rot_mod.matrix_to_axis_angle(aa_matrix).shape == (1, 3)
-    assert rot_mod.quaternion_to_axis_angle(rot_mod.axis_angle_to_quaternion(axis_angle)).shape == (1, 3)
+    assert rot_mod.quaternion_to_axis_angle(
+        rot_mod.axis_angle_to_quaternion(axis_angle)
+    ).shape == (1, 3)
     small = torch.tensor([[1e-8, 0.0, 0.0]], dtype=torch.float32)
     assert rot_mod.axis_angle_to_quaternion(small).shape == (1, 4)
-    assert rot_mod.quaternion_to_axis_angle(torch.tensor([[1.0, 1e-8, 0.0, 0.0]], dtype=torch.float32)).shape == (1, 3)
+    assert rot_mod.quaternion_to_axis_angle(
+        torch.tensor([[1.0, 1e-8, 0.0, 0.0]], dtype=torch.float32)
+    ).shape == (1, 3)
 
     rot6d = rot_mod.matrix_to_rotation_6d(torch.eye(3).unsqueeze(0))
     assert rot6d.shape == (1, 6)
@@ -255,7 +275,9 @@ def test_policy_and_inference_more(monkeypatch, tmp_path: Path) -> None:
 
     raw_path = tmp_path / "raw.yaml"
     raw_path.write_text("- 1\n- 2\n", encoding="utf-8")
-    assert isinstance(inf_mod._load_tyro_yaml(raw_path, inf_mod.DataArgs), inf_mod.DataArgs)
+    assert isinstance(
+        inf_mod._load_tyro_yaml(raw_path, inf_mod.DataArgs), inf_mod.DataArgs
+    )
 
     mlp_yaml = tmp_path / "mlp.yaml"
     mlp_yaml.write_text(
@@ -288,9 +310,13 @@ model_args:
     mvae = inf_mod._load_tyro_yaml(mvae_yaml, inf_mod.MVAEArgs)
     assert mvae.model_args.latent_dim == (1, 16)
 
-    diff = inf_mod._create_diffusion(inf_mod.DiffusionArgs(diffusion_steps=4, noise_schedule="cosine"))
+    diff = inf_mod._create_diffusion(
+        inf_mod.DiffusionArgs(diffusion_steps=4, noise_schedule="cosine")
+    )
     diff_spaced = inf_mod._create_diffusion(
-        inf_mod.DiffusionArgs(diffusion_steps=4, noise_schedule="cosine", respacing="ddim2")
+        inf_mod.DiffusionArgs(
+            diffusion_steps=4, noise_schedule="cosine", respacing="ddim2"
+        )
     )
     assert diff.num_timesteps == 4
     assert diff_spaced.num_timesteps == 2
@@ -337,27 +363,35 @@ model_args:
     monkeypatch.setattr(
         inf_mod,
         "_load_tyro_yaml",
-        lambda path, cls: inf_mod.MLDArgs(
-            denoiser_args=inf_mod.DenoiserArgs(
-                model_type="mlp",
-                model_args=inf_mod.DenoiserMLPArgs(
-                    h_dim=8,
-                    n_blocks=2,
-                    history_shape=(2, 5),
-                    noise_shape=(1, 3),
-                ),
+        lambda path, cls: (
+            inf_mod.MLDArgs(
+                denoiser_args=inf_mod.DenoiserArgs(
+                    model_type="mlp",
+                    model_args=inf_mod.DenoiserMLPArgs(
+                        h_dim=8,
+                        n_blocks=2,
+                        history_shape=(2, 5),
+                        noise_shape=(1, 3),
+                    ),
+                )
             )
-        )
-        if cls is inf_mod.MLDArgs
-        else inf_mod.MVAEArgs(model_args=inf_mod.VAEArgs(latent_dim=(1, 3), nfeats=5)),
+            if cls is inf_mod.MLDArgs
+            else inf_mod.MVAEArgs(
+                model_args=inf_mod.VAEArgs(latent_dim=(1, 3), nfeats=5)
+            )
+        ),
     )
     monkeypatch.setattr(inf_mod, "DenoiserMLP", _FakeDenoiser)
     monkeypatch.setattr(inf_mod, "AutoMldVae", _FakeVAE)
-    monkeypatch.setattr(inf_mod, "ClassifierFreeWrapper", lambda model: SimpleNamespace(model=model))
+    monkeypatch.setattr(
+        inf_mod, "ClassifierFreeWrapper", lambda model: SimpleNamespace(model=model)
+    )
     monkeypatch.setattr(
         inf_mod.torch,
         "load",
-        lambda path, map_location=None, weights_only=None: {"model_state_dict": {"w": torch.tensor([1.0])}},
+        lambda path, map_location=None, weights_only=None: {
+            "model_state_dict": {"w": torch.tensor([1.0])}
+        },
     )
     dummy = object.__new__(inf_mod.DartControlInference)
     dummy.device = "cpu"
@@ -378,15 +412,25 @@ model_args:
     infer.noise_shape = (1, 3)
     infer.rescale_latent = True
     infer._clip_model = SimpleNamespace(
-        encode_text=lambda tokens: torch.arange(tokens.shape[0] * 4, dtype=torch.float32).reshape(tokens.shape[0], 4)
+        encode_text=lambda tokens: torch.arange(
+            tokens.shape[0] * 4, dtype=torch.float32
+        ).reshape(tokens.shape[0], 4)
     )
     infer.denoiser_model = "denoiser"
     infer.vae_model = _FakeVAE()
     infer.diffusion = SimpleNamespace(
-        p_sample_loop=lambda *args, **kwargs: torch.ones((2, 1, 3), dtype=torch.float32),
-        ddim_sample_loop=lambda *args, **kwargs: torch.full((2, 1, 3), 2.0, dtype=torch.float32),
+        p_sample_loop=lambda *args, **kwargs: torch.ones(
+            (2, 1, 3), dtype=torch.float32
+        ),
+        ddim_sample_loop=lambda *args, **kwargs: torch.full(
+            (2, 1, 3), 2.0, dtype=torch.float32
+        ),
     )
-    monkeypatch.setattr(inf_mod.clip, "tokenize", lambda texts, truncate=True: torch.ones((len(texts), 3), dtype=torch.long))
+    monkeypatch.setattr(
+        inf_mod.clip,
+        "tokenize",
+        lambda texts, truncate=True: torch.ones((len(texts), 3), dtype=torch.long),
+    )
     assert torch.allclose(
         infer.normalize(torch.full((1, 1, 5), 5.0)),
         torch.full((1, 1, 5), 2.0),

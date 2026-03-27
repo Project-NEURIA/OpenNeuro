@@ -87,16 +87,28 @@ def test_pose_renderer_3d_paths(monkeypatch) -> None:
     fake_pyrender = SimpleNamespace(
         OffscreenRenderer=_FakeRenderer,
         Scene=_FakeScene,
-        PointLight=lambda color, intensity: SimpleNamespace(color=color, intensity=intensity),
+        PointLight=lambda color, intensity: SimpleNamespace(
+            color=color, intensity=intensity
+        ),
         MetallicRoughnessMaterial=lambda **kwargs: SimpleNamespace(**kwargs),
-        Mesh=SimpleNamespace(from_trimesh=lambda mesh, material=None: SimpleNamespace(mesh=mesh, material=material)),
+        Mesh=SimpleNamespace(
+            from_trimesh=lambda mesh, material=None: SimpleNamespace(
+                mesh=mesh, material=material
+            )
+        ),
         PerspectiveCamera=lambda **kwargs: SimpleNamespace(**kwargs),
         RenderFlags=SimpleNamespace(RGBA="rgba"),
     )
     fake_trimesh = SimpleNamespace(
         Trimesh=_FakeTrimeshMesh,
-        creation=SimpleNamespace(cylinder=lambda radius, height, sections: _FakeTrimeshMesh(vertices=np.zeros((2, 3)), faces=np.zeros((1, 3), dtype=np.int32))),
-        transformations=SimpleNamespace(rotation_matrix=lambda angle, axis: np.eye(4, dtype=np.float32)),
+        creation=SimpleNamespace(
+            cylinder=lambda radius, height, sections: _FakeTrimeshMesh(
+                vertices=np.zeros((2, 3)), faces=np.zeros((1, 3), dtype=np.int32)
+            )
+        ),
+        transformations=SimpleNamespace(
+            rotation_matrix=lambda angle, axis: np.eye(4, dtype=np.float32)
+        ),
     )
     fake_smplx = SimpleNamespace(build_layer=lambda *args, **kwargs: fake_body_model)
     monkeypatch.setitem(sys.modules, "pyrender", fake_pyrender)
@@ -104,7 +116,9 @@ def test_pose_renderer_3d_paths(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "smplx", fake_smplx)
 
     renderer = pose3d_mod.PoseRenderer3D(
-        pose3d_mod.PoseRenderer3DConfig(width=4, height=4, camera_distance=2.0, device="cpu")
+        pose3d_mod.PoseRenderer3DConfig(
+            width=4, height=4, camera_distance=2.0, device="cpu"
+        )
     )
     renderer._ensure_resources()
     assert renderer._initialized is True
@@ -137,8 +151,12 @@ def test_pose_renderer_3d_paths(monkeypatch) -> None:
 
     sent = []
     renderer.run(
-        pose3d_mod.PoseRenderer3DInputs(pose=_FakeRecv([BodyPoseFrame(poses=poses), None])),
-        pose3d_mod.PoseRenderer3DOutputs(video=SimpleNamespace(send=lambda value: sent.append(value))),
+        pose3d_mod.PoseRenderer3DInputs(
+            pose=_FakeRecv([BodyPoseFrame(poses=poses), None])
+        ),
+        pose3d_mod.PoseRenderer3DOutputs(
+            video=SimpleNamespace(send=lambda value: sent.append(value))
+        ),
     )
     assert len(sent) == 1
     assert sent[0].get(VideoDataFormat.RGB).shape == (4, 4, 3)

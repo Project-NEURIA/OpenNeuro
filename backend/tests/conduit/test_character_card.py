@@ -35,9 +35,7 @@ def _write_card_png(path: Path, keyword: str = "chara") -> CharacterCardConfig:
     encoded = base64.b64encode(json.dumps(payload).encode("utf-8"))
     text_data = keyword.encode("latin-1") + b"\x00" + encoded
     png = (
-        b"\x89PNG\r\n\x1a\n"
-        + _png_chunk(b"tEXt", text_data)
-        + _png_chunk(b"IEND", b"")
+        b"\x89PNG\r\n\x1a\n" + _png_chunk(b"tEXt", text_data) + _png_chunk(b"IEND", b"")
     )
     path.write_bytes(png)
     return CharacterCardConfig(
@@ -52,7 +50,9 @@ def _write_card_png(path: Path, keyword: str = "chara") -> CharacterCardConfig:
     )
 
 
-def test_character_card_png_and_emit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_character_card_png_and_emit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     png_path = tmp_path / "card.png"
     expected = _write_card_png(png_path)
 
@@ -106,8 +106,12 @@ def test_character_card_png_and_emit(tmp_path: Path, monkeypatch: pytest.MonkeyP
             send=lambda value: sent["system_prompt"].append(value)
         ),
         name=SimpleNamespace(send=lambda value: sent["name"].append(value)),
-        description=SimpleNamespace(send=lambda value: sent["description"].append(value)),
-        personality=SimpleNamespace(send=lambda value: sent["personality"].append(value)),
+        description=SimpleNamespace(
+            send=lambda value: sent["description"].append(value)
+        ),
+        personality=SimpleNamespace(
+            send=lambda value: sent["personality"].append(value)
+        ),
         scenario=SimpleNamespace(send=lambda value: sent["scenario"].append(value)),
         first_message=SimpleNamespace(
             send=lambda value: sent["first_message"].append(value)

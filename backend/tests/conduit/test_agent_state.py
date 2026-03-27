@@ -4,8 +4,21 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from src.core.conduit.agent_state import AgentState, AgentStateConfig, AgentStateInputs, AgentStateOutputs
-from src.core.frames import BodyPoseFrame, BonePose, MessageFrame, ObjectLocationFrame, TextFrame, ToolCall, ToolResult
+from src.core.conduit.agent_state import (
+    AgentState,
+    AgentStateConfig,
+    AgentStateInputs,
+    AgentStateOutputs,
+)
+from src.core.frames import (
+    BodyPoseFrame,
+    BonePose,
+    MessageFrame,
+    ObjectLocationFrame,
+    TextFrame,
+    ToolCall,
+    ToolResult,
+)
 
 
 class _FakeRecv:
@@ -115,6 +128,11 @@ def test_agent_state_run(monkeypatch) -> None:
     assert any("vision note" in (content or "") for content in contents)
     assert any("memory note" in (content or "") for content in contents)
     assert any("Currently visible objects" in (content or "") for content in contents)
-    assert any("Heading (from +Z clockwise): -0" in (content or "") for content in contents)
+    assert any(
+        "Heading (from +Z clockwise): -0" in (content or "") for content in contents
+    )
     assert any(msg.tool_calls and msg.tool_calls[0].name == "lookup" for msg in msgs)
-    assert any(msg.tool_call_id == "tool-1" and "tool output" in (msg.content or "") for msg in msgs)
+    assert any(
+        msg.tool_call_id == "tool-1" and "tool output" in (msg.content or "")
+        for msg in msgs
+    )

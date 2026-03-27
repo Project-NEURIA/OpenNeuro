@@ -36,11 +36,15 @@ def test_openvr_movement_helpers_and_run(monkeypatch) -> None:
         def update_pose(self, **kwargs):
             self.calls.append(kwargs)
 
-    monkeypatch.setitem(sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Pose=_Pose))
+    monkeypatch.setitem(
+        sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Pose=_Pose)
+    )
     mod = importlib.reload(importlib.import_module("src.core.sink.openvr_movement"))
 
     assert mod._to_ovd_pose(None) is None
-    converted = mod._to_ovd_pose(BonePose(pos_x=1, pos_y=2, pos_z=3, rot_w=1, rot_x=4, rot_y=5, rot_z=6))
+    converted = mod._to_ovd_pose(
+        BonePose(pos_x=1, pos_y=2, pos_z=3, rot_w=1, rot_x=4, rot_y=5, rot_z=6)
+    )
     assert converted.pos_z == -3 and converted.rot_x == -4 and converted.rot_z == -6
 
     client = _Client()
@@ -53,7 +57,10 @@ def test_openvr_movement_helpers_and_run(monkeypatch) -> None:
 
     sink2 = mod.OpenVRMovementSink(mod.OpenVRMovementConfig())
     frame = BodyPoseFrame(poses={"head": BonePose(), "left_hand": None})
-    sink2.run(mod.OpenVRMovementInputs(poses=_FakeRecv([frame, None])), mod.OpenVRMovementOutputs())
+    sink2.run(
+        mod.OpenVRMovementInputs(poses=_FakeRecv([frame, None])),
+        mod.OpenVRMovementOutputs(),
+    )
 
 
 def test_osc_chatbox_paths(monkeypatch) -> None:
@@ -73,7 +80,9 @@ def test_osc_chatbox_paths(monkeypatch) -> None:
     monkeypatch.setattr("src.core.sink.osc_chatbox._OscClient", _Client)
     monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", lambda _s: None)
     monotonic = iter([0.0, 1.0, 2.0, 3.0])
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.monotonic", lambda: next(monotonic, 3.0))
+    monkeypatch.setattr(
+        "src.core.sink.osc_chatbox.time.monotonic", lambda: next(monotonic, 3.0)
+    )
 
     from src.core.sink.osc_chatbox import OSCChatbox, OSCChatboxConfig, OSCChatboxInputs
 
@@ -118,7 +127,9 @@ def test_osc_chatbox_paths(monkeypatch) -> None:
 
     box4._send_chatbox = _send_once  # type: ignore[method-assign]
     box4._send_worker()
-    assert any(args and args[0] == "msg" for _addr, args in sent if isinstance(args, list))
+    assert any(
+        args and args[0] == "msg" for _addr, args in sent if isinstance(args, list)
+    )
 
     box5 = OSCChatbox(OSCChatboxConfig())
     box5._text_buffer = "abc"
@@ -134,7 +145,9 @@ def test_osc_chatbox_paths(monkeypatch) -> None:
 
     runner = OSCChatbox(OSCChatboxConfig())
     runner.stop_event.set()
-    runner.run(OSCChatboxInputs(text=_FakeRecv([None]), interrupt=_FakeRecv([None])), ())
+    runner.run(
+        OSCChatboxInputs(text=_FakeRecv([None]), interrupt=_FakeRecv([None])), ()
+    )
     runner.stop()
 
 

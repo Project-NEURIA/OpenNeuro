@@ -60,7 +60,9 @@ class FakeManager:
 
     def components(self):
         return {
-            "a": types.SimpleNamespace(type_="A", status=types.SimpleNamespace(value="running"))
+            "a": types.SimpleNamespace(
+                type_="A", status=types.SimpleNamespace(value="running")
+            )
         }
 
     def sender_handles(self):
@@ -71,7 +73,9 @@ class FakeManager:
 
 
 def test_dep_get_manager() -> None:
-    request = types.SimpleNamespace(app=types.SimpleNamespace(state=types.SimpleNamespace(manager=123)))
+    request = types.SimpleNamespace(
+        app=types.SimpleNamespace(state=types.SimpleNamespace(manager=123))
+    )
     assert dep.get_manager(request) == 123
 
 
@@ -105,7 +109,11 @@ def test_component_controller_and_service(monkeypatch) -> None:
             return {"seen": values}
 
     original = component_controller.service.list_components
-    monkeypatch.setattr(component_controller.service, "list_components", lambda: {"Fake": FakeComponentClass})
+    monkeypatch.setattr(
+        component_controller.service,
+        "list_components",
+        lambda: {"Fake": FakeComponentClass},
+    )
     out = component_controller.list_components()
     assert out[0].type_ == "Fake"
     assert component_controller.is_type("int") is True
@@ -118,7 +126,9 @@ def test_component_controller_and_service(monkeypatch) -> None:
         component_controller.get_options("Missing", {})
 
     monkeypatch.setattr(component_controller.service, "list_components", original)
-    monkeypatch.setattr(component_service.Component, "registered_subclasses", lambda: {"A": object})
+    monkeypatch.setattr(
+        component_service.Component, "registered_subclasses", lambda: {"A": object}
+    )
     assert component_service.list_components() == {"A": object}
 
 
@@ -164,7 +174,9 @@ def test_edge_run_save_services(tmp_path, monkeypatch) -> None:
 
 def test_logs_controller(monkeypatch) -> None:
     entry = types.SimpleNamespace(seq=1, timestamp=2.0, stream="stdout", text="x")
-    fake_store = types.SimpleNamespace(get_entries=lambda node_id, after, limit: [entry])
+    fake_store = types.SimpleNamespace(
+        get_entries=lambda node_id, after, limit: [entry]
+    )
     monkeypatch.setattr(logs_controller, "get_log_store", lambda: fake_store)
     out = logs_controller.get_component_logs("node")
     assert out.node_id == "node"
@@ -175,8 +187,10 @@ def test_metrics_collector_collect() -> None:
     manager = FakeManager()
     frame = TextFrame.new(text="hello")
     manager._sender.send(frame)
-    receiver_it = manager._receiver(types.SimpleNamespace(stop_event=types.SimpleNamespace(is_set=lambda: False)),
-                                    no_block=True)
+    receiver_it = manager._receiver(
+        types.SimpleNamespace(stop_event=types.SimpleNamespace(is_set=lambda: False)),
+        no_block=True,
+    )
     next(receiver_it)
 
     collector = MetricsCollector()

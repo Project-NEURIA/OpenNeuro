@@ -115,7 +115,9 @@ class _GenericPair[T](NamedTuple):
 
 
 def test_component_generic_resolution_and_from_args() -> None:
-    assert Component._resolve_tuple_types(DoNothingInputs[int])["input"] == Receiver[int]
+    assert (
+        Component._resolve_tuple_types(DoNothingInputs[int])["input"] == Receiver[int]
+    )
     assert Component._resolve_tuple_types(_GenericPair[int])["label"] is str
     assert Component._resolve_tuple_types(tuple[()]) == {}
     assert _ModelComponent._get_type_param(99) is None
@@ -142,7 +144,9 @@ def test_threaded_component_exception_and_early_return(monkeypatch) -> None:
     unregistered: list[str] = []
     monkeypatch.setattr(
         "src.core.component.get_log_store",
-        lambda: types.SimpleNamespace(unregister_thread=lambda: unregistered.append("x")),
+        lambda: types.SimpleNamespace(
+            unregister_thread=lambda: unregistered.append("x")
+        ),
     )
 
     comp = _ThreadBoom()
@@ -170,7 +174,14 @@ def test_composite_component_additional_paths(monkeypatch) -> None:
             "n1": Node(id_="n1", type="Known", init_args={}),
             "skip": Node(id_="skip", type="Missing", init_args={}),
         },
-        edges=[Edge(source_node="n1", source_slot="out", target_node="n1", target_slot="plain")],
+        edges=[
+            Edge(
+                source_node="n1",
+                source_slot="out",
+                target_node="n1",
+                target_slot="plain",
+            )
+        ],
     )
     comp = CompositeComponent("Wrap", sub_graph)
     assert comp.type_ == "Wrap"
@@ -225,7 +236,9 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     monkeypatch.setattr(
         Component,
         "registered_subclasses",
-        classmethod(lambda cls: {"Known": _CompositeInner, "OutputOnly": _OutputOnlyComp}),
+        classmethod(
+            lambda cls: {"Known": _CompositeInner, "OutputOnly": _OutputOnlyComp}
+        ),
     )
 
     gm = GraphManager(Graph(nodes={}, edges=[]))
@@ -237,7 +250,9 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
 
     running_node = Node(id_="running", type="Known", init_args={})
     gm2 = GraphManager(Graph(nodes={"running": running_node}, edges=[]))
-    gm2._components["running"] = types.SimpleNamespace(status=types.SimpleNamespace(value="running"))
+    gm2._components["running"] = types.SimpleNamespace(
+        status=types.SimpleNamespace(value="running")
+    )
     calls: list[str] = []
     gm2.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
     gm2.run = lambda: calls.append("run")  # type: ignore[method-assign]
@@ -246,7 +261,12 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     assert calls == ["stop", "run"]
     assert gm2.update_node_init_args("missing", {}) is None
 
-    gm3 = GraphManager(Graph(nodes={"running": Node(id_="running", type="Missing", init_args={})}, edges=[]))
+    gm3 = GraphManager(
+        Graph(
+            nodes={"running": Node(id_="running", type="Missing", init_args={})},
+            edges=[],
+        )
+    )
     monkeypatch.setattr(
         Component,
         "registered_subclasses",
@@ -276,7 +296,9 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
         id_="wrap",
         type="Wrap",
         init_args={},
-        sub_graph=Graph(nodes={"n1": Node(id_="n1", type="Known", init_args={})}, edges=[]),
+        sub_graph=Graph(
+            nodes={"n1": Node(id_="n1", type="Known", init_args={})}, edges=[]
+        ),
     )
     gm5 = GraphManager(Graph(nodes={"wrap": composite_node}, edges=[]))
     assert isinstance(gm5.component("wrap"), CompositeComponent)
@@ -301,7 +323,9 @@ def test_frames_additional_paths(monkeypatch) -> None:
     pcm = np.array([0, 32767, -32768, 16384], dtype=np.int16).tobytes()
     stereo = AudioFrame.new(data=pcm, sample_rate=4, channels=2)
     assert stereo.data.shape == (2, 2)
-    mono_from_bytes = AudioFrame.new(data=np.array([0, 1], dtype=np.int16).tobytes(), sample_rate=2, channels=1)
+    mono_from_bytes = AudioFrame.new(
+        data=np.array([0, 1], dtype=np.int16).tobytes(), sample_rate=2, channels=1
+    )
     assert mono_from_bytes.data.shape == (1, 2)
 
     mono = AudioFrame.new(
@@ -352,7 +376,9 @@ def test_frames_additional_paths(monkeypatch) -> None:
     assert text.get() == "hello"
     interrupt = InterruptFrame.new(reason="x")
     assert interrupt.reason == "x"
-    message = MessageFrame.new(role="assistant", content="ok", tool_calls=[], tool_call_id="1")
+    message = MessageFrame.new(
+        role="assistant", content="ok", tool_calls=[], tool_call_id="1"
+    )
     assert message.content == "ok"
     tool_def = ToolDef.new(name="n", description="d", parameters={"a": 1}, strict=True)
     assert tool_def.strict is True
@@ -407,7 +433,9 @@ def test_frames_additional_paths(monkeypatch) -> None:
     )
     monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
 
-    video = VideoFrame.new(data=np.zeros((2, 3, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
+    video = VideoFrame.new(
+        data=np.zeros((2, 3, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
     assert video.get(VideoDataFormat.BGR).shape == (2, 3, 3)
     assert np.all(video.get(VideoDataFormat.RGB) == 1)
 

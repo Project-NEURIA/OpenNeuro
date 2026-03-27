@@ -46,7 +46,10 @@ class DemoComp(PrimitiveComponent[InT, OutT]):
         self.opt = opt
 
 
-class DemoThread(ThreadedComponent[tuple[Receiver[TextFrame] | None], tuple[Sender[TextFrame]]], EmitOnStart[tuple[Sender[TextFrame]]]):
+class DemoThread(
+    ThreadedComponent[tuple[Receiver[TextFrame] | None], tuple[Sender[TextFrame]]],
+    EmitOnStart[tuple[Sender[TextFrame]]],
+):
     _registerable = True
 
     def __init__(self) -> None:
@@ -98,13 +101,17 @@ def test_threaded_component_lifecycle(monkeypatch) -> None:
 
 def test_composite_component_and_graph_manager(monkeypatch) -> None:
     classes = {"DemoThread": DemoThread, "DemoComp": DemoComp}
-    monkeypatch.setattr(Component, "registered_subclasses", classmethod(lambda cls: classes))
+    monkeypatch.setattr(
+        Component, "registered_subclasses", classmethod(lambda cls: classes)
+    )
 
     n1 = Node(id_="n1", type="DemoThread", init_args={})
     n2 = Node(id_="n2", type="DemoThread", init_args={})
     g = Graph(
         nodes={"n1": n1, "n2": n2},
-        edges=[Edge(source_node="n1", source_slot="1", target_node="n2", target_slot="1")],
+        edges=[
+            Edge(source_node="n1", source_slot="1", target_node="n2", target_slot="1")
+        ],
     )
     gm = GraphManager(g)
     assert gm.get_node("n1") is not None
@@ -118,7 +125,9 @@ def test_composite_component_and_graph_manager(monkeypatch) -> None:
     assert gm.ui_receivers() == {}
     gm.stop()
 
-    gm.add_edge(Edge(source_node="n1", source_slot="1", target_node="n2", target_slot="1"))
+    gm.add_edge(
+        Edge(source_node="n1", source_slot="1", target_node="n2", target_slot="1")
+    )
     gm.delete_edge(gm.graph.edges[-1])
     grouped = GraphManager._group([(("a", "o"), ("b", "i"))])
     assert len(grouped) == 1
@@ -134,7 +143,9 @@ def test_composite_component_and_graph_manager(monkeypatch) -> None:
 
 def test_composite_component_start_stop(monkeypatch) -> None:
     classes = {"DemoThread": DemoThread}
-    monkeypatch.setattr(Component, "registered_subclasses", classmethod(lambda cls: classes))
+    monkeypatch.setattr(
+        Component, "registered_subclasses", classmethod(lambda cls: classes)
+    )
     n1 = Node(id_="a", type="DemoThread", init_args={})
     sub = Graph(nodes={"a": n1}, edges=[])
     comp = CompositeComponent("C", sub)

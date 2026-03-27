@@ -62,9 +62,7 @@ class _WS:
         self.recv_msgs = list(recv_msgs or [])
         self.sent_json = []
         self.sent_bytes = []
-        self.app = types.SimpleNamespace(
-            state=types.SimpleNamespace(manager=None)
-        )
+        self.app = types.SimpleNamespace(state=types.SimpleNamespace(manager=None))
 
     async def accept(self):
         return None
@@ -90,13 +88,18 @@ def _manager_for_resolve():
 def test_resolve_ui_types() -> None:
     manager = _manager_for_resolve()
     assert ui_controller._resolve_ui_output_type(manager, "n1", "bytes_alias") is bytes
-    assert ui_controller._resolve_ui_output_type(manager, "n1", "bytes_concrete") is bytes
+    assert (
+        ui_controller._resolve_ui_output_type(manager, "n1", "bytes_concrete") is bytes
+    )
     assert ui_controller._resolve_ui_output_type(manager, "n1", "no_args") is None
     assert ui_controller._resolve_ui_output_type(manager, "n1", "missing") is None
     assert ui_controller._resolve_ui_output_type(manager, "missing", "x") is None
 
     assert ui_controller._resolve_ui_input_type(manager, "n1", "model_alias") is _Model
-    assert ui_controller._resolve_ui_input_type(manager, "n1", "text_concrete") is TextFrame
+    assert (
+        ui_controller._resolve_ui_input_type(manager, "n1", "text_concrete")
+        is TextFrame
+    )
     assert ui_controller._resolve_ui_input_type(manager, "n1", "no_args") is None
     assert ui_controller._resolve_ui_input_type(manager, "n1", "missing") is None
     assert ui_controller._resolve_ui_input_type(manager, "missing", "x") is None
@@ -165,6 +168,7 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
         await asyncio.sleep(0.001)
 
     monkeypatch.setattr(ui_controller, "_read_ui_output", fake_reader)
+
     async def run_watch():
         watch_task = asyncio.create_task(
             ui_controller._watch_ui_channels(ws, manager, stop, tasks)
@@ -187,7 +191,9 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
             ui_senders=lambda: {},
             components=lambda: {"n1": _Comp()},
         )
-        t = asyncio.create_task(ui_controller._watch_ui_channels(ws, manager2, asyncio.Event(), {}))
+        t = asyncio.create_task(
+            ui_controller._watch_ui_channels(ws, manager2, asyncio.Event(), {})
+        )
         await asyncio.sleep(0)
         t.cancel()
         try:
@@ -203,15 +209,39 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
         _ui_changed=asyncio.Event(),
         ui_receivers=lambda: {},
         components=lambda: {"n1": _Comp()},
-        ui_senders=lambda: {("n1", "model_alias"): types.SimpleNamespace(send=lambda x: sent.append(("m", x))),
-                            ("n1", "text_concrete"): types.SimpleNamespace(send=lambda x: sent.append(("t", x))),
-                            ("n1", "other"): types.SimpleNamespace(send=lambda x: sent.append(("o", x)))},
+        ui_senders=lambda: {
+            ("n1", "model_alias"): types.SimpleNamespace(
+                send=lambda x: sent.append(("m", x))
+            ),
+            ("n1", "text_concrete"): types.SimpleNamespace(
+                send=lambda x: sent.append(("t", x))
+            ),
+            ("n1", "other"): types.SimpleNamespace(
+                send=lambda x: sent.append(("o", x))
+            ),
+        },
     )
     ws = _WS(
         recv_msgs=[
-            json.dumps({"type": "ui_input", "node_id": "n1", "channel": "model_alias", "payload": {"value": 9}}),
-            json.dumps({"type": "ui_input", "node_id": "n1", "channel": "text_concrete", "payload": "hello"}),
-            json.dumps({"type": "ui_input", "node_id": "n1", "channel": "other", "payload": 7}),
+            json.dumps(
+                {
+                    "type": "ui_input",
+                    "node_id": "n1",
+                    "channel": "model_alias",
+                    "payload": {"value": 9},
+                }
+            ),
+            json.dumps(
+                {
+                    "type": "ui_input",
+                    "node_id": "n1",
+                    "channel": "text_concrete",
+                    "payload": "hello",
+                }
+            ),
+            json.dumps(
+                {"type": "ui_input", "node_id": "n1", "channel": "other", "payload": 7}
+            ),
             json.dumps({"type": "noop"}),
         ]
     )

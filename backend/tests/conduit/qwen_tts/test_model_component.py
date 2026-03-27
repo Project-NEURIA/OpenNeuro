@@ -40,7 +40,7 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -58,12 +58,18 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     class _SpeechTokenizer:
         def __init__(self):
             self.calls = []
-            self.model = SimpleNamespace(decoder=lambda codes: torch.tensor([[0.1, 0.2, 0.3]], dtype=torch.float32))
+            self.model = SimpleNamespace(
+                decoder=lambda codes: torch.tensor(
+                    [[0.1, 0.2, 0.3]], dtype=torch.float32
+                )
+            )
 
         def encode(self, wavs, sr=None):
             self.calls.append((wavs, sr))
             if isinstance(wavs, list):
-                return SimpleNamespace(audio_codes=[torch.tensor([1, 2], dtype=torch.long) for _ in wavs])
+                return SimpleNamespace(
+                    audio_codes=[torch.tensor([1, 2], dtype=torch.long) for _ in wavs]
+                )
             return SimpleNamespace(audio_codes=[torch.tensor([3, 4], dtype=torch.long)])
 
         def get_output_sample_rate(self):
@@ -94,19 +100,41 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(model_mod, "Qwen3TTSForConditionalGeneration", _FakeQwenModel)
 
     register_calls = []
-    monkeypatch.setattr(model_mod.AutoConfig, "register", lambda name, cls: register_calls.append(("config", name)))
-    monkeypatch.setattr(model_mod.AutoModel, "register", lambda cfg, cls: register_calls.append(("model", cfg)))
-    monkeypatch.setattr(model_mod.AutoProcessor, "register", lambda cfg, cls: register_calls.append(("processor", cfg)))
-    monkeypatch.setattr(model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: fake_model)
-    monkeypatch.setattr(model_mod.AutoProcessor, "from_pretrained", lambda path, fix_mistral_regex=True: processor)
+    monkeypatch.setattr(
+        model_mod.AutoConfig,
+        "register",
+        lambda name, cls: register_calls.append(("config", name)),
+    )
+    monkeypatch.setattr(
+        model_mod.AutoModel,
+        "register",
+        lambda cfg, cls: register_calls.append(("model", cfg)),
+    )
+    monkeypatch.setattr(
+        model_mod.AutoProcessor,
+        "register",
+        lambda cfg, cls: register_calls.append(("processor", cfg)),
+    )
+    monkeypatch.setattr(
+        model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: fake_model
+    )
+    monkeypatch.setattr(
+        model_mod.AutoProcessor,
+        "from_pretrained",
+        lambda path, fix_mistral_regex=True: processor,
+    )
     wrapped = model_mod.Qwen3TTSModel.from_pretrained("demo")
     assert wrapped.model is fake_model
     assert len(register_calls) == 3
 
-    monkeypatch.setattr(model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: object())
+    monkeypatch.setattr(
+        model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: object()
+    )
     with pytest.raises(TypeError):
         model_mod.Qwen3TTSModel.from_pretrained("demo")
-    monkeypatch.setattr(model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: fake_model)
+    monkeypatch.setattr(
+        model_mod.AutoModel, "from_pretrained", lambda path, **kwargs: fake_model
+    )
 
     assert qwen._as_list(1) == [1]
     assert qwen._as_list([1]) == [1]
@@ -116,10 +144,19 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     assert toks[0].shape[0] == 1
     assert toks[1].shape == (1, 2)
 
-    monkeypatch.setattr(model_mod.librosa, "load", lambda path, sr=None, mono=True: (np.array([1.0, 2.0], dtype=np.float32), 22050))
+    monkeypatch.setattr(
+        model_mod.librosa,
+        "load",
+        lambda path, sr=None, mono=True: (
+            np.array([1.0, 2.0], dtype=np.float32),
+            22050,
+        ),
+    )
     wav, sr = qwen._load_audio("demo.wav")
     assert sr == 22050
-    wav2, sr2 = qwen._load_audio((np.array([[1.0, 3.0], [2.0, 4.0]], dtype=np.float32), 16000))
+    wav2, sr2 = qwen._load_audio(
+        (np.array([[1.0, 3.0], [2.0, 4.0]], dtype=np.float32), 16000)
+    )
     assert wav2.dtype == np.float32 and sr2 == 16000
 
     items_dict = qwen._items_to_prompt(
@@ -140,11 +177,16 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
 
     fake_model.tts_model_type = "chat"
     with pytest.raises(ValueError):
-        qwen.create_voice_clone_prompt(ref_audio=(np.array([1.0], dtype=np.float32), 16000))
+        qwen.create_voice_clone_prompt(
+            ref_audio=(np.array([1.0], dtype=np.float32), 16000)
+        )
     fake_model.tts_model_type = "base"
     with pytest.raises(ValueError):
         qwen.create_voice_clone_prompt(
-            ref_audio=[(np.array([1.0], dtype=np.float32), 16000), (np.array([2.0], dtype=np.float32), 16000)],
+            ref_audio=[
+                (np.array([1.0], dtype=np.float32), 16000),
+                (np.array([2.0], dtype=np.float32), 16000),
+            ],
             ref_text=["one"],
             x_vector_only_mode=[False, False],
         )
@@ -155,7 +197,9 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
             x_vector_only_mode=False,
         )
 
-    monkeypatch.setattr(model_mod.librosa, "resample", lambda y, orig_sr, target_sr: np.asarray(y) * 2)
+    monkeypatch.setattr(
+        model_mod.librosa, "resample", lambda y, orig_sr, target_sr: np.asarray(y) * 2
+    )
     same_sr_items = qwen.create_voice_clone_prompt(
         ref_audio=[
             (np.array([1.0, 2.0], dtype=np.float32), 16000),
@@ -179,7 +223,10 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     with pytest.raises(ValueError):
         qwen.generate_voice_clone("hello", voice_clone_prompt=None)
     with pytest.raises(ValueError):
-        qwen.generate_voice_clone(["a", "b"], voice_clone_prompt=[same_sr_items[0], same_sr_items[1], diff_sr_items[0]])
+        qwen.generate_voice_clone(
+            ["a", "b"],
+            voice_clone_prompt=[same_sr_items[0], same_sr_items[1], diff_sr_items[0]],
+        )
 
     out = qwen.generate_voice_clone(
         ["a", "b"],
@@ -193,7 +240,11 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(utils_mod, "auto_device", lambda cfg: torch.device("cpu"))
     monkeypatch.setattr(utils_mod, "auto_dtype", lambda device: torch.float32)
     monkeypatch.setattr(model_mod.torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(model_mod.Qwen3TTSModel, "from_pretrained", lambda *args, **kwargs: SimpleNamespace(model=fake_model, processor=processor))
+    monkeypatch.setattr(
+        model_mod.Qwen3TTSModel,
+        "from_pretrained",
+        lambda *args, **kwargs: SimpleNamespace(model=fake_model, processor=processor),
+    )
     loaded = model_mod.SimpleStreamingTTS.load("demo", "cpu")
     assert loaded.sample_rate == 24000
 
@@ -201,13 +252,19 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(utils_mod, "auto_device", lambda cfg: fake_cuda_device)
     monkeypatch.setattr(utils_mod, "auto_dtype", lambda device: torch.float16)
     monkeypatch.setattr(model_mod.torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(model_mod.torch, "set_float32_matmul_precision", lambda value: None)
+    monkeypatch.setattr(
+        model_mod.torch, "set_float32_matmul_precision", lambda value: None
+    )
     loaded_cuda = model_mod.SimpleStreamingTTS.load("demo", "cuda")
     assert loaded_cuda._decode_stream is not None
 
     save_calls = []
-    monkeypatch.setattr(model_mod.torch, "save", lambda prompt, path: save_calls.append((prompt, path)))
-    voice_path = loaded.register_voice("voice name", (np.array([1.0], dtype=np.float32), 16000), "hello")
+    monkeypatch.setattr(
+        model_mod.torch, "save", lambda prompt, path: save_calls.append((prompt, path))
+    )
+    voice_path = loaded.register_voice(
+        "voice name", (np.array([1.0], dtype=np.float32), 16000), "hello"
+    )
     assert save_calls and voice_path.name.startswith("voice_name")
 
     loaded._decode_stream = None
@@ -219,12 +276,20 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
             self.synced = True
 
     loaded_cuda._decode_stream = _Stream()
-    monkeypatch.setattr(model_mod.torch.cuda, "stream", lambda stream: contextlib.nullcontext())
+    monkeypatch.setattr(
+        model_mod.torch.cuda, "stream", lambda stream: contextlib.nullcontext()
+    )
     loaded_cuda._decode_audio([torch.tensor([1]), torch.tensor([2])])
 
     streaming = model_mod.SimpleStreamingTTS(fake_model, processor, torch.device("cpu"))
-    monkeypatch.setattr(model_mod, "_streaming_config", model_mod.StreamingConfig(min_initial_frames=1, yield_every_n_frames=1))
-    monkeypatch.setattr(model_mod.torch, "load", lambda path, weights_only=False: "prompt")
+    monkeypatch.setattr(
+        model_mod,
+        "_streaming_config",
+        model_mod.StreamingConfig(min_initial_frames=1, yield_every_n_frames=1),
+    )
+    monkeypatch.setattr(
+        model_mod.torch, "load", lambda path, weights_only=False: "prompt"
+    )
     monkeypatch.setattr(model_mod.threading, "Thread", _SyncThread)
     monkeypatch.setattr(
         streaming,
@@ -239,20 +304,31 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
 
         def _forward(self, *args, **kwargs):
             self.calls += 1
-            return SimpleNamespace(hidden_states=(None, torch.tensor([self.calls], dtype=torch.float32)))
+            return SimpleNamespace(
+                hidden_states=(None, torch.tensor([self.calls], dtype=torch.float32))
+            )
 
     talker = _Talker()
     streaming._talker = talker
-    streaming._model.generate_voice_clone = lambda **kwargs: [streaming._talker.forward(), streaming._talker.forward()]
+    streaming._model.generate_voice_clone = lambda **kwargs: [
+        streaming._talker.forward(),
+        streaming._talker.forward(),
+    ]
     chunks = list(streaming.generate_streaming("hi", tmp_path / "voice.pt"))
     assert chunks[0][1]["frame_idx"] == 1
     assert chunks[-1][1]["is_final"] is True
 
-    streaming_err = model_mod.SimpleStreamingTTS(fake_model, processor, torch.device("cpu"))
+    streaming_err = model_mod.SimpleStreamingTTS(
+        fake_model, processor, torch.device("cpu")
+    )
     streaming_err._talker = _Talker()
     monkeypatch.setattr(model_mod.threading, "Thread", _SyncThread)
-    monkeypatch.setattr(model_mod.torch, "load", lambda path, weights_only=False: "prompt")
-    streaming_err._model.generate_voice_clone = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+    monkeypatch.setattr(
+        model_mod.torch, "load", lambda path, weights_only=False: "prompt"
+    )
+    streaming_err._model.generate_voice_clone = lambda **kwargs: (_ for _ in ()).throw(
+        RuntimeError("boom")
+    )
     with pytest.raises(RuntimeError):
         list(streaming_err.generate_streaming("hi", tmp_path / "voice.pt"))
 
@@ -264,7 +340,7 @@ def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -288,8 +364,14 @@ def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
     (voices_dir / "skip.mp3").write_bytes(b"x")
 
     options = comp_mod.QwenTTS.get_options({"ref_samples_dir": str(voices_dir)})
-    assert options["config"]["voice_id"][0]["value"] == "bad" or options["config"]["voice_id"][0]["value"] == "good"
-    assert comp_mod.QwenTTS.get_options({"ref_samples_dir": str(tmp_path / "missing")}) == {}
+    assert (
+        options["config"]["voice_id"][0]["value"] == "bad"
+        or options["config"]["voice_id"][0]["value"] == "good"
+    )
+    assert (
+        comp_mod.QwenTTS.get_options({"ref_samples_dir": str(tmp_path / "missing")})
+        == {}
+    )
 
     comp = comp_mod.QwenTTS(
         comp_mod.QwenTTSConfig(
@@ -319,14 +401,20 @@ def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
     comp._register_voices()
     assert "good" in comp._voice_paths
 
-    missing_comp = comp_mod.QwenTTS(comp_mod.QwenTTSConfig(ref_samples_dir=str(tmp_path / "missing")))
+    missing_comp = comp_mod.QwenTTS(
+        comp_mod.QwenTTSConfig(ref_samples_dir=str(tmp_path / "missing"))
+    )
     missing_comp._tts = fake_tts
     missing_comp._register_voices()
     assert missing_comp._voice_paths == {}
 
-    failing_comp = comp_mod.QwenTTS(comp_mod.QwenTTSConfig(ref_samples_dir=str(voices_dir)))
+    failing_comp = comp_mod.QwenTTS(
+        comp_mod.QwenTTSConfig(ref_samples_dir=str(voices_dir))
+    )
     failing_comp._tts = SimpleNamespace(
-        register_voice=lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bad")),
+        register_voice=lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("bad")
+        ),
     )
     failing_comp._register_voices()
     assert failing_comp._voice_paths == {}

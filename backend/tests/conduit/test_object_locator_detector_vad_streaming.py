@@ -30,7 +30,9 @@ class _FakeRecv:
         return iter(self._items)
 
 
-def _audio_frame(samples: int = 16000, sample_rate: int = 16000, channels: int = 1) -> AudioFrame:
+def _audio_frame(
+    samples: int = 16000, sample_rate: int = 16000, channels: int = 1
+) -> AudioFrame:
     data = np.zeros((channels, samples), dtype=np.float32)
     return AudioFrame.new(data=data, sample_rate=sample_rate, channels=channels)
 
@@ -49,7 +51,9 @@ def test_object_locator_paths(monkeypatch) -> None:
     monkeypatch.setattr(loc_mod, "cv2", fake_cv2)
 
     cam = CameraParamsFrame.new(
-        intrinsics=np.array([[2.0, 0.0, 1.0], [0.0, 2.0, 1.0], [0.0, 0.0, 1.0]], dtype=np.float32),
+        intrinsics=np.array(
+            [[2.0, 0.0, 1.0], [0.0, 2.0, 1.0], [0.0, 0.0, 1.0]], dtype=np.float32
+        ),
         extrinsics=np.eye(4, dtype=np.float32),
         width=2,
         height=2,
@@ -88,7 +92,9 @@ def test_object_locator_paths(monkeypatch) -> None:
             depth=_FakeRecv([depth, depth]),
             camera_params=_FakeRecv([cam, cam, None]),
         ),
-        loc_mod.ObjectLocatorOutputs(locations=SimpleNamespace(send=lambda value: sent.append(value))),
+        loc_mod.ObjectLocatorOutputs(
+            locations=SimpleNamespace(send=lambda value: sent.append(value))
+        ),
     )
     assert len(sent) == 2
     assert sent[0].labels == ()
@@ -99,7 +105,9 @@ def test_object_locator_paths(monkeypatch) -> None:
             depth=_FakeRecv([depth]),
             camera_params=_FakeRecv([cam]),
         ),
-        loc_mod.ObjectLocatorOutputs(locations=SimpleNamespace(send=lambda value: sent.append(value))),
+        loc_mod.ObjectLocatorOutputs(
+            locations=SimpleNamespace(send=lambda value: sent.append(value))
+        ),
     )
     locator.run(
         loc_mod.ObjectLocatorInputs(
@@ -107,7 +115,9 @@ def test_object_locator_paths(monkeypatch) -> None:
             depth=_FakeRecv([depth]),
             camera_params=_FakeRecv([None]),
         ),
-        loc_mod.ObjectLocatorOutputs(locations=SimpleNamespace(send=lambda value: sent.append(value))),
+        loc_mod.ObjectLocatorOutputs(
+            locations=SimpleNamespace(send=lambda value: sent.append(value))
+        ),
     )
 
 
@@ -127,7 +137,9 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(vlm_mod, "OpenAI", _Client)
-    vlm = vlm_mod.StreamingVLM(vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2))
+    vlm = vlm_mod.StreamingVLM(
+        vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2)
+    )
 
     class _Image:
         def __init__(self):
@@ -150,7 +162,9 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
 
     monkeypatch.setattr(vlm_mod.time, "time", lambda: 10.0)
     assert vlm._sample_window() is None
-    frame = VideoFrame.new(data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
+    frame = VideoFrame.new(
+        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
     vlm._frame_buffer.extend([(8.0, frame), (9.0, frame), (10.0, frame)])
     sample = vlm._sample_window()
     assert sample is not None and len(sample) >= 1
@@ -158,9 +172,19 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
     vlm._captions_history = ["seen"]
     assert "seen" in vlm._build_prompt(3)
     out = []
-    vlm._handle_caption("", SimpleNamespace(observation=SimpleNamespace(send=lambda value: out.append(value))))
+    vlm._handle_caption(
+        "",
+        SimpleNamespace(
+            observation=SimpleNamespace(send=lambda value: out.append(value))
+        ),
+    )
     vlm._captions_history = ["a", "b", "c", "d"]
-    vlm._handle_caption("new", SimpleNamespace(observation=SimpleNamespace(send=lambda value: out.append(value))))
+    vlm._handle_caption(
+        "new",
+        SimpleNamespace(
+            observation=SimpleNamespace(send=lambda value: out.append(value))
+        ),
+    )
     assert out[-1].get() == "new"
     assert len(vlm._captions_history) == vlm.config.memory_size
 
@@ -195,7 +219,9 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
     monkeypatch.setattr(vlm, "_sample_window", lambda: [_Image()])
     monkeypatch.setattr(vlm, "_build_prompt", lambda count: f"prompt-{count}")
     handled = []
-    monkeypatch.setattr(vlm, "_handle_caption", lambda caption, outputs: handled.append(caption))
+    monkeypatch.setattr(
+        vlm, "_handle_caption", lambda caption, outputs: handled.append(caption)
+    )
     vlm.run(
         vlm_mod.StreamingVLMInputs(video=_FakeRecv([frame, frame, None])),
         vlm_mod.StreamingVLMOutputs(
@@ -223,7 +249,9 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         vad_mod.torch,
         "hub",
-        SimpleNamespace(load=lambda **kwargs: ("model", (None, None, None, _Iterator, None))),
+        SimpleNamespace(
+            load=lambda **kwargs: ("model", (None, None, None, _Iterator, None))
+        ),
     )
 
     class _SessionOptions:
@@ -278,7 +306,9 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     vad._feature_extractor = _Extractor(8)
     vad._current_segment = [_audio_frame(samples=16000 * 9)]
     assert vad._check_smart_turn() is True
-    vad._feature_extractor = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bad"))
+    vad._feature_extractor = lambda *args, **kwargs: (_ for _ in ()).throw(
+        RuntimeError("bad")
+    )
     assert vad._check_smart_turn() is False
 
     outputs = SimpleNamespace(
@@ -307,7 +337,14 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     proc_vad = vad_mod.VAD(cfg)
     proc_vad._vad_iterator.responses = [{"start": 1}]
     start_calls = []
-    monkeypatch.setattr(proc_vad, "_handle_speech_start", lambda outputs: (start_calls.append("start"), setattr(proc_vad, "_speaking", True)))
+    monkeypatch.setattr(
+        proc_vad,
+        "_handle_speech_start",
+        lambda outputs: (
+            start_calls.append("start"),
+            setattr(proc_vad, "_speaking", True),
+        ),
+    )
     proc_vad._process_audio_frame(_audio_frame(samples=1024), outputs)
     assert start_calls == ["start"]
 
@@ -315,14 +352,18 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(vad_mod.time, "time", lambda: 10.0)
     proc_vad._speaking = True
     proc_vad._silence_start = 9.0
-    monkeypatch.setattr(proc_vad, "_finalize_segment", lambda outputs: finalize_calls.append("max"))
+    monkeypatch.setattr(
+        proc_vad, "_finalize_segment", lambda outputs: finalize_calls.append("max")
+    )
     proc_vad._process_audio_frame(_audio_frame(samples=256), outputs)
     assert finalize_calls == ["max"]
 
     proc_vad._speaking = True
     proc_vad._silence_start = 9.93
     monkeypatch.setattr(proc_vad, "_check_smart_turn", lambda: True)
-    monkeypatch.setattr(proc_vad, "_finalize_segment", lambda outputs: finalize_calls.append("turn"))
+    monkeypatch.setattr(
+        proc_vad, "_finalize_segment", lambda outputs: finalize_calls.append("turn")
+    )
     monkeypatch.setattr(vad_mod.time, "time", lambda: 10.05)
     proc_vad._process_audio_frame(_audio_frame(samples=256), outputs)
     assert "turn" in finalize_calls
@@ -394,8 +435,12 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
             return
 
     monkeypatch.setattr(vad_mod.threading, "Thread", _Thread)
-    monkeypatch.setattr(run_vad, "_process_audio_frame", lambda frame, outputs: processed.append(frame))
-    monkeypatch.setattr(run_vad, "_finalize_segment", lambda outputs: finalized.append("done"))
+    monkeypatch.setattr(
+        run_vad, "_process_audio_frame", lambda frame, outputs: processed.append(frame)
+    )
+    monkeypatch.setattr(
+        run_vad, "_finalize_segment", lambda outputs: finalized.append("done")
+    )
     run_vad._current_segment = [_audio_frame(samples=1000)]
     run_vad.run(
         vad_mod.VADInputs(audio=_FakeRecv([_audio_frame(samples=1000), None])),
@@ -408,9 +453,13 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
 def test_object_detector_paths(monkeypatch) -> None:
     import src.core.conduit.object_detector as det_mod
 
-    monkeypatch.setattr(det_mod, "auto_device", lambda device: SimpleNamespace(type="cpu"))
+    monkeypatch.setattr(
+        det_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")
+    )
     monkeypatch.setattr(det_mod, "auto_dtype", lambda device: "f32")
-    monkeypatch.setattr(det_mod, "resize_and_crop", lambda frame, width, height: frame[:height, :width])
+    monkeypatch.setattr(
+        det_mod, "resize_and_crop", lambda frame, width, height: frame[:height, :width]
+    )
 
     fake_torch = types.SimpleNamespace(
         inference_mode=lambda: contextlib.nullcontext(),
@@ -419,7 +468,9 @@ def test_object_detector_paths(monkeypatch) -> None:
     )
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
-    detector = det_mod.ObjectDetector(det_mod.ObjectDetectorConfig(resolution=2, session_ttl=1))
+    detector = det_mod.ObjectDetector(
+        det_mod.ObjectDetectorConfig(resolution=2, session_ttl=1)
+    )
     assert detector._device.type == "cpu"
     assert detector._dtype == "f32"
 
@@ -465,8 +516,14 @@ def test_object_detector_paths(monkeypatch) -> None:
         def __call__(self, **kwargs):
             return {
                 "obj_id_to_mask": {
-                    1: SimpleNamespace(isnan=lambda: np.array([True]), __le__=lambda self, other: np.array([False])),
-                    2: SimpleNamespace(isnan=lambda: np.array([False]), __le__=lambda self, other: np.array([True])),
+                    1: SimpleNamespace(
+                        isnan=lambda: np.array([True]),
+                        __le__=lambda self, other: np.array([False]),
+                    ),
+                    2: SimpleNamespace(
+                        isnan=lambda: np.array([False]),
+                        __le__=lambda self, other: np.array([True]),
+                    ),
                 },
                 "obj_id_to_score": {1: 0.9, 2: 0.8},
             }
@@ -534,7 +591,9 @@ def test_object_detector_paths(monkeypatch) -> None:
         {
             "object_ids": np.array([1, 2, 3], dtype=np.int64),
             "scores": np.array([0.9, 0.8, 0.7], dtype=np.float32),
-            "boxes": np.array([[0, 0, 1, 1], [1, 1, 2, 2], [2, 2, 3, 3]], dtype=np.float32),
+            "boxes": np.array(
+                [[0, 0, 1, 1], [1, 1, 2, 2], [2, 2, 3, 3]], dtype=np.float32
+            ),
             "prompt_to_obj_ids": {"cat": _Tensor([1, 2])},
         }
     )
@@ -553,7 +612,10 @@ def test_object_detector_paths(monkeypatch) -> None:
             return np.array([self._neg])
 
     detector._session = _Session()
-    outputs = {"obj_id_to_mask": {1: _Mask(nan=True), 2: _Mask(neg=True), 3: _Mask()}, "obj_id_to_score": {1: 1, 2: 1, 3: 1}}
+    outputs = {
+        "obj_id_to_mask": {1: _Mask(nan=True), 2: _Mask(neg=True), 3: _Mask()},
+        "obj_id_to_score": {1: 1, 2: 1, 3: 1},
+    }
     detector._purge_dead_tracklets(outputs)
     assert detector._session.removed == [(1, False), (2, False)]
     detector._prune_old_frames()
@@ -562,12 +624,23 @@ def test_object_detector_paths(monkeypatch) -> None:
     listener = det_mod.ObjectDetector(det_mod.ObjectDetectorConfig(resolution=2))
     listener._prompts = ["old"]
     init_calls = []
-    monkeypatch.setattr(listener, "_init_session", lambda: init_calls.append(list(listener._prompts)))
-    listener._prompt_listener(det_mod.ObjectDetectorInputs(video=_FakeRecv([]), prompts=_FakeRecv([TextFrame.new(text="old"), TextFrame.new(text="cat, dog"), None])))
+    monkeypatch.setattr(
+        listener, "_init_session", lambda: init_calls.append(list(listener._prompts))
+    )
+    listener._prompt_listener(
+        det_mod.ObjectDetectorInputs(
+            video=_FakeRecv([]),
+            prompts=_FakeRecv(
+                [TextFrame.new(text="old"), TextFrame.new(text="cat, dog"), None]
+            ),
+        )
+    )
     assert listener._prompts == ["cat", "dog"]
     assert init_calls == [["cat", "dog"]]
 
-    run_detector = det_mod.ObjectDetector(det_mod.ObjectDetectorConfig(resolution=2, session_ttl=1))
+    run_detector = det_mod.ObjectDetector(
+        det_mod.ObjectDetectorConfig(resolution=2, session_ttl=1)
+    )
     run_detector._prompts = []
     run_detector._ensure_model = lambda: None
     run_detector._processor = _Processor()
@@ -577,9 +650,18 @@ def test_object_detector_paths(monkeypatch) -> None:
     monkeypatch.setattr(run_detector, "_purge_dead_tracklets", lambda outputs: None)
     monkeypatch.setattr(run_detector, "_prune_old_frames", lambda: None)
     gather_calls = []
-    monkeypatch.setattr(run_detector, "_gather_by_prompt", lambda processed: (np.zeros((1, 1, 4), dtype=np.float32), np.zeros((1, 1), dtype=np.float32)))
+    monkeypatch.setattr(
+        run_detector,
+        "_gather_by_prompt",
+        lambda processed: (
+            np.zeros((1, 1, 4), dtype=np.float32),
+            np.zeros((1, 1), dtype=np.float32),
+        ),
+    )
     init_session_calls = []
-    monkeypatch.setattr(run_detector, "_init_session", lambda: init_session_calls.append("init"))
+    monkeypatch.setattr(
+        run_detector, "_init_session", lambda: init_session_calls.append("init")
+    )
 
     class _Thread:
         def __init__(self, target, args=(), daemon=False):
@@ -596,7 +678,9 @@ def test_object_detector_paths(monkeypatch) -> None:
     monkeypatch.setattr(det_mod.threading, "Thread", _Thread)
     sent_det = []
     sent_video = []
-    video = VideoFrame.new(data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
+    video = VideoFrame.new(
+        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
     run_detector.run(
         det_mod.ObjectDetectorInputs(
             video=_FakeRecv([video, video, None]),
@@ -611,7 +695,9 @@ def test_object_detector_paths(monkeypatch) -> None:
     assert len(sent_video) == 2
     assert len(init_session_calls) == 3
 
-    no_prompt_detector = det_mod.ObjectDetector(det_mod.ObjectDetectorConfig(resolution=2))
+    no_prompt_detector = det_mod.ObjectDetector(
+        det_mod.ObjectDetectorConfig(resolution=2)
+    )
     no_prompt_detector._prompts = []
     no_prompt_detector._ensure_model = lambda: None
     monkeypatch.setattr(det_mod.threading, "Thread", _Thread)

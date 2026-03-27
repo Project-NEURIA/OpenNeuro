@@ -7,7 +7,15 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from src.core.frames import AudioFrame, EOS, InterruptFrame, MessageFrame, TextFrame, ToolCall, ToolDef
+from src.core.frames import (
+    AudioFrame,
+    EOS,
+    InterruptFrame,
+    MessageFrame,
+    TextFrame,
+    ToolCall,
+    ToolDef,
+)
 
 
 class _FakeRecv:
@@ -35,7 +43,13 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             self.arguments = arguments
 
     class _ToolCallDelta:
-        def __init__(self, index: int, id_: str = "", name: str | None = None, arguments: str | None = None):
+        def __init__(
+            self,
+            index: int,
+            id_: str = "",
+            name: str | None = None,
+            arguments: str | None = None,
+        ):
             self.index = index
             self.id = id_
             self.function = _Function(name, arguments)
@@ -63,8 +77,14 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         return [
             object(),
             _Chunk([]),
-            _Chunk([_Choice(_Delta(tool_calls=[_ToolCallDelta(0, "id-", "lookup", '{"a":')]))]),
-            _Chunk([_Choice(_Delta(tool_calls=[_ToolCallDelta(0, "1", None, '1}')]))]),
+            _Chunk(
+                [
+                    _Choice(
+                        _Delta(tool_calls=[_ToolCallDelta(0, "id-", "lookup", '{"a":')])
+                    )
+                ]
+            ),
+            _Chunk([_Choice(_Delta(tool_calls=[_ToolCallDelta(0, "1", None, "1}")]))]),
             _Chunk([_Choice(_Delta(content="Hello "))]),
             _Chunk([_Choice(_Delta(content="world"))]),
             _Chunk([_Choice(_Delta(), finish_reason="stop")]),
@@ -72,7 +92,9 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(llm_mod, "completion", fake_completion)
 
-    llm = llm_mod.LLM(llm_mod.LLMConfig(model="demo", top_p=0.8, temperature=0.1, max_tokens=32))
+    llm = llm_mod.LLM(
+        llm_mod.LLMConfig(model="demo", top_p=0.8, temperature=0.1, max_tokens=32)
+    )
     token_out = []
     text_out = []
     tool_out = []
@@ -90,8 +112,15 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             messages=_FakeRecv([messages, None]),
             tools=_FakeRecv(
                 [
-                    ToolDef.new(name="lookup", description="desc", parameters={"type": "object"}, strict=True),
-                    ToolDef.new(name="ping", description="desc2", parameters={"type": "object"}),
+                    ToolDef.new(
+                        name="lookup",
+                        description="desc",
+                        parameters={"type": "object"},
+                        strict=True,
+                    ),
+                    ToolDef.new(
+                        name="ping", description="desc2", parameters={"type": "object"}
+                    ),
                     None,
                 ]
             ),
@@ -165,21 +194,32 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
     url_cfg = memory_mod.Mem0Config(
         vector_store=memory_mod.Mem0VectorStoreConfig(url="http://qdrant")
     )
-    assert memory_mod._build_mem0_config(url_cfg)["vector_store"]["config"]["url"] == "http://qdrant"
+    assert (
+        memory_mod._build_mem0_config(url_cfg)["vector_store"]["config"]["url"]
+        == "http://qdrant"
+    )
 
-    default_cfg = memory_mod.Mem0Config(vector_store=memory_mod.Mem0VectorStoreConfig(path=None))
-    default_path = memory_mod._build_mem0_config(default_cfg)["vector_store"]["config"]["path"]
+    default_cfg = memory_mod.Mem0Config(
+        vector_store=memory_mod.Mem0VectorStoreConfig(path=None)
+    )
+    default_path = memory_mod._build_mem0_config(default_cfg)["vector_store"]["config"][
+        "path"
+    ]
     assert default_path.endswith("qdrant")
 
     assert memory_mod._format_memory_prefix([]) == ""
-    assert memory_mod._format_memory_prefix([{"memory": "A"}, {"memory": ""}, {"memory": "B"}]) == (
-        "[Relevant memories]\n- A\n- B\n[End of memories]"
-    )
+    assert memory_mod._format_memory_prefix(
+        [{"memory": "A"}, {"memory": ""}, {"memory": "B"}]
+    ) == ("[Relevant memories]\n- A\n- B\n[End of memories]")
 
     closed = []
     fake_mem = SimpleNamespace(
-        vector_store=SimpleNamespace(client=SimpleNamespace(close=lambda: closed.append("vector"))),
-        _telemetry_vector_store=SimpleNamespace(client=SimpleNamespace(close=lambda: closed.append("telemetry"))),
+        vector_store=SimpleNamespace(
+            client=SimpleNamespace(close=lambda: closed.append("vector"))
+        ),
+        _telemetry_vector_store=SimpleNamespace(
+            client=SimpleNamespace(close=lambda: closed.append("telemetry"))
+        ),
     )
     memory_mod._close_memory(fake_mem)
     assert closed == ["vector", "telemetry"]
@@ -197,7 +237,9 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
     memory_mod._memory_config_hash = None
     close_calls = []
     monkeypatch.setattr(memory_mod, "Memory", _MemoryFactory)
-    monkeypatch.setattr(memory_mod, "_close_memory", lambda mem: close_calls.append(mem))
+    monkeypatch.setattr(
+        memory_mod, "_close_memory", lambda mem: close_calls.append(mem)
+    )
     first = memory_mod._get_or_create_memory(memory_mod.Mem0Config(user_id="u1"))
     second = memory_mod._get_or_create_memory(memory_mod.Mem0Config(user_id="u1"))
     third = memory_mod._get_or_create_memory(memory_mod.Mem0Config(user_id="u2"))
@@ -216,17 +258,25 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
         def add(self, messages, user_id):
             add_calls.append((messages, user_id))
 
-    monkeypatch.setattr(memory_mod, "_get_or_create_memory", lambda config: _MemoryImpl())
+    monkeypatch.setattr(
+        memory_mod, "_get_or_create_memory", lambda config: _MemoryImpl()
+    )
     mem = memory_mod.Mem0(memory_mod.Mem0Config(last_k=1, memory_limit=2))
     assert mem._query_memory([]) == ""
-    assert "keep context" in mem._query_memory([MessageFrame.new(role="user", content="hello")])
+    assert "keep context" in mem._query_memory(
+        [MessageFrame.new(role="user", content="hello")]
+    )
     mem._memory.search = lambda **kwargs: [{"memory": "list result"}]
-    assert "list result" in mem._query_memory([MessageFrame.new(role="assistant", content="reply")])
+    assert "list result" in mem._query_memory(
+        [MessageFrame.new(role="assistant", content="reply")]
+    )
     mem._memory.search = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     assert mem._query_memory([MessageFrame.new(role="user", content="hello")]) == ""
     mem._memory.add = lambda messages, user_id: add_calls.append((messages, user_id))
     mem._update_memory([MessageFrame.new(role="user", content="x")])
-    mem._memory.add = lambda messages, user_id: (_ for _ in ()).throw(RuntimeError("boom"))
+    mem._memory.add = lambda messages, user_id: (_ for _ in ()).throw(
+        RuntimeError("boom")
+    )
     mem._update_memory([MessageFrame.new(role="assistant", content="y")])
 
     update_threads = []
@@ -244,7 +294,9 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
     monkeypatch.setattr(memory_mod.threading, "Thread", _Thread)
     monkeypatch.setattr(mem, "_query_memory", lambda turns: "prefix")
     updated = []
-    monkeypatch.setattr(mem, "_update_memory", lambda new_messages: updated.append(new_messages))
+    monkeypatch.setattr(
+        mem, "_update_memory", lambda new_messages: updated.append(new_messages)
+    )
     prefixes = []
     frames = [
         [],
@@ -262,7 +314,9 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
     ]
     mem.run(
         memory_mod.Mem0Inputs(messages=_FakeRecv(frames)),
-        memory_mod.Mem0Outputs(memory_prefix=SimpleNamespace(send=lambda value: prefixes.append(value))),
+        memory_mod.Mem0Outputs(
+            memory_prefix=SimpleNamespace(send=lambda value: prefixes.append(value))
+        ),
     )
     assert [frame.get() for frame in prefixes] == ["prefix", "prefix"]
     assert len(updated) == 1
@@ -298,9 +352,13 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
         def iter_lines(self):
             yield b""
             short = base64.b64encode(b"short")
-            yield json.dumps({"result": {"audioContent": short.decode("utf-8")}}).encode("utf-8")
+            yield json.dumps(
+                {"result": {"audioContent": short.decode("utf-8")}}
+            ).encode("utf-8")
             raw = base64.b64encode(b"R" * 60)
-            yield json.dumps({"result": {"audioContent": raw.decode("utf-8")}}).encode("utf-8")
+            yield json.dumps({"result": {"audioContent": raw.decode("utf-8")}}).encode(
+                "utf-8"
+            )
 
     request_calls = {"count": 0}
 
@@ -350,11 +408,13 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             yield payload
             yield payload
 
-    monkeypatch.setattr(tts_mod.requests, "post", lambda *args, **kwargs: _MismatchResponse())
+    monkeypatch.setattr(
+        tts_mod.requests, "post", lambda *args, **kwargs: _MismatchResponse()
+    )
     monkeypatch.setattr(
         mismatch_tts._task_queue,
         "get",
-        lambda timeout: (mismatch_tts.stop_event.set() or (0, "x")),
+        lambda timeout: mismatch_tts.stop_event.set() or (0, "x"),
     )
 
     def flip_generation(value):
@@ -433,12 +493,16 @@ def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
 
     sts = sts_mod.STS(sts_mod.STSConfig())
     closed = {"count": 0}
-    sts._ws = SimpleNamespace(close=lambda: closed.__setitem__("count", closed["count"] + 1))
+    sts._ws = SimpleNamespace(
+        close=lambda: closed.__setitem__("count", closed["count"] + 1)
+    )
     sts.stop()
     assert closed["count"] == 1
 
     sts2 = sts_mod.STS(sts_mod.STSConfig())
-    sts2._ws = SimpleNamespace(close=lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    sts2._ws = SimpleNamespace(
+        close=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     sts2.stop()
 
     ws_messages = []
@@ -452,7 +516,9 @@ def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     def raising_send(payload):
         raise _Closed()
 
-    sender._send_loop(SimpleNamespace(send=raising_send), _FakeRecv([_audio_frame(), None]))
+    sender._send_loop(
+        SimpleNamespace(send=raising_send), _FakeRecv([_audio_frame(), None])
+    )
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ValueError, match="must be set"):
@@ -517,14 +583,18 @@ def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
             self.target(*self.args)
 
     run_sts = sts_mod.STS(sts_mod.STSConfig())
-    monkeypatch.setattr(sts_mod, "connect", lambda url, additional_headers: _ConnectCtx(run_sts))
+    monkeypatch.setattr(
+        sts_mod, "connect", lambda url, additional_headers: _ConnectCtx(run_sts)
+    )
     monkeypatch.setattr(sts_mod.threading, "Thread", _Thread)
     run_sts.run(
         sts_mod.STSInputs(
             audio=_FakeRecv([_audio_frame(), None]),
             interrupt=_FakeRecv([InterruptFrame.new(reason="clear"), None]),
         ),
-        sts_mod.STSOutputs(audio=SimpleNamespace(send=lambda value: audio_out.append(value))),
+        sts_mod.STSOutputs(
+            audio=SimpleNamespace(send=lambda value: audio_out.append(value))
+        ),
     )
     assert len(audio_out) == 1
     assert run_sts._ws is not None

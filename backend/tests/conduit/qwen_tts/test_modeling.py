@@ -17,7 +17,7 @@ def _ensure_transformers_patch(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -97,7 +97,9 @@ def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
         "default",
         lambda config, device=None: (
             torch.ones(
-                getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
+                getattr(
+                    config, "head_dim", config.hidden_size // config.num_attention_heads
+                )
                 // 2,
                 dtype=torch.float32,
             ),
@@ -127,7 +129,9 @@ def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
     pool = mod.AttentiveStatisticsPooling(4, attention_channels=2)
     mask = pool._length_to_mask(torch.tensor([2, 3]), dtype=torch.float32)
     assert mask.shape == (2, 3)
-    mean, std = pool._compute_statistics(torch.ones((1, 4, 3)), torch.ones((1, 4, 3)) / 3)
+    mean, std = pool._compute_statistics(
+        torch.ones((1, 4, 3)), torch.ones((1, 4, 3)) / 3
+    )
     assert mean.shape == std.shape == (1, 4)
     assert pool(torch.ones((1, 4, 4))).shape == (1, 8, 1)
     tdnn = mod.TimeDelayNetBlock(4, 4, kernel_size=3, dilation=1)
@@ -158,7 +162,9 @@ def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
     monkeypatch.setattr(
         mod,
         "librosa_mel_fn",
-        lambda sr, n_fft, n_mels, fmin, fmax: np.ones((n_mels, n_fft // 2 + 1), dtype=np.float32),
+        lambda sr, n_fft, n_mels, fmin, fmax: np.ones(
+            (n_mels, n_fft // 2 + 1), dtype=np.float32
+        ),
     )
     mel = mod.mel_spectrogram(
         torch.tensor([[-1.5, 0.0, 1.5, 0.0]], dtype=torch.float32),
@@ -193,13 +199,18 @@ def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
     assert cos.shape == sin.shape
 
     tts_rot = mod.Qwen3TTSRotaryEmbedding(qcfg.talker_config.code_predictor_config)
-    cos2, sin2 = tts_rot(torch.ones((1, 2, 4)), torch.tensor([[0, 1]], dtype=torch.long))
+    cos2, sin2 = tts_rot(
+        torch.ones((1, 2, 4)), torch.tensor([[0, 1]], dtype=torch.long)
+    )
     assert cos2.shape == sin2.shape == (1, 2, 4)
 
     rms = mod.Qwen3TTSRMSNorm(4)
     assert rms(torch.ones((1, 2, 4))).shape == (1, 2, 4)
     assert "eps=" in rms.extra_repr()
-    assert torch.equal(mod.rotate_half(torch.tensor([[1.0, 2.0, 3.0, 4.0]])), torch.tensor([[-3.0, -4.0, 1.0, 2.0]]))
+    assert torch.equal(
+        mod.rotate_half(torch.tensor([[1.0, 2.0, 3.0, 4.0]])),
+        torch.tensor([[-3.0, -4.0, 1.0, 2.0]]),
+    )
     kv = torch.ones((1, 1, 2, 4))
     assert mod.repeat_kv(kv, 2).shape == (1, 2, 2, 4)
     attn_out, attn_weights = mod.eager_attention_forward(
@@ -241,7 +252,9 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
         "default",
         lambda config, device=None: (
             torch.ones(
-                getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
+                getattr(
+                    config, "head_dim", config.hidden_size // config.num_attention_heads
+                )
                 // 2,
                 dtype=torch.float32,
             ),
@@ -329,7 +342,9 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
     with pytest.raises(ValueError):
         predictor_model(inputs_embeds=torch.ones((1, 2, 4)), past_key_values="bad")
     warnings = []
-    monkeypatch.setattr(mod.logger, "warning_once", lambda message: warnings.append(message))
+    monkeypatch.setattr(
+        mod.logger, "warning_once", lambda message: warnings.append(message)
+    )
     predictor_model.gradient_checkpointing = True
     predictor_model.train()
     predictor_out = predictor_model(inputs_embeds=torch.ones((1, 2, 4)), use_cache=True)
@@ -339,11 +354,17 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
     predictor_gen = mod.Qwen3TTSTalkerCodePredictorModelForConditionalGeneration(
         code_cfg, talker_cfg
     )
-    assert predictor_gen.get_input_embeddings() is predictor_gen.model.get_input_embeddings()
+    assert (
+        predictor_gen.get_input_embeddings()
+        is predictor_gen.model.get_input_embeddings()
+    )
     assert predictor_gen.get_output_embeddings() is predictor_gen.lm_head
     predictor_input = "input"
     predictor_output = torch.nn.ModuleList(
-        [torch.nn.Linear(4, 16, bias=False) for _ in range(code_cfg.num_code_groups - 1)]
+        [
+            torch.nn.Linear(4, 16, bias=False)
+            for _ in range(code_cfg.num_code_groups - 1)
+        ]
     )
     predictor_decoder = mod.Qwen3TTSTalkerCodePredictorModel(code_cfg, embedding_dim=4)
     predictor_gen.set_input_embeddings(predictor_input)
@@ -392,7 +413,10 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
     talker_model.set_input_embeddings("embed")
     assert talker_model.embed_tokens == "embed"
     with pytest.raises(ValueError):
-        talker_model(input_ids=torch.ones((1, 1), dtype=torch.long), inputs_embeds=torch.ones((1, 1, 4)))
+        talker_model(
+            input_ids=torch.ones((1, 1), dtype=torch.long),
+            inputs_embeds=torch.ones((1, 1, 4)),
+        )
     talker_model.gradient_checkpointing = True
     talker_model.train()
     warnings.clear()
@@ -418,8 +442,10 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
 
     talker_gen = mod.Qwen3TTSTalkerForConditionalGeneration(talker_cfg)
     talker_gen.loss_function = lambda **kwargs: torch.tensor(2.0)
-    talker_gen.code_predictor.forward_finetune = lambda inputs_embeds, labels: SimpleNamespace(
-        logits=torch.ones((1, 2, 16), dtype=torch.float32), loss=torch.tensor(3.0)
+    talker_gen.code_predictor.forward_finetune = lambda inputs_embeds, labels: (
+        SimpleNamespace(
+            logits=torch.ones((1, 2, 16), dtype=torch.float32), loss=torch.tensor(3.0)
+        )
     )
     logits, loss = talker_gen.forward_sub_talker_finetune(
         torch.tensor([[1, 2, 3]], dtype=torch.long),
@@ -492,7 +518,9 @@ def test_qwen_tts_modeling_full_model_paths(monkeypatch) -> None:
         "default",
         lambda config, device=None: (
             torch.ones(
-                getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
+                getattr(
+                    config, "head_dim", config.hidden_size // config.num_attention_heads
+                )
                 // 2,
                 dtype=torch.float32,
             ),
@@ -519,7 +547,9 @@ def test_qwen_tts_modeling_full_model_paths(monkeypatch) -> None:
             "from_pretrained",
             classmethod(lambda cls, *args, **kwargs: base_instance),
         )
-        monkeypatch.setattr(mod, "download_weights_from_hf_specific", lambda *args, **kwargs: str(root))
+        monkeypatch.setattr(
+            mod, "download_weights_from_hf_specific", lambda *args, **kwargs: str(root)
+        )
         monkeypatch.setattr(
             mod,
             "cached_file",
@@ -530,7 +560,9 @@ def test_qwen_tts_modeling_full_model_paths(monkeypatch) -> None:
             "from_pretrained",
             classmethod(lambda cls, path, *args, **kwargs: SimpleNamespace(path=path)),
         )
-        loaded = mod.Qwen3TTSForConditionalGeneration.from_pretrained("remote-model", config=qcfg)
+        loaded = mod.Qwen3TTSForConditionalGeneration.from_pretrained(
+            "remote-model", config=qcfg
+        )
         assert loaded.speech_tokenizer.path.endswith("speech_tokenizer")
         assert loaded.generate_config["temperature"] == 0.5
 
@@ -630,12 +662,15 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
         "default",
         lambda config, device=None: (
             torch.ones(
-                getattr(config, "head_dim", config.hidden_size // config.num_attention_heads) // 2,
+                getattr(
+                    config, "head_dim", config.hidden_size // config.num_attention_heads
+                )
+                // 2,
                 dtype=torch.float32,
             ),
             1.0,
         ),
-        )
+    )
 
     # Res2Net branch with scale > 2.
     res2 = mod.Res2NetBlock(6, 6, scale=3, kernel_size=3, dilation=1)
@@ -691,7 +726,14 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
         "custom",
         lambda module, query, key, value, attention_mask, scaling, dropout=0.0, **kwargs: (
             query.transpose(1, 2).contiguous(),
-            torch.zeros((query.shape[0], module.num_key_value_groups, query.shape[2], key.shape[2])),
+            torch.zeros(
+                (
+                    query.shape[0],
+                    module.num_key_value_groups,
+                    query.shape[2],
+                    key.shape[2],
+                )
+            ),
         ),
     )
     talker_pos = mod.Qwen3TTSTalkerRotaryEmbedding(talker_custom)(
@@ -733,7 +775,9 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
         max_window_layers=1,
     )
     sliding_code._attn_implementation = "eager"
-    predictor_model = mod.Qwen3TTSTalkerCodePredictorModel(sliding_code, embedding_dim=4)
+    predictor_model = mod.Qwen3TTSTalkerCodePredictorModel(
+        sliding_code, embedding_dim=4
+    )
     with pytest.raises(ValueError):
         predictor_model()
     predictor_model.eval()
@@ -811,7 +855,9 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
     assert talker_layer[1] is not None
 
     talker_model = mod.Qwen3TTSTalkerModel(talker_cfg)
-    talker_model.set_input_embeddings(torch.nn.Embedding(talker_cfg.vocab_size, talker_cfg.hidden_size))
+    talker_model.set_input_embeddings(
+        torch.nn.Embedding(talker_cfg.vocab_size, talker_cfg.hidden_size)
+    )
     talker_forward = talker_model(
         input_ids=torch.tensor([[1, 2]], dtype=torch.long),
         position_ids=torch.tensor([[0, 1]], dtype=torch.long),
@@ -824,7 +870,9 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
     assert talker_forward.attentions is not None
     talker_forward_4d = talker_model(
         inputs_embeds=torch.ones((1, 2, 4)),
-        position_ids=torch.tensor([[[9, 9]], [[0, 1]], [[0, 1]], [[0, 1]]], dtype=torch.long),
+        position_ids=torch.tensor(
+            [[[9, 9]], [[0, 1]], [[0, 1]], [[0, 1]]], dtype=torch.long
+        ),
         use_cache=False,
     )
     assert talker_forward_4d.last_hidden_state.shape == (1, 2, 4)
@@ -858,10 +906,14 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
         "from_pretrained",
         classmethod(lambda cls, *args, **kwargs: missing_tok_model),
     )
-    monkeypatch.setattr(mod, "download_weights_from_hf_specific", lambda *args, **kwargs: "folder")
+    monkeypatch.setattr(
+        mod, "download_weights_from_hf_specific", lambda *args, **kwargs: "folder"
+    )
     monkeypatch.setattr(mod, "cached_file", lambda *args, **kwargs: None)
     with pytest.raises(ValueError):
-        mod.Qwen3TTSForConditionalGeneration.from_pretrained("broken-model", config=qcfg)
+        mod.Qwen3TTSForConditionalGeneration.from_pretrained(
+            "broken-model", config=qcfg
+        )
 
     icl_model = mod.Qwen3TTSForConditionalGeneration(qcfg)
     icl_input, trailing = icl_model.generate_icl_prompt(
@@ -919,14 +971,18 @@ def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
 
     with pytest.raises(NotImplementedError):
         gen_model.generate(
-            input_ids=[torch.tensor([[1, 2, 3, 14, 15, 16, 17, 18, 19]], dtype=torch.long)],
+            input_ids=[
+                torch.tensor([[1, 2, 3, 14, 15, 16, 17, 18, 19]], dtype=torch.long)
+            ],
             languages=["auto"],
             speakers=["ghost"],
             non_streaming_mode=False,
         )
     with pytest.raises(NotImplementedError):
         gen_model.generate(
-            input_ids=[torch.tensor([[1, 2, 3, 14, 15, 16, 17, 18, 19]], dtype=torch.long)],
+            input_ids=[
+                torch.tensor([[1, 2, 3, 14, 15, 16, 17, 18, 19]], dtype=torch.long)
+            ],
             languages=["klingon"],
             speakers=[None],
             non_streaming_mode=False,

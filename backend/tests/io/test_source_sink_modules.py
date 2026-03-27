@@ -10,8 +10,16 @@ import numpy as np
 from src.core.channel import Sender, Channel
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat, AudioFrame
 from src.core.sink.do_nothing import DoNothing, DoNothingInputs
-from src.core.sink.text_display import TextDisplay, TextDisplayInputs, TextDisplayOutputs
-from src.core.sink.video_stream import VideoStream, VideoStreamInputs, VideoStreamOutputs
+from src.core.sink.text_display import (
+    TextDisplay,
+    TextDisplayInputs,
+    TextDisplayOutputs,
+)
+from src.core.sink.video_stream import (
+    VideoStream,
+    VideoStreamInputs,
+    VideoStreamOutputs,
+)
 from src.core.sink.speaker import Speaker, SpeakerConfig, SpeakerInputs
 from src.core.source.prompt_repeater import (
     PromptRepeater,
@@ -19,9 +27,17 @@ from src.core.source.prompt_repeater import (
     PromptRepeaterOutputs,
 )
 from src.core.source.pulse import Pulse, PulseConfig, PulseOutputs
-from src.core.source.dummy_poses import DummyPosesInput, DummyPosesConfig, DummyPosesOutputs
+from src.core.source.dummy_poses import (
+    DummyPosesInput,
+    DummyPosesConfig,
+    DummyPosesOutputs,
+)
 from src.core.source.text_input import TextInput, TextInputInputs, TextInputOutputs
-from src.core.source.video_source import VideoSource, VideoSourceConfig, VideoSourceOutputs
+from src.core.source.video_source import (
+    VideoSource,
+    VideoSourceConfig,
+    VideoSourceOutputs,
+)
 from src.core.source.video_player import VideoPlayer, VideoPlayerConfig
 from src.core.source.camera import Camera
 from src.core.source.mic import Mic, MicConfig, MicOutputs
@@ -45,7 +61,9 @@ def test_do_nothing_text_display_text_input() -> None:
     td = TextDisplay()
     td.run(
         TextDisplayInputs(text=_FakeRecv([TextFrame.new(text="a"), None])),
-        TextDisplayOutputs(ui_text=types.SimpleNamespace(send=lambda x: sent.append(x))),
+        TextDisplayOutputs(
+            ui_text=types.SimpleNamespace(send=lambda x: sent.append(x))
+        ),
     )
     assert sent and sent[0].get() == "a"
 
@@ -66,10 +84,14 @@ def test_video_stream_and_speaker(monkeypatch) -> None:
     monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
     sent = []
     vs = VideoStream()
-    vf = VideoFrame.new(data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
+    vf = VideoFrame.new(
+        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
     vs.run(
         VideoStreamInputs(video=_FakeRecv([vf, None])),
-        VideoStreamOutputs(ui_video=types.SimpleNamespace(send=lambda b: sent.append(b))),
+        VideoStreamOutputs(
+            ui_video=types.SimpleNamespace(send=lambda b: sent.append(b))
+        ),
     )
     assert sent[0] == b"\x01\x02\x03"
 
@@ -88,7 +110,9 @@ def test_video_stream_and_speaker(monkeypatch) -> None:
     fake_sd = types.SimpleNamespace(OutputStream=lambda **kwargs: _Out())
     monkeypatch.setattr("src.core.sink.speaker.sd", fake_sd)
     sp = Speaker(SpeakerConfig(sample_rate=16000, channels=1))
-    af = AudioFrame.new(data=np.zeros((1, 8), dtype=np.float32), sample_rate=16000, channels=1)
+    af = AudioFrame.new(
+        data=np.zeros((1, 8), dtype=np.float32), sample_rate=16000, channels=1
+    )
     sp.run(SpeakerInputs(audio=_FakeRecv([af, None])), ())
     assert len(writes) == 1
 
@@ -103,7 +127,12 @@ def test_prompt_pulse_dummy_poses() -> None:
         return orig_wait(0)
 
     pr.stop_event.wait = _w_pr  # type: ignore[method-assign]
-    pr.run((), PromptRepeaterOutputs(text=types.SimpleNamespace(send=lambda x: psent.append(x))))
+    pr.run(
+        (),
+        PromptRepeaterOutputs(
+            text=types.SimpleNamespace(send=lambda x: psent.append(x))
+        ),
+    )
     assert psent and psent[0].get() == "p"
 
     pulsed = []
@@ -115,7 +144,9 @@ def test_prompt_pulse_dummy_poses() -> None:
         return orig_wait2(0)
 
     pu.stop_event.wait = _w_pu  # type: ignore[method-assign]
-    pu.run((), PulseOutputs(pulse=types.SimpleNamespace(send=lambda x: pulsed.append(x))))
+    pu.run(
+        (), PulseOutputs(pulse=types.SimpleNamespace(send=lambda x: pulsed.append(x)))
+    )
     assert pulsed
 
     poses = []
@@ -158,7 +189,9 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
         CAP_PROP_FPS=1,
         CAP_PROP_POS_FRAMES=2,
         INTER_LINEAR=1,
-        resize=lambda frame, size, interpolation: np.zeros((size[1], size[0], 3), dtype=np.uint8),
+        resize=lambda frame, size, interpolation: np.zeros(
+            (size[1], size[0], 3), dtype=np.uint8
+        ),
     )
     monkeypatch.setattr("src.core.source.video_source.cv2", fake_cv2)
     monkeypatch.setattr("src.core.source.camera.cv2", fake_cv2)
@@ -172,11 +205,18 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
             self.stop_event.set()
 
     sent = []
-    src = _VS(VideoSourceConfig(source="0", width_resize=3, height_resize=2, fps_resample=30))
+    src = _VS(
+        VideoSourceConfig(source="0", width_resize=3, height_resize=2, fps_resample=30)
+    )
     ticks = iter([0.0, 2.0, 2.0, 2.0, 2.0])
-    monkeypatch.setattr("src.core.source.video_source.time.monotonic", lambda: next(ticks, 2.0))
+    monkeypatch.setattr(
+        "src.core.source.video_source.time.monotonic", lambda: next(ticks, 2.0)
+    )
     monkeypatch.setattr("src.core.source.video_source.time.sleep", lambda _s: None)
-    src.run((), VideoSourceOutputs(video=types.SimpleNamespace(send=lambda f: sent.append(f))))
+    src.run(
+        (),
+        VideoSourceOutputs(video=types.SimpleNamespace(send=lambda f: sent.append(f))),
+    )
     assert sent and sent[0].width == 3 and sent[0].height == 2
     assert src._resize(np.zeros((2, 4, 3), dtype=np.uint8)).shape[1] == 3
     src._config.width_resize = 4
@@ -306,7 +346,9 @@ def test_openvr_vrchat_and_package_init(monkeypatch) -> None:
 
     monkeypatch.setattr("src.core.source.openvr_player.Client", _Client)
     monkeypatch.setattr("src.core.source.openvr_player.Player", _Player)
-    monkeypatch.setitem(sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Player=_Player))
+    monkeypatch.setitem(
+        sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Player=_Player)
+    )
     op = OpenVRPlayer(OpenVRPlayerConfig())
     op.run(types.SimpleNamespace(), types.SimpleNamespace())
     assert calls[:2] == ["connect", "play"]
@@ -359,7 +401,9 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
         CAP_PROP_FPS=1,
         CAP_PROP_POS_FRAMES=2,
         INTER_LINEAR=1,
-        resize=lambda frame, size, interpolation: np.zeros((size[1], size[0], 3), dtype=np.uint8),
+        resize=lambda frame, size, interpolation: np.zeros(
+            (size[1], size[0], 3), dtype=np.uint8
+        ),
     )
     monkeypatch.setattr("src.core.source.video_source.cv2", fake_cv2)
 
@@ -373,10 +417,20 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
     src = _VS(VideoSourceConfig(source="0", fps_resample=10))
     monotonic_values = iter([0.0, 0.2, 0.0, 0.0])
     sleeps = []
-    monkeypatch.setattr("src.core.source.video_source.time.monotonic", lambda: next(monotonic_values, 0.0))
-    monkeypatch.setattr("src.core.source.video_source.time.sleep", lambda value: sleeps.append(value))
+    monkeypatch.setattr(
+        "src.core.source.video_source.time.monotonic",
+        lambda: next(monotonic_values, 0.0),
+    )
+    monkeypatch.setattr(
+        "src.core.source.video_source.time.sleep", lambda value: sleeps.append(value)
+    )
     sent = []
-    src.run((), VideoSourceOutputs(video=types.SimpleNamespace(send=lambda frame: sent.append(frame))))
+    src.run(
+        (),
+        VideoSourceOutputs(
+            video=types.SimpleNamespace(send=lambda frame: sent.append(frame))
+        ),
+    )
     assert sent and sleeps
 
     class _Frame:
@@ -419,9 +473,13 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
         def get_extrinsics(self, frame, eye=0):
             return np.eye(4, dtype=np.float32)
 
-    monkeypatch.setitem(sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client))
+    monkeypatch.setitem(
+        sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client)
+    )
     monotonic_values = iter([0.0, 1.0])
-    monkeypatch.setattr("src.core.source.vrchat.time.monotonic", lambda: next(monotonic_values, 1.0))
+    monkeypatch.setattr(
+        "src.core.source.vrchat.time.monotonic", lambda: next(monotonic_values, 1.0)
+    )
     out_v = []
     out_c = []
     vc = VRChatVideo(host="h", port=1, fps=1)

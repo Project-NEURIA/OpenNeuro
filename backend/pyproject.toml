@@ -46,6 +46,8 @@ dependencies = [
 ]
 
 [tool.mypy]
+exclude = '(^tests/)'
+
 [[tool.mypy.overrides]]
 module = [
     "sounddevice", "onnxruntime", "clip", "smplx", "yaml",

@@ -53,7 +53,9 @@ def test_monocular_depth_estimator_paths(monkeypatch) -> None:
     import torch
     import src.core.conduit.monocular_depth_estimator as mono_mod
 
-    monkeypatch.setattr(mono_mod, "auto_device", lambda device: SimpleNamespace(type="cpu"))
+    monkeypatch.setattr(
+        mono_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")
+    )
     monkeypatch.setattr(mono_mod, "auto_dtype", lambda device: "float32")
     monkeypatch.setattr(
         mono_mod,
@@ -108,30 +110,42 @@ def test_monocular_depth_estimator_paths(monkeypatch) -> None:
             output_height=2,
         )
     )
-    assert mono_mod.MonocularDepthEstimator.get_options({})["config"]["model"][0]["value"]
+    assert mono_mod.MonocularDepthEstimator.get_options({})["config"]["model"][0][
+        "value"
+    ]
 
     estimator.setup()
     assert fake_model.to_device.type == "cpu"
     assert fake_model.eval_called is True
 
-    metric = estimator._infer(np.zeros((2, 2, 3), dtype=np.uint8), np.eye(3, dtype=np.float32))
+    metric = estimator._infer(
+        np.zeros((2, 2, 3), dtype=np.uint8), np.eye(3, dtype=np.float32)
+    )
     assert metric.shape == (2, 2)
 
     fake_model.pred = SimpleNamespace(
         depth=np.array([[[2.0, 4.0], [6.0, 8.0]]], dtype=np.float32),
         is_metric=False,
     )
-    scaled = estimator._infer(np.zeros((2, 2, 3), dtype=np.uint8), np.eye(3, dtype=np.float32))
+    scaled = estimator._infer(
+        np.zeros((2, 2, 3), dtype=np.uint8), np.eye(3, dtype=np.float32)
+    )
     assert np.allclose(scaled, np.array([[3.5, 5.5], [7.5, 9.5]], dtype=np.float32))
 
-    video = VideoFrame.new(data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
-    depth_out, video_out = estimator._resize_outputs(np.ones((2, 2), dtype=np.float32), video)
+    video = VideoFrame.new(
+        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
+    depth_out, video_out = estimator._resize_outputs(
+        np.ones((2, 2), dtype=np.float32), video
+    )
     assert depth_out.shape == (2, 2)
     assert video_out.shape == (2, 2, 3)
 
     sent_depth = []
     sent_video = []
-    monkeypatch.setattr(estimator, "_infer", lambda rgb, intrinsics: np.ones((2, 2), dtype=np.float32))
+    monkeypatch.setattr(
+        estimator, "_infer", lambda rgb, intrinsics: np.ones((2, 2), dtype=np.float32)
+    )
     estimator.run(
         mono_mod.MonocularDepthEstimatorInputs(
             video=_FakeRecv([video, None]),
@@ -197,9 +211,7 @@ def test_pose_renderer_paths() -> None:
 
     sent = []
     renderer.run(
-        pose_mod.PoseRendererInputs(
-            pose=_FakeRecv([BodyPoseFrame(poses=poses), None])
-        ),
+        pose_mod.PoseRendererInputs(pose=_FakeRecv([BodyPoseFrame(poses=poses), None])),
         pose_mod.PoseRendererOutputs(
             video=SimpleNamespace(send=lambda value: sent.append(value))
         ),
@@ -214,7 +226,10 @@ def test_stereo_to_mono_paths() -> None:
     left = np.zeros((2, 2, 3), dtype=np.uint8)
     right = np.ones((2, 2, 3), dtype=np.uint8)
     stereo = StereoVideoFrame.new(left=left, right=right, format=VideoDataFormat.RGB)
-    assert mono_mod.StereoToMonocularVideo.get_options({})["config"]["eye"][1]["value"] == "right"
+    assert (
+        mono_mod.StereoToMonocularVideo.get_options({})["config"]["eye"][1]["value"]
+        == "right"
+    )
 
     sent_left = []
     mono_mod.StereoToMonocularVideo(
@@ -310,11 +325,15 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
         def forward(self, t0, t1, **kwargs):
             self.calls.append((t0.value.shape, t1.value.shape, kwargs))
             h, w = t0.value.shape[-2:]
-            return _FakeTensor(np.arange(h * w, dtype=np.float32).reshape(1, 1, h, w) - 1)
+            return _FakeTensor(
+                np.arange(h * w, dtype=np.float32).reshape(1, 1, h, w) - 1
+            )
 
     fake_model = _FakeModel()
     fake_torch = types.SimpleNamespace(
-        empty=lambda *shape, dtype=None, device=None: _FakeBuffer(np.zeros(shape, dtype=np.float32)),
+        empty=lambda *shape, dtype=None, device=None: _FakeBuffer(
+            np.zeros(shape, dtype=np.float32)
+        ),
         as_tensor=lambda value, device=None: _FakeTensor(value),
         no_grad=lambda: contextlib.nullcontext(),
         amp=SimpleNamespace(autocast=lambda *args, **kwargs: contextlib.nullcontext()),
@@ -375,18 +394,24 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
     )
     left_out, right_out = estimator._resize_outputs(stereo_frame)
     assert np.array_equal(left_out, cv2.cvtColor(stereo_frame.left, cv2.COLOR_RGB2BGR))
-    assert np.array_equal(right_out, cv2.cvtColor(stereo_frame.right, cv2.COLOR_RGB2BGR))
+    assert np.array_equal(
+        right_out, cv2.cvtColor(stereo_frame.right, cv2.COLOR_RGB2BGR)
+    )
 
     sent_depth = []
     sent_video = []
-    monkeypatch.setattr(estimator, "_infer", lambda left, right: np.full((2, 2), 2.0, dtype=np.float32))
+    monkeypatch.setattr(
+        estimator, "_infer", lambda left, right: np.full((2, 2), 2.0, dtype=np.float32)
+    )
     monkeypatch.setattr(
         estimator,
         "_resize_outputs",
         lambda frame: (frame.left.copy(), frame.right.copy()),
     )
     camera = StereoCameraParamsFrame.new(
-        intrinsics=np.array([[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32),
+        intrinsics=np.array(
+            [[4.0, 0.0, 0.0], [0.0, 4.0, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32
+        ),
         extrinsics=np.eye(4, dtype=np.float32),
         baseline=0.5,
         width=2,
@@ -485,7 +510,9 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
             return [self.responses.pop(0)]
 
     fake_yolo = _YOLOE("unused")
-    monkeypatch.setitem(sys.modules, "ultralytics", SimpleNamespace(YOLOE=lambda checkpoint: fake_yolo))
+    monkeypatch.setitem(
+        sys.modules, "ultralytics", SimpleNamespace(YOLOE=lambda checkpoint: fake_yolo)
+    )
 
     segmenter = seg_mod.ObjectSegmenter(
         seg_mod.ObjectSegmenterConfig(
@@ -559,7 +586,9 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
 
     listener = seg_mod.ObjectSegmenter(seg_mod.ObjectSegmenterConfig())
     updated = []
-    monkeypatch.setattr(listener, "_set_phrases", lambda prompts: updated.append(list(prompts)))
+    monkeypatch.setattr(
+        listener, "_set_phrases", lambda prompts: updated.append(list(prompts))
+    )
     listener._prompt_listener(
         seg_mod.ObjectSegmenterInputs(
             video=_FakeRecv([]),
@@ -574,7 +603,9 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     run_segmenter._infer = lambda frame: None
     monkeypatch.setattr(seg_mod.threading, "Thread", _SyncThread)
     skipped = []
-    frame = VideoFrame.new(data=np.zeros((4, 4, 3), dtype=np.uint8), format=VideoDataFormat.BGR)
+    frame = VideoFrame.new(
+        data=np.zeros((4, 4, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
     run_segmenter.run(
         seg_mod.ObjectSegmenterInputs(
             video=_FakeRecv([frame, None]),
@@ -668,8 +699,12 @@ def test_discord_paths(monkeypatch) -> None:
     discord_mod._discord_running = True
     io._ensure_discord_running()
 
-    monkeypatch.setattr(discord_mod.DiscordIO, "_register_handlers_for_bot", real_register_handlers)
-    monkeypatch.setattr(discord_mod.DiscordIO, "_ensure_discord_running", lambda self: None)
+    monkeypatch.setattr(
+        discord_mod.DiscordIO, "_register_handlers_for_bot", real_register_handlers
+    )
+    monkeypatch.setattr(
+        discord_mod.DiscordIO, "_ensure_discord_running", lambda self: None
+    )
     monkeypatch.setattr(discord_mod.threading, "Thread", real_thread)
     io = discord_mod.DiscordIO(discord_mod.DiscordConfig(audio_buffer_seconds=2))
 
@@ -728,11 +763,15 @@ def test_discord_paths(monkeypatch) -> None:
     asyncio.run(bot.commands["join"](missing_voice_ctx))
     assert missing_voice_ctx.responses == ["Join a voice channel first"]
 
-    no_guild_ctx = _Ctx(author=_Member(voice=SimpleNamespace(channel=object())), guild=None)
+    no_guild_ctx = _Ctx(
+        author=_Member(voice=SimpleNamespace(channel=object())), guild=None
+    )
     asyncio.run(bot.commands["join"](no_guild_ctx))
     assert no_guild_ctx.responses == ["Must be used in a guild"]
 
-    no_channel_ctx = _Ctx(author=_Member(voice=SimpleNamespace(channel=None)), guild=SimpleNamespace(id=4))
+    no_channel_ctx = _Ctx(
+        author=_Member(voice=SimpleNamespace(channel=None)), guild=SimpleNamespace(id=4)
+    )
     asyncio.run(bot.commands["join"](no_channel_ctx))
     assert no_channel_ctx.responses == ["Join a voice channel first"]
 
@@ -830,7 +869,10 @@ def test_discord_paths(monkeypatch) -> None:
     assert create_task_calls == ["task"]
 
     discord_mod._playback_tasks[10] = _Task()
-    leave_ctx = _Ctx(author=_Member(voice=SimpleNamespace(channel=None)), guild=SimpleNamespace(id=10))
+    leave_ctx = _Ctx(
+        author=_Member(voice=SimpleNamespace(channel=None)),
+        guild=SimpleNamespace(id=10),
+    )
     asyncio.run(bot.commands["leave"](leave_ctx))
     assert leave_ctx.responses == ["Disconnected"]
     assert new_vc.stop_calls == 1
@@ -857,7 +899,9 @@ def test_discord_paths(monkeypatch) -> None:
     assert "Failed to join voice channel" in timeout_ctx.followup.messages[0]
 
     err4017_ctx = _Ctx(
-        author=_Member(voice=SimpleNamespace(channel=_Channel(RuntimeError("4017 nope")))),
+        author=_Member(
+            voice=SimpleNamespace(channel=_Channel(RuntimeError("4017 nope")))
+        ),
         guild=_Guild(12),
     )
     asyncio.run(bot.commands["join"](err4017_ctx))

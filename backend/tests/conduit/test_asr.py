@@ -79,7 +79,9 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
     transcribe_path.write_bytes(b"wav")
 
     class _Response:
-        def __init__(self, status_code: int, payload: dict[str, object], text: str = "body"):
+        def __init__(
+            self, status_code: int, payload: dict[str, object], text: str = "body"
+        ):
             self.status_code = status_code
             self._payload = payload
             self.text = text
@@ -91,7 +93,9 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
         def json(self) -> dict[str, object]:
             return self._payload
 
-    monkeypatch.setattr(asr, "_prepare_audio_for_transcription", lambda frame: str(transcribe_path))
+    monkeypatch.setattr(
+        asr, "_prepare_audio_for_transcription", lambda frame: str(transcribe_path)
+    )
     monkeypatch.setattr(
         "src.core.conduit.asr.requests.post",
         lambda *args, **kwargs: _Response(200, {"text": " hello world "}),
@@ -109,7 +113,11 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
     assert asr._transcribe_audio(_audio_frame()) is None
     assert not transcribe_path.exists()
 
-    monkeypatch.setattr(asr, "_prepare_audio_for_transcription", lambda frame: (_ for _ in ()).throw(RuntimeError("prep failed")))
+    monkeypatch.setattr(
+        asr,
+        "_prepare_audio_for_transcription",
+        lambda frame: (_ for _ in ()).throw(RuntimeError("prep failed")),
+    )
     assert asr._transcribe_audio(_audio_frame()) is None
 
     sent = []
@@ -139,7 +147,9 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
 
     monkeypatch.setattr(asr._task_queue, "get", fake_get)
     monkeypatch.setattr(asr, "_transcribe_audio", fake_transcribe)
-    asr._worker_loop(ASROutputs(text=SimpleNamespace(send=lambda value: sent.append(value))))
+    asr._worker_loop(
+        ASROutputs(text=SimpleNamespace(send=lambda value: sent.append(value)))
+    )
     assert [frame.get() for frame in sent] == ["worker text"]
 
     class _FakeThread:

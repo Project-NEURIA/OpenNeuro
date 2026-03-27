@@ -37,7 +37,9 @@ class _Manager:
 
     def components(self):
         return {
-            "n1": types.SimpleNamespace(type_="A", status=types.SimpleNamespace(value="running"))
+            "n1": types.SimpleNamespace(
+                type_="A", status=types.SimpleNamespace(value="running")
+            )
         }
 
     def sender_handles(self):
@@ -60,12 +62,16 @@ def test_edge_controller_list_create_delete(monkeypatch) -> None:
     assert out.source_node == "a"
 
     monkeypatch.setattr(
-        edge_controller.service, "create_edge", lambda *a, **k: (_ for _ in ()).throw(KeyError("x"))
+        edge_controller.service,
+        "create_edge",
+        lambda *a, **k: (_ for _ in ()).throw(KeyError("x")),
     )
     with pytest.raises(HTTPException):
         edge_controller.create_edge(req, manager)
     monkeypatch.setattr(
-        edge_controller.service, "create_edge", lambda *a, **k: (_ for _ in ()).throw(ValueError("x"))
+        edge_controller.service,
+        "create_edge",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("x")),
     )
     with pytest.raises(HTTPException):
         edge_controller.create_edge(req, manager)
@@ -73,7 +79,9 @@ def test_edge_controller_list_create_delete(monkeypatch) -> None:
     monkeypatch.setattr(edge_controller.service, "delete_edge", lambda *a, **k: None)
     assert edge_controller.delete_edge(req, manager) is None
     monkeypatch.setattr(
-        edge_controller.service, "delete_edge", lambda *a, **k: (_ for _ in ()).throw(KeyError("x"))
+        edge_controller.service,
+        "delete_edge",
+        lambda *a, **k: (_ for _ in ()).throw(KeyError("x")),
     )
     with pytest.raises(HTTPException):
         edge_controller.delete_edge(req, manager)
@@ -97,10 +105,14 @@ def test_node_controller_paths(monkeypatch) -> None:
         "create_node",
         lambda m, t, i: ("n1", node),
     )
-    out = node_controller.create_node(NodeCreateRequest(type="A", init_args={}), manager)
+    out = node_controller.create_node(
+        NodeCreateRequest(type="A", init_args={}), manager
+    )
     assert out.id == "n1"
     monkeypatch.setattr(
-        node_controller.service, "create_node", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad"))
+        node_controller.service,
+        "create_node",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")),
     )
     with pytest.raises(HTTPException):
         node_controller.create_node(NodeCreateRequest(type="A", init_args={}), manager)
@@ -109,32 +121,63 @@ def test_node_controller_paths(monkeypatch) -> None:
     with pytest.raises(HTTPException):
         node_controller.update_node("n1", NodeUpdateRequest(x=1, y=2), manager)
     monkeypatch.setattr(node_controller.service, "update_node", lambda *a, **k: node)
-    assert node_controller.update_node("n1", NodeUpdateRequest(x=1, y=2), manager).id == "n1"
+    assert (
+        node_controller.update_node("n1", NodeUpdateRequest(x=1, y=2), manager).id
+        == "n1"
+    )
 
-    monkeypatch.setattr(node_controller.service, "update_node_init_args", lambda *a, **k: None)
+    monkeypatch.setattr(
+        node_controller.service, "update_node_init_args", lambda *a, **k: None
+    )
     with pytest.raises(HTTPException):
-        node_controller.update_node_init_args("n1", NodeInitArgsUpdateRequest(init_args={}), manager)
-    monkeypatch.setattr(node_controller.service, "update_node_init_args", lambda *a, **k: node)
-    assert node_controller.update_node_init_args("n1", NodeInitArgsUpdateRequest(init_args={}), manager).id == "n1"
+        node_controller.update_node_init_args(
+            "n1", NodeInitArgsUpdateRequest(init_args={}), manager
+        )
+    monkeypatch.setattr(
+        node_controller.service, "update_node_init_args", lambda *a, **k: node
+    )
+    assert (
+        node_controller.update_node_init_args(
+            "n1", NodeInitArgsUpdateRequest(init_args={}), manager
+        ).id
+        == "n1"
+    )
 
     called = {}
-    monkeypatch.setattr(node_controller.service, "delete_node", lambda m, nid: called.setdefault("deleted", nid))
+    monkeypatch.setattr(
+        node_controller.service,
+        "delete_node",
+        lambda m, nid: called.setdefault("deleted", nid),
+    )
     node_controller.delete_node("n1", manager)
     assert called["deleted"] == "n1"
 
-    monkeypatch.setattr(node_controller.service, "create_subgraph", lambda *a, **k: ("n1", node))
-    assert node_controller.create_subgraph(SubgraphCreateRequest(node_ids=["n1"], name="S"), manager).id == "n1"
     monkeypatch.setattr(
-        node_controller.service, "create_subgraph", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad"))
+        node_controller.service, "create_subgraph", lambda *a, **k: ("n1", node)
+    )
+    assert (
+        node_controller.create_subgraph(
+            SubgraphCreateRequest(node_ids=["n1"], name="S"), manager
+        ).id
+        == "n1"
+    )
+    monkeypatch.setattr(
+        node_controller.service,
+        "create_subgraph",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")),
     )
     with pytest.raises(HTTPException):
-        node_controller.create_subgraph(SubgraphCreateRequest(node_ids=["n1"], name="S"), manager)
+        node_controller.create_subgraph(
+            SubgraphCreateRequest(node_ids=["n1"], name="S"), manager
+        )
 
     monkeypatch.setattr(node_controller.service, "ungroup", lambda *a, **k: None)
     monkeypatch.setattr(node_controller.service, "list_nodes", lambda m: {"n1": node})
     assert len(node_controller.ungroup_node("n1", manager)) == 1
     monkeypatch.setattr(
-        node_controller.service, "ungroup", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad"))
+        node_controller.service,
+        "ungroup",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("bad")),
     )
     with pytest.raises(HTTPException):
         node_controller.ungroup_node("n1", manager)
@@ -152,16 +195,30 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
     manager = _Manager()
 
     called = {}
-    monkeypatch.setattr(run_controller.service, "start_all", lambda m: called.setdefault("start", True))
-    monkeypatch.setattr(run_controller.service, "stop_all", lambda m: called.setdefault("stop", True))
+    monkeypatch.setattr(
+        run_controller.service, "start_all", lambda m: called.setdefault("start", True)
+    )
+    monkeypatch.setattr(
+        run_controller.service, "stop_all", lambda m: called.setdefault("stop", True)
+    )
     run_controller.start_all(manager)
     run_controller.stop_all(manager)
     assert called == {"start": True, "stop": True}
 
-    monkeypatch.setattr(save_controller.AppConfig, "load_config", classmethod(lambda cls: types.SimpleNamespace(current_project=None)))
+    monkeypatch.setattr(
+        save_controller.AppConfig,
+        "load_config",
+        classmethod(lambda cls: types.SimpleNamespace(current_project=None)),
+    )
     assert save_controller.save_graph(manager) is None
-    monkeypatch.setattr(save_controller.AppConfig, "load_config", classmethod(lambda cls: types.SimpleNamespace(current_project="demo")))
-    monkeypatch.setattr(save_controller.service, "save_graph", lambda p, g: called.setdefault("save", p))
+    monkeypatch.setattr(
+        save_controller.AppConfig,
+        "load_config",
+        classmethod(lambda cls: types.SimpleNamespace(current_project="demo")),
+    )
+    monkeypatch.setattr(
+        save_controller.service, "save_graph", lambda p, g: called.setdefault("save", p)
+    )
     save_controller.save_graph(manager)
     assert called["save"] == "demo"
 
@@ -179,15 +236,37 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(project_controller.service, "list_projects", lambda: [])
     assert project_controller.list_projects() == []
-    monkeypatch.setattr(project_controller.service, "create_project", lambda n: called.setdefault("create", n))
-    project_controller.create_project(project_controller.ProjectCreateRequest(name="demo"))
-    monkeypatch.setattr(project_controller.service, "delete_project", lambda n: called.setdefault("delete", n))
+    monkeypatch.setattr(
+        project_controller.service,
+        "create_project",
+        lambda n: called.setdefault("create", n),
+    )
+    project_controller.create_project(
+        project_controller.ProjectCreateRequest(name="demo")
+    )
+    monkeypatch.setattr(
+        project_controller.service,
+        "delete_project",
+        lambda n: called.setdefault("delete", n),
+    )
     project_controller.delete_project("demo")
-    monkeypatch.setattr(project_controller.service, "start_project", lambda n, m: called.setdefault("start_project", n))
+    monkeypatch.setattr(
+        project_controller.service,
+        "start_project",
+        lambda n, m: called.setdefault("start_project", n),
+    )
     assert project_controller.start_project("demo", manager).current_project == "demo"
-    monkeypatch.setattr(project_controller.service, "close_project", lambda m: called.setdefault("close_project", True))
+    monkeypatch.setattr(
+        project_controller.service,
+        "close_project",
+        lambda m: called.setdefault("close_project", True),
+    )
     project_controller.close_project(manager)
-    monkeypatch.setattr(project_controller.AppConfig, "load_config", classmethod(lambda cls: types.SimpleNamespace(current_project="demo")))
+    monkeypatch.setattr(
+        project_controller.AppConfig,
+        "load_config",
+        classmethod(lambda cls: types.SimpleNamespace(current_project="demo")),
+    )
     assert project_controller.get_current_project().current_project == "demo"
 
     monkeypatch.setattr(project_controller, "PROJECTS_DIR", tmp_path)

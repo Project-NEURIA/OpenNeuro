@@ -42,7 +42,9 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     box._enqueue_text("   ")
     assert list(box._send_queue) == []
 
-    disabled_flush = osc_chatbox.OSCChatbox(osc_chatbox.OSCChatboxConfig(text_flush_ms=0))
+    disabled_flush = osc_chatbox.OSCChatbox(
+        osc_chatbox.OSCChatboxConfig(text_flush_ms=0)
+    )
     disabled_flush._text_flush_monitor()
 
     empty_box = osc_chatbox.OSCChatbox(osc_chatbox.OSCChatboxConfig(text_flush_ms=1))
@@ -67,7 +69,9 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     flush_box._text_flush_monitor()
     assert flushed == ["idle text"]
 
-    continue_box = osc_chatbox.OSCChatbox(osc_chatbox.OSCChatboxConfig(text_flush_ms=1000))
+    continue_box = osc_chatbox.OSCChatbox(
+        osc_chatbox.OSCChatboxConfig(text_flush_ms=1000)
+    )
     continue_box._text_buffer = "busy"
     continue_box._last_text_time = 0.95
     continue_calls = {"count": 0}
@@ -81,9 +85,13 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     continue_box._text_flush_monitor()
     assert continue_box._text_buffer == "busy"
 
-    worker_box = osc_chatbox.OSCChatbox(osc_chatbox.OSCChatboxConfig(clear_on_last=True))
+    worker_box = osc_chatbox.OSCChatbox(
+        osc_chatbox.OSCChatboxConfig(clear_on_last=True)
+    )
     sleeps = []
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr(
+        "src.core.sink.osc_chatbox.time.sleep", lambda seconds: sleeps.append(seconds)
+    )
 
     def fake_send(text: str, *, reset: bool = False) -> None:
         sent.append(("worker", [text, reset]))
@@ -186,7 +194,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     )
     monkeypatch.setattr(
         "src.core.sink.osc_face.requests.post",
-        lambda *args, **kwargs: _Response(500, json.dumps({"expression": "happy"}), "oops"),
+        lambda *args, **kwargs: _Response(
+            500, json.dumps({"expression": "happy"}), "oops"
+        ),
     )
     assert http_face._select_expression_llm("x")[1] == "LLM HTTP 500: oops"
 
@@ -233,7 +243,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
             debug_print_model_repr=False,
         )
     )
-    monkeypatch.setattr(llm_first, "_select_expression_llm", lambda text: ("happy", "ok"))
+    monkeypatch.setattr(
+        llm_first, "_select_expression_llm", lambda text: ("happy", "ok")
+    )
     expr, dbg = llm_first._fuse_expression("plain text")
     assert expr == "happy"
     assert dbg["final_reason"] == "llm_first"
@@ -241,7 +253,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     override_face = osc_face.OSCFace(
         osc_face.OSCFaceConfig(emotion_llm_enable=True, debug_print_model_repr=False)
     )
-    monkeypatch.setattr(override_face, "_select_expression_llm", lambda text: ("sad", "ok"))
+    monkeypatch.setattr(
+        override_face, "_select_expression_llm", lambda text: ("sad", "ok")
+    )
     expr, dbg = override_face._fuse_expression("plain text")
     assert expr == "sad"
     assert dbg["final_reason"] == "rule_weak->llm_override"
@@ -249,7 +263,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     fallback_face = osc_face.OSCFace(
         osc_face.OSCFaceConfig(emotion_llm_enable=True, debug_print_model_repr=False)
     )
-    monkeypatch.setattr(fallback_face, "_select_expression_llm", lambda text: (None, "bad"))
+    monkeypatch.setattr(
+        fallback_face, "_select_expression_llm", lambda text: (None, "bad")
+    )
     expr, dbg = fallback_face._fuse_expression("what now?")
     assert expr == "thinking"
     assert dbg["final_reason"] == "rule_weak->llm_failed_fallback_rule"
@@ -260,10 +276,14 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     assert dbg["final_reason"] == "rule_strong_or_llm_off"
 
     sender_face = osc_face.OSCFace(
-        osc_face.OSCFaceConfig(send_gap_seconds=0.25, transition_steps=2, transition_seconds=0.4)
+        osc_face.OSCFaceConfig(
+            send_gap_seconds=0.25, transition_steps=2, transition_seconds=0.4
+        )
     )
     sleeps = []
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr(
+        "src.core.sink.osc_face.time.sleep", lambda seconds: sleeps.append(seconds)
+    )
     sender_face._send_params({"JawOpen": 0.5})
     assert sent[-1][0].endswith("/FT/JawOpen")
     assert 0.25 in sleeps
@@ -290,11 +310,21 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
 
     text_face = osc_face.OSCFace(osc_face.OSCFaceConfig(debug_print_model_repr=False))
     text_enqueued = []
-    monkeypatch.setattr(text_face, "_enqueue_text", lambda text: text_enqueued.append(text))
+    monkeypatch.setattr(
+        text_face, "_enqueue_text", lambda text: text_enqueued.append(text)
+    )
     monotonic_values = iter([1.0, 2.0])
-    monkeypatch.setattr("src.core.sink.osc_face.time.monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(
+        "src.core.sink.osc_face.time.monotonic", lambda: next(monotonic_values)
+    )
     text_face._text_loop(
-        _FakeRecv([TextFrame.new(text="a"), TextFrame.new(text=osc_face.GENERATE_END_FLAG), None])
+        _FakeRecv(
+            [
+                TextFrame.new(text="a"),
+                TextFrame.new(text=osc_face.GENERATE_END_FLAG),
+                None,
+            ]
+        )
     )
     assert text_enqueued == ["a"]
 
@@ -325,7 +355,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         flush_face.stop_event.set()
 
     monkeypatch.setattr("src.core.sink.osc_face.time.sleep", stop_sleep)
-    monkeypatch.setattr(flush_face, "_enqueue_text", lambda text: flushed_idle.append(text))
+    monkeypatch.setattr(
+        flush_face, "_enqueue_text", lambda text: flushed_idle.append(text)
+    )
     flush_face._text_flush_monitor()
     assert flushed_idle == ["later"]
 
@@ -343,7 +375,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     continue_face._text_flush_monitor()
     assert continue_face._text_buffer == "busy"
 
-    interrupt_face = osc_face.OSCFace(osc_face.OSCFaceConfig(debug_print_model_repr=False))
+    interrupt_face = osc_face.OSCFace(
+        osc_face.OSCFaceConfig(debug_print_model_repr=False)
+    )
     interrupt_face._text_buffer = "x"
     interrupt_face._expr_queue.append("queued")
     interrupt_face._expr_event.set()
@@ -355,7 +389,21 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     worker_face = osc_face.OSCFace(
         osc_face.OSCFaceConfig(hold_seconds=0.2, debug_print_model_repr=True)
     )
-    monkeypatch.setattr(worker_face, "_fuse_expression", lambda text: ("happy", {"rule_expr": "happy", "rule_hits": "yay", "rule_strong": "1", "llm_expr": "(none)", "llm_detail": "(none)", "final_reason": "rule"}))
+    monkeypatch.setattr(
+        worker_face,
+        "_fuse_expression",
+        lambda text: (
+            "happy",
+            {
+                "rule_expr": "happy",
+                "rule_hits": "yay",
+                "rule_strong": "1",
+                "llm_expr": "(none)",
+                "llm_detail": "(none)",
+                "final_reason": "rule",
+            },
+        ),
+    )
 
     def fake_transition(current, target):
         worker_face.stop_event.set()
@@ -365,7 +413,10 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     worker_face._expr_queue.append("hello")
     worker_face._expr_event.set()
     sleep_values = []
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", lambda seconds: sleep_values.append(seconds))
+    monkeypatch.setattr(
+        "src.core.sink.osc_face.time.sleep",
+        lambda seconds: sleep_values.append(seconds),
+    )
     worker_face._expression_worker()
     printed = capsys.readouterr().out
     assert "[OSCFace DEBUG]" in printed
@@ -394,7 +445,9 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     assert "[OSCFace CONFIG]" in config_output
     assert sent_params
 
-    threaded_face = osc_face.OSCFace(osc_face.OSCFaceConfig(debug_print_model_repr=False))
+    threaded_face = osc_face.OSCFace(
+        osc_face.OSCFaceConfig(debug_print_model_repr=False)
+    )
     calls = []
     threaded_face._send_params = lambda params: calls.append("send")  # type: ignore[method-assign]
     threaded_face._text_loop = lambda recv: calls.append("text")  # type: ignore[method-assign]

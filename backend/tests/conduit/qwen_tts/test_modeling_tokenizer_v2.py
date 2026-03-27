@@ -13,7 +13,7 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -23,7 +23,10 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     monkeypatch.setitem(
         tokv2_mod.ROPE_INIT_FUNCTIONS,
         "default",
-        lambda config, device=None: (torch.ones(config.head_dim // 2, dtype=torch.float32), 1.0),
+        lambda config, device=None: (
+            torch.ones(config.head_dim // 2, dtype=torch.float32),
+            1.0,
+        ),
     )
 
     x = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
@@ -57,7 +60,9 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     assert conv._get_extra_padding_for_conv1d(hidden) >= 0
     assert conv(hidden).shape[0] == 1
 
-    trans_conv = tokv2_mod.Qwen3TTSTokenizerV2CausalTransConvNet(1, 1, kernel_size=4, stride=2)
+    trans_conv = tokv2_mod.Qwen3TTSTokenizerV2CausalTransConvNet(
+        1, 1, kernel_size=4, stride=2
+    )
     assert trans_conv(torch.ones((1, 1, 4))).shape[0] == 1
 
     convnext = tokv2_mod.Qwen3TTSTokenizerV2ConvNeXtBlock(4)
@@ -128,7 +133,14 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         "custom",
         lambda module, query, key, value, attention_mask, scaling, dropout=0.0, **kwargs: (
             query.transpose(1, 2).contiguous(),
-            torch.zeros((query.shape[0], module.num_key_value_groups, query.shape[2], key.shape[2])),
+            torch.zeros(
+                (
+                    query.shape[0],
+                    module.num_key_value_groups,
+                    query.shape[2],
+                    key.shape[2],
+                )
+            ),
         ),
     )
     attention_alt = tokv2_mod.Qwen3TTSTokenizerV2DecoderAttention(cfg_alt, layer_idx=0)
@@ -145,7 +157,9 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     layer_scale = tokv2_mod.Qwen3TTSTokenizerV2DecoderLayerScale(cfg)
     assert layer_scale(torch.ones((1, 3, 4))).shape == (1, 3, 4)
 
-    transformer_layer = tokv2_mod.Qwen3TTSTokenizerV2DecoderTransformerLayer(cfg, layer_idx=0)
+    transformer_layer = tokv2_mod.Qwen3TTSTokenizerV2DecoderTransformerLayer(
+        cfg, layer_idx=0
+    )
     with pytest.raises(TypeError):
         transformer_layer(
             hidden_states,
@@ -179,7 +193,9 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     snake = tokv2_mod.SnakeBeta(4)
     assert snake(torch.ones((1, 4, 3))).shape == (1, 4, 3)
 
-    residual_unit = tokv2_mod.Qwen3TTSTokenizerV2DecoderDecoderResidualUnit(dim=4, dilation=1)
+    residual_unit = tokv2_mod.Qwen3TTSTokenizerV2DecoderDecoderResidualUnit(
+        dim=4, dilation=1
+    )
     assert residual_unit(torch.ones((1, 4, 8))).shape == (1, 4, 8)
 
     decoder_block = tokv2_mod.Qwen3TTSTokenizerV2DecoderDecoderBlock(cfg, layer_idx=0)
@@ -192,7 +208,11 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     assert vq.decode(torch.tensor([[0, 1]], dtype=torch.long)).shape == (1, 2, 2)
 
     rvq = tokv2_mod.ResidualVectorQuantization(num_quantizers=2, dim=2, codebook_size=4)
-    assert rvq.decode(torch.tensor([[[0, 1]], [[1, 0]]], dtype=torch.long)).shape == (1, 2, 2)
+    assert rvq.decode(torch.tensor([[[0, 1]], [[1, 0]]], dtype=torch.long)).shape == (
+        1,
+        2,
+        2,
+    )
 
     rvq_proj = tokv2_mod.ResidualVectorQuantizer(
         dimension=2,
@@ -202,7 +222,9 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         bins=4,
         force_projection=True,
     )
-    assert rvq_proj.decode(torch.tensor([[[0, 1], [1, 0]]], dtype=torch.long)).shape == (1, 4, 2)
+    assert rvq_proj.decode(
+        torch.tensor([[[0, 1], [1, 0]]], dtype=torch.long)
+    ).shape == (1, 4, 2)
 
     split = tokv2_mod.SplitResidualVectorQuantizer(
         n_q=3,
@@ -212,7 +234,9 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         output_dimension=2,
         bins=4,
     )
-    assert split.decode(torch.tensor([[[0, 1], [1, 0], [0, 0]]], dtype=torch.long)).shape == (1, 2, 2)
+    assert split.decode(
+        torch.tensor([[[0, 1], [1, 0], [0, 0]]], dtype=torch.long)
+    ).shape == (1, 2, 2)
 
     decoder = tokv2_mod.Qwen3TTSTokenizerV2Decoder(cfg)
     for layer in decoder.pre_transformer.layers:
@@ -235,13 +259,36 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         )
     )
     fake_decoder = SimpleNamespace(
-        chunked_decode=lambda codes: torch.ones((codes.shape[0], 1, codes.shape[-1] * 2), dtype=torch.float32)
+        chunked_decode=lambda codes: torch.ones(
+            (codes.shape[0], 1, codes.shape[-1] * 2), dtype=torch.float32
+        )
     )
-    monkeypatch.setattr(tokv2_mod.Qwen3TTSTokenizerV2Encoder, "_from_config", classmethod(lambda cls, config: fake_encoder))
-    monkeypatch.setattr(tokv2_mod.Qwen3TTSTokenizerV2Decoder, "_from_config", classmethod(lambda cls, config: fake_decoder))
+    monkeypatch.setattr(
+        tokv2_mod.Qwen3TTSTokenizerV2Encoder,
+        "_from_config",
+        classmethod(lambda cls, config: fake_encoder),
+    )
+    monkeypatch.setattr(
+        tokv2_mod.Qwen3TTSTokenizerV2Decoder,
+        "_from_config",
+        classmethod(lambda cls, config: fake_decoder),
+    )
 
     wrapper_cfg = cfg_mod.Qwen3TTSTokenizerV2Config(
-        decoder_config={"num_hidden_layers": 1, "hidden_size": 4, "latent_dim": 4, "num_attention_heads": 1, "num_key_value_heads": 1, "num_quantizers": 2, "codebook_size": 8, "upsample_rates": (2,), "upsampling_ratios": (2,), "decoder_dim": 4, "codebook_dim": 4, "head_dim": 4},
+        decoder_config={
+            "num_hidden_layers": 1,
+            "hidden_size": 4,
+            "latent_dim": 4,
+            "num_attention_heads": 1,
+            "num_key_value_heads": 1,
+            "num_quantizers": 2,
+            "codebook_size": 8,
+            "upsample_rates": (2,),
+            "upsampling_ratios": (2,),
+            "decoder_dim": 4,
+            "codebook_dim": 4,
+            "head_dim": 4,
+        },
         encode_downsample_rate=2,
         decode_upsample_rate=2,
     )
@@ -259,9 +306,13 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     encoded_tuple = wrapper.encode(input_values, padding_mask, return_dict=False)
     assert len(encoded_tuple[0]) == 1
 
-    decoded = wrapper.decode(torch.tensor([[[1, 2], [3, 4], [1, 0]]], dtype=torch.long), return_dict=True)
+    decoded = wrapper.decode(
+        torch.tensor([[[1, 2], [3, 4], [1, 0]]], dtype=torch.long), return_dict=True
+    )
     assert len(decoded.audio_values) == 1
-    decoded_tuple = wrapper.decode(torch.tensor([[[1, 2], [3, 4], [1, 0]]], dtype=torch.long), return_dict=False)
+    decoded_tuple = wrapper.decode(
+        torch.tensor([[[1, 2], [3, 4], [1, 0]]], dtype=torch.long), return_dict=False
+    )
     assert len(decoded_tuple[0]) == 1
 
 
@@ -272,7 +323,7 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -282,7 +333,10 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
     monkeypatch.setitem(
         tokv2_mod.ROPE_INIT_FUNCTIONS,
         "default",
-        lambda config, device=None: (torch.ones(config.head_dim // 2, dtype=torch.float32), 1.0),
+        lambda config, device=None: (
+            torch.ones(config.head_dim // 2, dtype=torch.float32),
+            1.0,
+        ),
     )
 
     cfg = cfg_mod.Qwen3TTSTokenizerV2DecoderConfig(

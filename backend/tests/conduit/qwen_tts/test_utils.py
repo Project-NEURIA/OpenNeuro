@@ -16,7 +16,7 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -26,8 +26,14 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
 
     rope_calls = []
     layer_calls = []
-    monkeypatch.setattr(cfg_mod, "rope_config_validation", lambda cfg: rope_calls.append(cfg))
-    monkeypatch.setattr(cfg_mod, "layer_type_validation", lambda layer_types: layer_calls.append(list(layer_types)))
+    monkeypatch.setattr(
+        cfg_mod, "rope_config_validation", lambda cfg: rope_calls.append(cfg)
+    )
+    monkeypatch.setattr(
+        cfg_mod,
+        "layer_type_validation",
+        lambda layer_types: layer_calls.append(list(layer_types)),
+    )
 
     speaker_cfg = cfg_mod.Qwen3TTSSpeakerEncoderConfig(sample_rate=16000, enc_dim=256)
     assert speaker_cfg.sample_rate == 16000
@@ -42,7 +48,11 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
     )
     assert code_cfg.num_key_value_heads == code_cfg.num_attention_heads
     assert code_cfg.rope_scaling["rope_type"] == "linear"
-    assert code_cfg.layer_types == ["full_attention", "sliding_attention", "sliding_attention"]
+    assert code_cfg.layer_types == [
+        "full_attention",
+        "sliding_attention",
+        "sliding_attention",
+    ]
     assert rope_calls and layer_calls
 
     talker_default = cfg_mod.Qwen3TTSTalkerConfig(code_predictor_config=None)
@@ -52,7 +62,9 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
     )
     talker_existing = cfg_mod.Qwen3TTSTalkerConfig(code_predictor_config=code_cfg)
     assert talker_existing.code_predictor_config is code_cfg
-    talker_dict = cfg_mod.Qwen3TTSTalkerConfig(code_predictor_config={"hidden_size": 128})
+    talker_dict = cfg_mod.Qwen3TTSTalkerConfig(
+        code_predictor_config={"hidden_size": 128}
+    )
     assert talker_dict.code_predictor_config.hidden_size == 128
 
     tts_cfg = cfg_mod.Qwen3TTSConfig(
@@ -137,7 +149,7 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -187,14 +199,20 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
             yield torch.nn.Parameter(torch.zeros(1))
 
         def encode(self, input_values, padding_mask, return_dict=True):
-            self.encode_calls.append((input_values.shape, padding_mask.shape, return_dict))
-            return SimpleNamespace(audio_codes=[torch.tensor([[1, 2], [3, 4]], dtype=torch.long)])
+            self.encode_calls.append(
+                (input_values.shape, padding_mask.shape, return_dict)
+            )
+            return SimpleNamespace(
+                audio_codes=[torch.tensor([[1, 2], [3, 4]], dtype=torch.long)]
+            )
 
         def decode(self, audio_codes, *args, return_dict=True):
             self.decode_calls.append((audio_codes.shape, args, return_dict))
             batch = audio_codes.shape[0]
             return SimpleNamespace(
-                audio_values=[torch.arange(3, dtype=torch.float32) + i for i in range(batch)]
+                audio_values=[
+                    torch.arange(3, dtype=torch.float32) + i for i in range(batch)
+                ]
             )
 
         def get_model_type(self):
@@ -235,9 +253,12 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     assert tokenizer._is_probably_base64("x/y.wav") is False
     assert tokenizer._is_url("https://example.com/a.wav") is True
     assert tokenizer._is_url("not-a-url") is False
-    assert tokenizer._decode_base64_to_wav_bytes(
-        "data:audio/wav;base64," + base64.b64encode(b"abc").decode("ascii")
-    ) == b"abc"
+    assert (
+        tokenizer._decode_base64_to_wav_bytes(
+            "data:audio/wav;base64," + base64.b64encode(b"abc").decode("ascii")
+        )
+        == b"abc"
+    )
 
     class _URLResp:
         def __enter__(self):
@@ -257,8 +278,17 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
         ]
     )
     monkeypatch.setattr(tok_mod.sf, "read", lambda *args, **kwargs: next(sf_reads))
-    monkeypatch.setattr(tok_mod.librosa, "load", lambda path, sr=None, mono=True: (np.array([1.0, 2.0], dtype=np.float32), 22050))
-    monkeypatch.setattr(tok_mod.librosa, "resample", lambda y, orig_sr, target_sr: np.asarray(y) * 2)
+    monkeypatch.setattr(
+        tok_mod.librosa,
+        "load",
+        lambda path, sr=None, mono=True: (
+            np.array([1.0, 2.0], dtype=np.float32),
+            22050,
+        ),
+    )
+    monkeypatch.setattr(
+        tok_mod.librosa, "resample", lambda y, orig_sr, target_sr: np.asarray(y) * 2
+    )
 
     wav_url = tokenizer.load_audio("https://example.com/a.wav", target_sr=24000)
     wav_b64 = tokenizer.load_audio("data:audio/wav;base64,AAAA", target_sr=24000)
@@ -267,14 +297,20 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     assert wav_b64.dtype == np.float32
     assert wav_file.dtype == np.float32
 
-    monkeypatch.setattr(tokenizer, "load_audio", lambda x, target_sr: np.array([1.0, 2.0], dtype=np.float32))
+    monkeypatch.setattr(
+        tokenizer,
+        "load_audio",
+        lambda x, target_sr: np.array([1.0, 2.0], dtype=np.float32),
+    )
     assert tokenizer._normalize_audio_inputs([], sr=None) == []
     assert len(tokenizer._normalize_audio_inputs("a.wav", sr=None)) == 1
     assert len(tokenizer._normalize_audio_inputs(["a.wav", "b.wav"], sr=None)) == 2
     with pytest.raises(ValueError):
         tokenizer._normalize_audio_inputs(np.array([1.0], dtype=np.float32), sr=None)
     with pytest.raises(TypeError):
-        tokenizer._normalize_audio_inputs([np.array([1.0], dtype=np.float32), "x"], sr=16000)
+        tokenizer._normalize_audio_inputs(
+            [np.array([1.0], dtype=np.float32), "x"], sr=16000
+        )
 
     waveforms = tokenizer._normalize_audio_inputs(
         [np.array([[1.0, 3.0], [2.0, 4.0]], dtype=np.float32)],
@@ -294,7 +330,9 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     assert encoded.audio_codes[0].shape == (2, 2)
     assert model.encode_calls[0][0][0] == 2
 
-    wavs, sr = tokenizer.decode(SimpleNamespace(audio_codes=[torch.tensor([[1, 2], [3, 4]], dtype=torch.long)]))
+    wavs, sr = tokenizer.decode(
+        SimpleNamespace(audio_codes=[torch.tensor([[1, 2], [3, 4]], dtype=torch.long)])
+    )
     assert len(wavs) == 1
     assert sr == 24000
 
@@ -323,7 +361,9 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     assert len(wavs3) == 1
 
     model.config.model_type = "qwen3_tts_tokenizer_12hz"
-    wavs4, _ = tokenizer.decode({"audio_codes": torch.tensor([[1, 2], [3, 4]], dtype=torch.long)})
+    wavs4, _ = tokenizer.decode(
+        {"audio_codes": torch.tensor([[1, 2], [3, 4]], dtype=torch.long)}
+    )
     assert len(wavs4) == 1
 
     with pytest.raises(TypeError):
@@ -348,7 +388,7 @@ def test_qwen_tts_config_and_tokenizer_remaining_paths(monkeypatch) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -360,7 +400,9 @@ def test_qwen_tts_config_and_tokenizer_remaining_paths(monkeypatch) -> None:
 
     monkeypatch.setattr(tok_mod.AutoConfig, "register", lambda *args, **kwargs: None)
     monkeypatch.setattr(tok_mod.AutoModel, "register", lambda *args, **kwargs: None)
-    monkeypatch.setattr(tok_mod.AutoFeatureExtractor, "from_pretrained", lambda path: object())
+    monkeypatch.setattr(
+        tok_mod.AutoFeatureExtractor, "from_pretrained", lambda path: object()
+    )
 
     class _NoParamModel:
         def __init__(self):
@@ -390,9 +432,13 @@ def test_qwen_tts_config_and_tokenizer_remaining_paths(monkeypatch) -> None:
         def get_decode_upsample_rate(self):
             return 1920
 
-    monkeypatch.setattr(tok_mod.AutoModel, "from_pretrained", lambda path, **kwargs: _NoParamModel())
+    monkeypatch.setattr(
+        tok_mod.AutoModel, "from_pretrained", lambda path, **kwargs: _NoParamModel()
+    )
     tokenizer = tok_mod.Qwen3TTSTokenizer.from_pretrained("demo")
     assert tokenizer.device.type == "cpu"
-    decoded, sample_rate = tokenizer.decode({"audio_codes": torch.tensor([1, 2], dtype=torch.long)})
+    decoded, sample_rate = tokenizer.decode(
+        {"audio_codes": torch.tensor([1, 2], dtype=torch.long)}
+    )
     assert len(decoded) == 1
     assert sample_rate == 24000

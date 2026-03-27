@@ -48,8 +48,12 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
     fish = fish_mod.FishTTS(fish_mod.FishTTSConfig(api_key="k", base_url="u"))
     fish_audio = []
     fish.run(
-        fish_mod.FishTTSInputs(text=_FakeRecv([TextFrame.new(text="hi"), EOS.END, None])),
-        fish_mod.FishTTSOutputs(audio=SimpleNamespace(send=lambda value: fish_audio.append(value))),
+        fish_mod.FishTTSInputs(
+            text=_FakeRecv([TextFrame.new(text="hi"), EOS.END, None])
+        ),
+        fish_mod.FishTTSOutputs(
+            audio=SimpleNamespace(send=lambda value: fish_audio.append(value))
+        ),
     )
     assert len(fish_audio) == 2
     assert isinstance(fish_audio[0], AudioFrame)
@@ -71,7 +75,9 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
             text=_FakeRecv([TextFrame.new(text="later"), None]),
             interrupt=_FakeRecv([InterruptFrame.new(reason="stop"), None]),
         ),
-        fish_mod.FishTTSOutputs(audio=SimpleNamespace(send=lambda value: interrupted_audio.append(value))),
+        fish_mod.FishTTSOutputs(
+            audio=SimpleNamespace(send=lambda value: interrupted_audio.append(value))
+        ),
     )
     assert interrupted_audio == []
 
@@ -81,7 +87,10 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
         FONT_HERSHEY_SIMPLEX=0,
         LINE_AA=16,
         applyColorMap=lambda data, cmap: np.stack([data, data, data], axis=-1),
-        resize=lambda img, size, interpolation=None: np.zeros((size[1], size[0], *(img.shape[2:] if img.ndim == 3 else ())), dtype=img.dtype if hasattr(img, "dtype") else np.uint8),
+        resize=lambda img, size, interpolation=None: np.zeros(
+            (size[1], size[0], *(img.shape[2:] if img.ndim == 3 else ())),
+            dtype=img.dtype if hasattr(img, "dtype") else np.uint8,
+        ),
         addWeighted=lambda a, wa, b, wb, gamma: a,
         rectangle=lambda *args, **kwargs: None,
         getTextSize=lambda text, font, scale, thickness: ((len(text), 10), 0),
@@ -108,8 +117,17 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
     depth_outputs = []
     depth_mod.DepthEstimationVisualizer().run(
         depth_mod.DepthEstimationVisualizerInputs(
-            depth=_FakeRecv([DepthFrame.new(data=depth), DepthFrame.new(data=depth), None]),
-            video=_FakeRecv([VideoFrame.new(data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR)]),
+            depth=_FakeRecv(
+                [DepthFrame.new(data=depth), DepthFrame.new(data=depth), None]
+            ),
+            video=_FakeRecv(
+                [
+                    VideoFrame.new(
+                        data=np.zeros((2, 2, 3), dtype=np.uint8),
+                        format=VideoDataFormat.BGR,
+                    )
+                ]
+            ),
         ),
         depth_mod.DepthEstimationVisualizerOutputs(
             video=SimpleNamespace(send=lambda value: depth_outputs.append(value))
@@ -158,7 +176,9 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
     loc_img = np.zeros((8, 8, 3), dtype=np.uint8)
     loc_frame = ObjectLocationFrame.new(
         labels=("obj", "skip-score", "skip-pos"),
-        positions=np.array([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [np.nan, 0.0, 0.0]], dtype=np.float32),
+        positions=np.array(
+            [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [np.nan, 0.0, 0.0]], dtype=np.float32
+        ),
         depths=np.array([1.0, 1.0, 1.0], dtype=np.float32),
         scores=np.array([0.9, 0.1, 0.9], dtype=np.float32),
         boxes=np.array([[0, 0, 5, 5], [0, 0, 2, 2], [1, 1, 3, 3]], dtype=np.float32),

@@ -188,6 +188,7 @@ def exercise_discord_qwen_component_segmenter_and_pose_branches(
         guild=existing_guild,
     )
     join_ctx.followup.send = _followup_send.__get__(join_ctx.followup, object)
+
     async def _sleep(_s):
         return None
 
@@ -381,9 +382,7 @@ def exercise_discord_qwen_component_segmenter_and_pose_branches(
                 else np.zeros((1, 3), dtype=np.int32)
             )
             self.transforms = []
-            self.bounds = np.array(
-                [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], dtype=np.float32
-            )
+            self.bounds = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], dtype=np.float32)
 
         def apply_transform(self, mat):
             self.transforms.append(mat)
@@ -394,10 +393,8 @@ def exercise_discord_qwen_component_segmenter_and_pose_branches(
     )
     renderer._faces = np.array([[0, 1, 2]], dtype=np.int32)
     renderer._scene = SimpleNamespace(nodes=[])
-    renderer._scene.add = (
-        lambda obj, name=None, pose=None: renderer._scene.nodes.append(
-            SimpleNamespace(obj=obj, name=name, pose=pose)
-        )
+    renderer._scene.add = lambda obj, name=None, pose=None: (
+        renderer._scene.nodes.append(SimpleNamespace(obj=obj, name=name, pose=pose))
         or renderer._scene.nodes[-1]
     )
     renderer._scene.remove_node = lambda node: renderer._scene.nodes.remove(node)
@@ -567,8 +564,10 @@ def test_discord_cleanup_branches(monkeypatch) -> None:
     monkeypatch.setattr(
         discord_mod.DiscordIO, "_register_handlers_for_bot", real_register_handlers
     )
+
     async def _sleep(_s):
         return None
+
     monkeypatch.setattr(discord_mod.asyncio, "sleep", _sleep)
     monkeypatch.setattr(
         discord_mod.asyncio,
@@ -781,9 +780,7 @@ def test_pose_renderer_3d_neg_z_branch(monkeypatch) -> None:
                 else np.zeros((1, 3), dtype=np.int32)
             )
             self.transforms = []
-            self.bounds = np.array(
-                [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], dtype=np.float32
-            )
+            self.bounds = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], dtype=np.float32)
 
         def apply_transform(self, mat):
             self.transforms.append(mat)
@@ -794,10 +791,8 @@ def test_pose_renderer_3d_neg_z_branch(monkeypatch) -> None:
     )
     renderer._faces = np.array([[0, 1, 2]], dtype=np.int32)
     renderer._scene = SimpleNamespace(nodes=[])
-    renderer._scene.add = (
-        lambda obj, name=None, pose=None: renderer._scene.nodes.append(
-            SimpleNamespace(obj=obj, name=name, pose=pose)
-        )
+    renderer._scene.add = lambda obj, name=None, pose=None: (
+        renderer._scene.nodes.append(SimpleNamespace(obj=obj, name=name, pose=pose))
         or renderer._scene.nodes[-1]
     )
     renderer._scene.remove_node = lambda node: renderer._scene.nodes.remove(node)
@@ -854,7 +849,7 @@ def test_qwen_small_branches(monkeypatch, tmp_path: Path) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -922,9 +917,7 @@ def test_qwen_small_branches(monkeypatch, tmp_path: Path) -> None:
 
         def encode(self, wavs, sr=None):
             return SimpleNamespace(
-                audio_codes=[
-                    torch.tensor([1, 2], dtype=torch.long) for _ in wavs
-                ]
+                audio_codes=[torch.tensor([1, 2], dtype=torch.long) for _ in wavs]
             )
 
         def get_output_sample_rate(self):
@@ -965,8 +958,12 @@ def test_qwen_small_branches(monkeypatch, tmp_path: Path) -> None:
             voice_clone_prompt=[prompt_item, prompt_item, prompt_item],
         )
 
-    streaming = model_mod.SimpleStreamingTTS(_Model(), _Processor(), torch.device("cpu"))
-    monkeypatch.setattr(model_mod.torch, "load", lambda path, weights_only=False: "prompt")
+    streaming = model_mod.SimpleStreamingTTS(
+        _Model(), _Processor(), torch.device("cpu")
+    )
+    monkeypatch.setattr(
+        model_mod.torch, "load", lambda path, weights_only=False: "prompt"
+    )
 
     class _Talker:
         def __init__(self):
@@ -980,9 +977,10 @@ def test_qwen_small_branches(monkeypatch, tmp_path: Path) -> None:
             )
 
     streaming._talker = _Talker()
-    streaming._model.generate_voice_clone = (
-        lambda **kwargs: [streaming._talker.forward(), streaming._talker.forward()]
-    )
+    streaming._model.generate_voice_clone = lambda **kwargs: [
+        streaming._talker.forward(),
+        streaming._talker.forward(),
+    ]
     streaming._decode_audio = lambda codes: np.arange(len(codes), dtype=np.float32)
     monkeypatch.setattr(
         model_mod.threading,
@@ -1067,7 +1065,9 @@ def test_gaussian_diffusion_paths(monkeypatch) -> None:
     )
     x_start = torch.ones((2, 1, 2, 2), dtype=torch.float32)
     t = torch.tensor([0, 1], dtype=torch.long)
-    assert gd_mod._extract_into_tensor(np.array([1.0, 2.0]), torch.tensor([0]), (1, 1)).shape == (1, 1)
+    assert gd_mod._extract_into_tensor(
+        np.array([1.0, 2.0]), torch.tensor([0]), (1, 1)
+    ).shape == (1, 1)
     assert diff.q_mean_variance(x_start, t)[0].shape == x_start.shape
     noisy = diff.q_sample(x_start, t, noise=torch.zeros_like(x_start))
     assert noisy.shape == x_start.shape
@@ -1081,11 +1081,23 @@ def test_gaussian_diffusion_paths(monkeypatch) -> None:
             self.num_classes = 5
 
         def forward(self, x, ts, **kwargs):
-            return torch.zeros((x.shape[0], self.out_channels, *x.shape[2:]), dtype=x.dtype, device=x.device)
+            return torch.zeros(
+                (x.shape[0], self.out_channels, *x.shape[2:]),
+                dtype=x.dtype,
+                device=x.device,
+            )
 
     fixed_model = _BaseModel(1)
-    assert diff.p_mean_variance(fixed_model, x_start, t, denoised_fn=lambda x: x + 2.0)["mean"].shape == x_start.shape
-    assert diff.p_sample(fixed_model, x_start, t, const_noise=True)["sample"].shape == x_start.shape
+    assert (
+        diff.p_mean_variance(fixed_model, x_start, t, denoised_fn=lambda x: x + 2.0)[
+            "mean"
+        ].shape
+        == x_start.shape
+    )
+    assert (
+        diff.p_sample(fixed_model, x_start, t, const_noise=True)["sample"].shape
+        == x_start.shape
+    )
     assert diff._scale_timesteps(t).dtype == torch.float32
     monkeypatch.setitem(sys.modules, "tqdm.auto", SimpleNamespace(tqdm=lambda x: x))
     loop_out = diff.p_sample_loop(
@@ -1122,21 +1134,33 @@ def test_gaussian_diffusion_paths(monkeypatch) -> None:
         loss_type=gd_mod.LossType.MSE,
     )
     learned_model = _BaseModel(2)
-    assert diff_eps.p_mean_variance(learned_model, x_start, t)["pred_xstart"].shape == x_start.shape
-    assert diff_eps._predict_xstart_from_eps(x_start, t, torch.zeros_like(x_start)).shape == x_start.shape
+    assert (
+        diff_eps.p_mean_variance(learned_model, x_start, t)["pred_xstart"].shape
+        == x_start.shape
+    )
+    assert (
+        diff_eps._predict_xstart_from_eps(x_start, t, torch.zeros_like(x_start)).shape
+        == x_start.shape
+    )
     assert diff_eps._predict_eps_from_xstart(x_start, t, x_start).shape == x_start.shape
-    assert diff_eps.ddim_sample(learned_model, x_start, t, eta=0.5)["sample"].shape == x_start.shape
-    assert diff_eps.ddim_sample_loop(
-        learned_model,
-        x_start.shape,
-        noise=torch.zeros_like(x_start),
-        model_kwargs={"y": torch.zeros((2, 1), dtype=torch.long)},
-        progress=True,
-        eta=0.1,
-        skip_timesteps=1,
-        init_image=torch.zeros_like(x_start),
-        randomize_class=True,
-    ).shape == x_start.shape
+    assert (
+        diff_eps.ddim_sample(learned_model, x_start, t, eta=0.5)["sample"].shape
+        == x_start.shape
+    )
+    assert (
+        diff_eps.ddim_sample_loop(
+            learned_model,
+            x_start.shape,
+            noise=torch.zeros_like(x_start),
+            model_kwargs={"y": torch.zeros((2, 1), dtype=torch.long)},
+            progress=True,
+            eta=0.1,
+            skip_timesteps=1,
+            init_image=torch.zeros_like(x_start),
+            randomize_class=True,
+        ).shape
+        == x_start.shape
+    )
     assert list(
         diff_eps.ddim_sample_loop_progressive(
             learned_model,
@@ -1158,8 +1182,15 @@ def test_gaussian_diffusion_paths(monkeypatch) -> None:
         loss_type=gd_mod.LossType.MSE,
     )
     prev_model = _BaseModel(2)
-    assert diff_prev.p_mean_variance(prev_model, x_start, t, clip_denoised=False)["mean"].shape == x_start.shape
-    assert diff_prev._predict_xstart_from_xprev(x_start, t, x_start).shape == x_start.shape
+    assert (
+        diff_prev.p_mean_variance(prev_model, x_start, t, clip_denoised=False)[
+            "mean"
+        ].shape
+        == x_start.shape
+    )
+    assert (
+        diff_prev._predict_xstart_from_xprev(x_start, t, x_start).shape == x_start.shape
+    )
 
 
 def test_gaussian_diffusion_remaining_paths(monkeypatch) -> None:
@@ -1175,13 +1206,21 @@ def test_gaussian_diffusion_remaining_paths(monkeypatch) -> None:
             self.out_channels = out_channels
 
         def forward(self, x, ts, **kwargs):
-            return torch.zeros((x.shape[0], self.out_channels, *x.shape[2:]), dtype=x.dtype, device=x.device)
+            return torch.zeros(
+                (x.shape[0], self.out_channels, *x.shape[2:]),
+                dtype=x.dtype,
+                device=x.device,
+            )
 
-    monkeypatch.setattr(gd_mod.th, "randn_like", lambda tensor: torch.zeros_like(tensor))
+    monkeypatch.setattr(
+        gd_mod.th, "randn_like", lambda tensor: torch.zeros_like(tensor)
+    )
     monkeypatch.setattr(
         gd_mod.th,
         "randn",
-        lambda *shape, device=None: torch.zeros(shape, dtype=torch.float32, device=device),
+        lambda *shape, device=None: torch.zeros(
+            shape, dtype=torch.float32, device=device
+        ),
     )
 
     diff = gd_mod.GaussianDiffusion(
@@ -1191,7 +1230,10 @@ def test_gaussian_diffusion_remaining_paths(monkeypatch) -> None:
         loss_type=gd_mod.LossType.MSE,
     )
     assert diff.q_sample(x_start, t).shape == x_start.shape
-    assert diff.p_sample_loop(_BaseModel(1), x_start.shape, device=x_start.device).shape == x_start.shape
+    assert (
+        diff.p_sample_loop(_BaseModel(1), x_start.shape, device=x_start.device).shape
+        == x_start.shape
+    )
     assert list(
         diff.p_sample_loop_progressive(
             _BaseModel(1),
@@ -1223,7 +1265,9 @@ def test_gaussian_diffusion_remaining_paths(monkeypatch) -> None:
         loss_type=gd_mod.LossType.MSE,
     )
     with pytest.raises(NotImplementedError):
-        bad.p_mean_variance(_BaseModel(1), x_start[:, :, :1, :1], torch.tensor([0], dtype=torch.long))
+        bad.p_mean_variance(
+            _BaseModel(1), x_start[:, :, :1, :1], torch.tensor([0], dtype=torch.long)
+        )
 
 
 def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> None:
@@ -1264,7 +1308,9 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
                 vertices=torch.zeros((batch, 5, 3), dtype=torch.float32),
             )
 
-    monkeypatch.setattr(smpl_mod.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel())
+    monkeypatch.setattr(
+        smpl_mod.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel()
+    )
     primitive = smpl_mod.PrimitiveUtility(device="cpu")
     assert primitive.get_smpl_model("male") is primitive.bm_male
     assert primitive.get_smpl_model("female") is primitive.bm_female
@@ -1287,7 +1333,12 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         "poses_6d": poses_6d,
         "pelvis_delta": torch.zeros((1, 3), dtype=torch.float32),
     }
-    assert smpl_mod.tensor_dict_to_device({"x": torch.ones(1), "y": "z"}, device="cpu")["x"].device.type == "cpu"
+    assert (
+        smpl_mod.tensor_dict_to_device({"x": torch.ones(1), "y": "z"}, device="cpu")[
+            "x"
+        ].device.type
+        == "cpu"
+    )
     aa_dict = smpl_mod.convert_smpl_aa_to_rotmat(
         {
             "global_orient": torch.zeros((1, 3), dtype=torch.float32),
@@ -1314,12 +1365,18 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         torch.zeros((1, 1, 3), dtype=torch.float32),
     )["transf_rotmat"].shape == (1, 3, 3)
     points = torch.ones((1, 2, 3), dtype=torch.float32)
-    assert smpl_mod.transform_local_points_to_global(
-        points, torch.eye(3).unsqueeze(0), torch.zeros((1, 1, 3))
-    ).shape == points.shape
-    assert smpl_mod.transform_global_points_to_local(
-        points, torch.eye(3).unsqueeze(0), torch.zeros((1, 1, 3))
-    ).shape == points.shape
+    assert (
+        smpl_mod.transform_local_points_to_global(
+            points, torch.eye(3).unsqueeze(0), torch.zeros((1, 1, 3))
+        ).shape
+        == points.shape
+    )
+    assert (
+        smpl_mod.transform_global_points_to_local(
+            points, torch.eye(3).unsqueeze(0), torch.zeros((1, 1, 3))
+        ).shape
+        == points.shape
+    )
     assert smpl_mod.get_dict_subset_by_batch(feature_dict, 0)["gender"] == "male"
 
     body_param = primitive.feature_dict_to_smpl_dict(feature_dict)
@@ -1329,7 +1386,9 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         features_for_tensor[key] = torch.cat(
             [features_for_tensor[key], features_for_tensor[key][:, -1:, :]], dim=1
         )
-    assert primitive.dict_to_tensor(features_for_tensor).shape[-1] == primitive.feature_dim
+    assert (
+        primitive.dict_to_tensor(features_for_tensor).shape[-1] == primitive.feature_dim
+    )
     assert set(
         primitive.tensor_to_dict(
             torch.zeros((1, 1, primitive.feature_dim), dtype=torch.float32)
@@ -1347,24 +1406,29 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         return_vertices=False,
         batch_size=2,
     ).shape == (3, 22, 3)
-    assert primitive.smpl_dict_inference(
-        {
-            "gender": "male",
-            "betas": torch.zeros((3, 10), dtype=torch.float32),
-            "global_orient": torch.eye(3).reshape(1, 3, 3).repeat(3, 1, 1),
-            "body_pose": torch.eye(3).reshape(1, 1, 3, 3).repeat(3, 21, 1, 1),
-            "transl": torch.zeros((3, 3), dtype=torch.float32),
-        },
-        return_vertices=True,
-        batch_size=2,
-    )[1].shape[0] == 3
+    assert (
+        primitive.smpl_dict_inference(
+            {
+                "gender": "male",
+                "betas": torch.zeros((3, 10), dtype=torch.float32),
+                "global_orient": torch.eye(3).reshape(1, 3, 3).repeat(3, 1, 1),
+                "body_pose": torch.eye(3).reshape(1, 1, 3, 3).repeat(3, 21, 1, 1),
+                "transl": torch.zeros((3, 3), dtype=torch.float32),
+            },
+            return_vertices=True,
+            batch_size=2,
+        )[1].shape[0]
+        == 3
+    )
 
     monkeypatch.setattr(
         smpl_mod,
         "get_new_coordinate",
         lambda joints: (torch.eye(3).unsqueeze(0), torch.zeros((1, 1, 3))),
     )
-    assert primitive.get_new_coordinate(body_param, use_predicted_joints=False)[0].shape == (1, 3, 3)
+    assert primitive.get_new_coordinate(body_param, use_predicted_joints=False)[
+        0
+    ].shape == (1, 3, 3)
     assert primitive.get_new_coordinate(
         body_param, use_predicted_joints=True, pred_joints=joints_template
     )[0].shape == (1, 3, 3)
@@ -1372,14 +1436,30 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         {"gender": "male", "betas": torch.zeros((1, 10), dtype=torch.float32)}
     ).shape == (1, 3)
     canonical = primitive.canonicalize(dict(body_param), use_predicted_joints=False)[2]
-    assert primitive.calc_features(canonical, use_predicted_joints=True)["poses_6d"].shape[-1] == 132
-    assert primitive.calc_features(canonical, use_predicted_joints=False)["joints"].shape[-1] == 66
-    blended_pred = primitive.get_blended_feature(feature_dict, use_predicted_joints=True)
+    assert (
+        primitive.calc_features(canonical, use_predicted_joints=True)["poses_6d"].shape[
+            -1
+        ]
+        == 132
+    )
+    assert (
+        primitive.calc_features(canonical, use_predicted_joints=False)["joints"].shape[
+            -1
+        ]
+        == 66
+    )
+    blended_pred = primitive.get_blended_feature(
+        feature_dict, use_predicted_joints=True
+    )
     blended_fk = primitive.get_blended_feature(feature_dict, use_predicted_joints=False)
     assert blended_pred[1]["transf_rotmat"].shape == (1, 3, 3)
     assert blended_fk[1]["transf_transl"].shape == (1, 1, 3)
-    assert primitive.transform_feature_to_world(blended_pred[1])["transf_rotmat"].shape == (1, 3, 3)
-    assert primitive.transform_primitive_to_world(dict(body_param))["transf_transl"].shape == (1, 1, 3)
+    assert primitive.transform_feature_to_world(blended_pred[1])[
+        "transf_rotmat"
+    ].shape == (1, 3, 3)
+    assert primitive.transform_primitive_to_world(dict(body_param))[
+        "transf_transl"
+    ].shape == (1, 1, 3)
     assert primitive.transform_primitive_to_world(
         {**dict(body_param), "joints": torch.zeros((1, 3, 22, 3), dtype=torch.float32)}
     )["transf_rotmat"].shape == (1, 3, 3)
@@ -1395,13 +1475,19 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
         input_length=1,
         run_function=lambda v: v,
     )
-    assert nn_mod.CheckpointFunction._backward_impl(no_grad_ctx, torch.tensor([1.0]))[2] is None
+    assert (
+        nn_mod.CheckpointFunction._backward_impl(no_grad_ctx, torch.tensor([1.0]))[2]
+        is None
+    )
     no_output_ctx = SimpleNamespace(
         saved_tensors=[torch.tensor([1.0], requires_grad=True)],
         input_length=1,
         run_function=lambda v: v.detach(),
     )
-    assert nn_mod.CheckpointFunction._backward_impl(no_output_ctx, torch.tensor([1.0]))[2] is None
+    assert (
+        nn_mod.CheckpointFunction._backward_impl(no_output_ctx, torch.tensor([1.0]))[2]
+        is None
+    )
 
     with pytest.raises(ValueError):
         rot_mod.euler_angles_to_matrix(torch.zeros((1, 3)), "XY")
@@ -1449,11 +1535,16 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
             "global_orient_delta_6d": torch.zeros((1, 2, 6), dtype=torch.float32),
             "poses_6d": torch.zeros((1, 3, 132), dtype=torch.float32),
         },
-        dict_to_tensor=lambda feature_dict: torch.zeros((1, 3, 276), dtype=torch.float32),
+        dict_to_tensor=lambda feature_dict: torch.zeros(
+            (1, 3, 276), dtype=torch.float32
+        ),
     )
     dart._init_from_stand(fake_engine, fake_putil)
     assert dart._history.shape == (1, 2, 276)
-    assert dart._load_policy(SimpleNamespace(history_shape=(2,), noise_shape=(1, 3))) is None
+    assert (
+        dart._load_policy(SimpleNamespace(history_shape=(2,), noise_shape=(1, 3)))
+        is None
+    )
     missing = dart_comp_mod.DartControl(
         dart_comp_mod.DartControlConfig(
             device="cpu",
@@ -1461,7 +1552,10 @@ def test_smpl_utils_and_dart_control_branches(monkeypatch, tmp_path: Path) -> No
             policy_checkpoint=str(tmp_path / "missing.pt"),
         )
     )
-    assert missing._load_policy(SimpleNamespace(history_shape=(2,), noise_shape=(1, 3))) is None
+    assert (
+        missing._load_policy(SimpleNamespace(history_shape=(2,), noise_shape=(1, 3)))
+        is None
+    )
 
     cancel_dart = dart_comp_mod.DartControl(
         dart_comp_mod.DartControlConfig(device="cpu", batch_size=1, fps=60)

@@ -26,16 +26,25 @@ def test_dart_control_operators_paths() -> None:
     x = torch.zeros((3, 2, 4))
     assert pos_sine(x).shape == (3, 1, 4)
     with pytest.raises(UnboundLocalError):
-        ops_mod.PositionEmbeddingSine1D(4, max_len=8, batch_first=True)(torch.zeros((2, 3, 4)))
+        ops_mod.PositionEmbeddingSine1D(4, max_len=8, batch_first=True)(
+            torch.zeros((2, 3, 4))
+        )
 
     pos_learned = ops_mod.PositionEmbeddingLearned1D(4, max_len=8, batch_first=False)
     out = pos_learned(x.clone())
     assert out.shape == x.shape
-    out_bf = ops_mod.PositionEmbeddingLearned1D(4, max_len=8, batch_first=True)(torch.zeros((2, 3, 4)))
+    out_bf = ops_mod.PositionEmbeddingLearned1D(4, max_len=8, batch_first=True)(
+        torch.zeros((2, 3, 4))
+    )
     assert out_bf.shape == (2, 3, 4)
 
-    assert isinstance(ops_mod.build_position_encoding(4, "sine"), ops_mod.PositionEmbeddingSine1D)
-    assert isinstance(ops_mod.build_position_encoding(4, "learned"), ops_mod.PositionEmbeddingLearned1D)
+    assert isinstance(
+        ops_mod.build_position_encoding(4, "sine"), ops_mod.PositionEmbeddingSine1D
+    )
+    assert isinstance(
+        ops_mod.build_position_encoding(4, "learned"),
+        ops_mod.PositionEmbeddingLearned1D,
+    )
     with pytest.raises(ValueError):
         ops_mod.build_position_encoding(4, "bad")
     with pytest.raises(ValueError):
@@ -46,8 +55,12 @@ def test_dart_control_operators_paths() -> None:
 
     src = torch.randn(3, 2, 4)
     pos = torch.randn(3, 2, 4)
-    enc_post = ops_mod.TransformerEncoderLayer(4, 1, dim_feedforward=8, dropout=0.0, normalize_before=False)
-    enc_pre = ops_mod.TransformerEncoderLayer(4, 1, dim_feedforward=8, dropout=0.0, normalize_before=True)
+    enc_post = ops_mod.TransformerEncoderLayer(
+        4, 1, dim_feedforward=8, dropout=0.0, normalize_before=False
+    )
+    enc_pre = ops_mod.TransformerEncoderLayer(
+        4, 1, dim_feedforward=8, dropout=0.0, normalize_before=True
+    )
     assert enc_post.with_pos_embed(src, None).shape == src.shape
     assert enc_post.forward_post(src, pos=pos).shape == src.shape
     assert enc_pre.forward_pre(src, pos=pos).shape == src.shape
@@ -56,8 +69,12 @@ def test_dart_control_operators_paths() -> None:
 
     tgt = torch.randn(3, 2, 4)
     memory = torch.randn(3, 2, 4)
-    dec_post = ops_mod.TransformerDecoderLayer(4, 1, dim_feedforward=8, dropout=0.0, normalize_before=False)
-    dec_pre = ops_mod.TransformerDecoderLayer(4, 1, dim_feedforward=8, dropout=0.0, normalize_before=True)
+    dec_post = ops_mod.TransformerDecoderLayer(
+        4, 1, dim_feedforward=8, dropout=0.0, normalize_before=False
+    )
+    dec_pre = ops_mod.TransformerDecoderLayer(
+        4, 1, dim_feedforward=8, dropout=0.0, normalize_before=True
+    )
     assert dec_post.forward_post(tgt, memory, pos=pos, query_pos=pos).shape == tgt.shape
     assert dec_pre.forward_pre(tgt, memory, pos=pos, query_pos=pos).shape == tgt.shape
     assert dec_post(tgt, memory, pos=pos, query_pos=pos).shape == tgt.shape
@@ -119,7 +136,9 @@ def test_dart_control_denoiser_paths() -> None:
         cond_mask_prob=0.5,
     )
     assert den_mlp.parameters_wo_clip()
-    assert torch.count_nonzero(den_mlp.mask_cond(torch.ones((2, 4)), force_mask=True)) == 0
+    assert (
+        torch.count_nonzero(den_mlp.mask_cond(torch.ones((2, 4)), force_mask=True)) == 0
+    )
     den_mlp.train()
     masked = den_mlp.mask_cond(torch.ones((2, 4)))
     assert masked.shape == (2, 4)
@@ -140,7 +159,9 @@ def test_dart_control_denoiser_paths() -> None:
         cond_mask_prob=0.5,
     )
     assert den_tf.parameters_wo_clip()
-    assert torch.count_nonzero(den_tf.mask_cond(torch.ones((2, 4)), force_mask=True)) == 0
+    assert (
+        torch.count_nonzero(den_tf.mask_cond(torch.ones((2, 4)), force_mask=True)) == 0
+    )
     den_tf.train()
     den_tf.mask_cond(torch.ones((2, 4)))
     den_tf.eval()
@@ -148,7 +169,10 @@ def test_dart_control_denoiser_paths() -> None:
 
     with pytest.raises(AssertionError):
         den_mod.ClassifierFreeWrapper(
-            SimpleNamespace(cond_mask_prob=0, __call__=lambda *args, **kwargs: torch.zeros((2, 1, 3)))
+            SimpleNamespace(
+                cond_mask_prob=0,
+                __call__=lambda *args, **kwargs: torch.zeros((2, 1, 3)),
+            )
         )
 
     wrapper = den_mod.ClassifierFreeWrapper(den_tf)
@@ -160,7 +184,16 @@ def test_dart_control_vae_paths() -> None:
     import src.core.conduit.dart_control.models.vae as vae_mod
 
     with pytest.raises(ValueError):
-        vae_mod.AutoMldVae(nfeats=3, latent_dim=(1, 4), h_dim=4, ff_size=8, num_layers=3, num_heads=1, dropout=0.0, arch="bad")
+        vae_mod.AutoMldVae(
+            nfeats=3,
+            latent_dim=(1, 4),
+            h_dim=4,
+            ff_size=8,
+            num_layers=3,
+            num_heads=1,
+            dropout=0.0,
+            arch="bad",
+        )
 
     history = torch.ones((2, 2, 3), dtype=torch.float32)
     future = torch.ones((2, 3, 3), dtype=torch.float32)

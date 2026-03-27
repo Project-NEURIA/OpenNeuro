@@ -23,7 +23,11 @@ from src.core.conduit.movement_tool import (
     MovementToolInputs,
     MovementToolOutputs,
 )
-from src.core.conduit.passthrough import Passthrough, PassthroughInputs, PassthroughOutputs
+from src.core.conduit.passthrough import (
+    Passthrough,
+    PassthroughInputs,
+    PassthroughOutputs,
+)
 from src.core.conduit.stereo_camera_params_adapter import (
     StereoCameraParamsAdapter,
     StereoCameraParamsAdapterInputs,
@@ -70,7 +74,9 @@ def test_small_conduit_modules_run_paths() -> None:
                 ]
             )
         ),
-        MessagesToTextOutputs(text=types.SimpleNamespace(send=lambda x: texts.append(x))),
+        MessagesToTextOutputs(
+            text=types.SimpleNamespace(send=lambda x: texts.append(x))
+        ),
     )
     assert texts[0].get() == "user: hi\nassistant: hello"
 
@@ -92,7 +98,11 @@ def test_small_conduit_modules_run_paths() -> None:
         )
     )
     do_nothing.run(
-        DoNothingToolInputs(tool_call=_FakeRecv([ToolCall.new(call_id="1", name="x", arguments="{}"), None])),
+        DoNothingToolInputs(
+            tool_call=_FakeRecv(
+                [ToolCall.new(call_id="1", name="x", arguments="{}"), None]
+            )
+        ),
         DoNothingToolOutputs(
             tool_def=types.SimpleNamespace(send=lambda x: tool_defs.append(x)),
             tool_result=types.SimpleNamespace(send=lambda x: tool_results.append(x)),
@@ -183,7 +193,7 @@ def test_heavy_module_import_smoke(monkeypatch, tmp_path) -> None:
         monkeypatch.setattr(
             transformers_generic,
             "check_model_inputs",
-            lambda *args, **kwargs: (lambda func: func),
+            lambda *args, **kwargs: lambda func: func,
             raising=False,
         )
 
@@ -212,10 +222,14 @@ def test_heavy_module_import_smoke(monkeypatch, tmp_path) -> None:
         imported.append(importlib.reload(importlib.import_module(name)))
 
     qwen_component = imported[8]
-    options = qwen_component.QwenTTS.get_options({"ref_samples_dir": str(qwen_voice_dir)})
+    options = qwen_component.QwenTTS.get_options(
+        {"ref_samples_dir": str(qwen_voice_dir)}
+    )
     assert options["config"]["voice_id"][0]["value"] == "a"
 
-    no_options = qwen_component.QwenTTS.get_options({"ref_samples_dir": str(tmp_path / "missing")})
+    no_options = qwen_component.QwenTTS.get_options(
+        {"ref_samples_dir": str(tmp_path / "missing")}
+    )
     assert no_options == {}
 
     assert imported[9]._to_ovd_pose(None) is None
