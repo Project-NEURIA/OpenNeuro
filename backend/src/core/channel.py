@@ -25,9 +25,8 @@ class Channel[T]:
 
     def _register(self, sub_id: int, latest: bool = True) -> None:
         with self._condition:
-            self._cursors[sub_id] = (
-                self._offset + len(self._items) if latest else self._offset
-            )
+            cursor = self._offset + len(self._items) if latest else self._offset
+            self._cursors[sub_id] = max(cursor, self._offset)
 
     def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
         with self._condition:
@@ -69,7 +68,8 @@ class Channel[T]:
     def _gc(self) -> None:
         if not self._cursors:
             return
-        drop = min(self._cursors.values()) - self._offset
+        min_cursor = max(min(self._cursors.values()), self._offset)
+        drop = min_cursor - self._offset
         if drop > 0:
             del self._items[:drop]
             self._offset += drop
