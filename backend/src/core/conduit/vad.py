@@ -120,6 +120,8 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
 
     def _run_smart_turn_inference(self, pcm_16k: np.ndarray) -> bool:
         """Run ONNX inference without holding the lock."""
+        if self._smart_turn_session is None:
+            return False
         try:
             features = self._feature_extractor(
                 pcm_16k,
