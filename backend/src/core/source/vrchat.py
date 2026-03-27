@@ -79,10 +79,16 @@ class VRChatVideo(ThreadedComponent[tuple[()], VRChatVideoOutputs]):
                             format=VideoDataFormat.RGB,
                         )
                     )
+                    # Convert extrinsics from OpenVR (right-handed, -Z forward)
+                    # to our convention (left-handed, +Z forward) by negating Z.
+                    ext = client.get_extrinsics(frame, eye=0)
+                    ext[2, :] = -ext[2, :]  # flip Z row
+                    ext[:, 2] = -ext[:, 2]  # flip Z column
+
                     outputs.camera_params.send(
                         StereoCameraParamsFrame.new(
                             intrinsics=intrinsics,
-                            extrinsics=client.get_extrinsics(frame, eye=0),
+                            extrinsics=ext,
                             baseline=baseline,
                             width=frame.width,
                             height=frame.height,

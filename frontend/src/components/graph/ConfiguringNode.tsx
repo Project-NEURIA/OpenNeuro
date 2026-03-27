@@ -305,16 +305,29 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
             <label key={key} className="flex flex-col gap-1">
               <span className="text-[12px] font-mono text-white/60">{key}</span>
               <input
-                type={propType === "number" || propType === "integer" ? "number" : "text"}
+                type={propType === "number" || propType === "integer" ? "text" : "text"}
+                inputMode={propType === "number" || propType === "integer" ? "decimal" : undefined}
                 step={propType === "number" ? "any" : undefined}
                 value={String(values[key] ?? "")}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  const parsed =
-                    propType === "number" || propType === "integer"
-                      ? raw === "" ? "" : Number(raw)
-                      : raw;
-                  setValues((v) => ({ ...v, [key]: parsed }));
+                  if (propType === "number" || propType === "integer") {
+                    // Allow intermediate states like "0.", "-", "1.0" while typing
+                    if (raw === "" || raw === "-" || raw === "." || /^-?\d*\.?\d*$/.test(raw)) {
+                      setValues((v) => ({ ...v, [key]: raw }));
+                    }
+                  } else {
+                    setValues((v) => ({ ...v, [key]: raw }));
+                  }
+                }}
+                onBlur={() => {
+                  if (propType === "number" || propType === "integer") {
+                    const raw = String(values[key] ?? "");
+                    const num = Number(raw);
+                    if (raw !== "" && !isNaN(num)) {
+                      setValues((v) => ({ ...v, [key]: num }));
+                    }
+                  }
                 }}
                 className={cn(
                   "rounded-lg px-3 py-1.5 text-[13px] font-mono",
