@@ -130,6 +130,62 @@ def test_subgraph_create_and_ungroup(monkeypatch) -> None:
     node_service.ungroup(m, c2)
 
 
+def test_subgraph_rewires_boundary_edges(monkeypatch) -> None:
+    m = _FakeManager()
+    outside = Node(id_="outside", type="A", init_args={}, x=8.0, y=9.0)
+    m.graph.nodes["outside"] = outside
+    m._components["outside"] = _FakeComp()
+    m.graph.edges.extend(
+        [
+            Edge(source_node="outside", source_slot="in", target_node="n1", target_slot="plain"),
+            Edge(source_node="n2", source_slot="out", target_node="outside", target_slot="sink"),
+            Edge(source_node="outside", source_slot="keep", target_node="outside", target_slot="stay"),
+        ]
+    )
+
+    cid, cnode = node_service.create_subgraph(m, ["n1", "n2"], name="G")
+    assert cid == "c1"
+    assert cnode.x == 2.0 and cnode.y == 3.0
+    assert Edge(
+        source_node="outside",
+        source_slot="in",
+        target_node=cid,
+        target_slot="n1.plain",
+    ) in m.graph.edges
+    assert Edge(
+        source_node=cid,
+        source_slot="n2.out",
+        target_node="outside",
+        target_slot="sink",
+    ) in m.graph.edges
+    assert Edge(
+        source_node="outside",
+        source_slot="keep",
+        target_node="outside",
+        target_slot="stay",
+    ) in m.graph.edges
+
+    class _Cls:
+        @classmethod
+        def from_args(cls, _args):
+            return _FakeComp()
+
+    monkeypatch.setattr("src.core.component.Component.registered_subclasses", lambda: {"A": _Cls})
+    node_service.ungroup(m, cid)
+    assert Edge(
+        source_node="outside",
+        source_slot="in",
+        target_node="n1",
+        target_slot="plain",
+    ) in m.graph.edges
+    assert Edge(
+        source_node="n2",
+        source_slot="out",
+        target_node="outside",
+        target_slot="sink",
+    ) in m.graph.edges
+
+
 def test_subgraph_validation_errors() -> None:
     m = _FakeManager()
     with pytest.raises(ValueError):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import builtins
 import sys
 import types
 
@@ -326,3 +327,151 @@ def test_openvr_vrchat_and_package_init(monkeypatch) -> None:
     sink_pkg = importlib.import_module("src.core.sink")
     assert hasattr(source_pkg, "Camera")
     assert hasattr(sink_pkg, "Speaker")
+
+
+def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) -> None:
+    cam = Camera()
+    assert cam is not None
+
+    class _Cap:
+        def __init__(self):
+            self.released = False
+            self.calls = 0
+
+        def isOpened(self):
+            return True
+
+        def read(self):
+            self.calls += 1
+            if self.calls == 1:
+                return True, np.zeros((2, 2, 3), dtype=np.uint8)
+            src.stop_event.set()
+            return False, None
+
+        def get(self, _prop):
+            return 10.0
+
+        def release(self):
+            self.released = True
+
+    fake_cv2 = types.SimpleNamespace(
+        VideoCapture=lambda _src: _Cap(),
+        CAP_PROP_FPS=1,
+        CAP_PROP_POS_FRAMES=2,
+        INTER_LINEAR=1,
+        resize=lambda frame, size, interpolation: np.zeros((size[1], size[0], 3), dtype=np.uint8),
+    )
+    monkeypatch.setattr("src.core.source.video_source.cv2", fake_cv2)
+
+    class _VS(VideoSource):
+        def __init__(self, config):
+            super().__init__(config)
+
+        def _on_eof(self, cap):
+            self.stop_event.set()
+
+    src = _VS(VideoSourceConfig(source="0", fps_resample=10))
+    monotonic_values = iter([0.0, 0.2, 0.0, 0.0])
+    sleeps = []
+    monkeypatch.setattr("src.core.source.video_source.time.monotonic", lambda: next(monotonic_values, 0.0))
+    monkeypatch.setattr("src.core.source.video_source.time.sleep", lambda value: sleeps.append(value))
+    sent = []
+    src.run((), VideoSourceOutputs(video=types.SimpleNamespace(send=lambda frame: sent.append(frame))))
+    assert sent and sleeps
+
+    class _Frame:
+        def __init__(self, value):
+            arr = np.full((2, 2, 4), value, dtype=np.uint8)
+            self.left = arr.tobytes()
+            self.right = arr.tobytes()
+            self.width = 2
+            self.height = 2
+
+    class _Client:
+        def __init__(self, host="h", port=1):
+            self.host = host
+            self.port = port
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def frame_stream(self):
+            frames = [_Frame(0), _Frame(1)]
+
+            class _Ctx:
+                def __enter__(self_):
+                    return frames
+
+                def __exit__(self_, *args):
+                    return False
+
+            return _Ctx()
+
+        def get_intrinsics(self):
+            return np.eye(3, dtype=np.float32)
+
+        def get_ipd(self):
+            return 0.06
+
+        def get_extrinsics(self, frame, eye=0):
+            return np.eye(4, dtype=np.float32)
+
+    monkeypatch.setitem(sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client))
+    monotonic_values = iter([0.0, 1.0])
+    monkeypatch.setattr("src.core.source.vrchat.time.monotonic", lambda: next(monotonic_values, 1.0))
+    out_v = []
+    out_c = []
+    vc = VRChatVideo(host="h", port=1, fps=1)
+    vc.run(
+        (),
+        VRChatVideoOutputs(
+            stereo_video=types.SimpleNamespace(send=lambda x: out_v.append(x)),
+            camera_params=types.SimpleNamespace(send=lambda x: out_c.append(x)),
+        ),
+    )
+    assert len(out_v) == 1 and len(out_c) == 1
+
+    vc2 = VRChatVideo(host="h", port=1, fps=1)
+    vc2.stop_event.set()
+    vc2.run(
+        (),
+        VRChatVideoOutputs(
+            stereo_video=types.SimpleNamespace(send=lambda x: out_v.append(x)),
+            camera_params=types.SimpleNamespace(send=lambda x: out_c.append(x)),
+        ),
+    )
+    assert len(out_v) == 1 and len(out_c) == 1
+
+
+def test_camera_get_options_import_fallback(monkeypatch) -> None:
+    class _Cap:
+        def __init__(self, opened):
+            self._opened = opened
+            self.released = False
+
+        def isOpened(self):
+            return self._opened
+
+        def release(self):
+            self.released = True
+
+    caps = {_i: _Cap(_i == 1) for _i in range(4)}
+    monkeypatch.setattr(
+        "src.core.source.camera.cv2",
+        types.SimpleNamespace(VideoCapture=lambda idx: caps[idx]),
+    )
+
+    original_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "cv2_enumerate_cameras":
+            raise ImportError("boom")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    options = Camera.get_options({})
+    assert options["config"]["source"] == [{"value": "1", "label": "Camera 1"}]
+    assert caps[1].released is True

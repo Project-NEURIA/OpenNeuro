@@ -132,6 +132,21 @@ def test_read_ui_output_variants() -> None:
     assert ws4.sent_json[0]["payload"] == 123
 
 
+def test_read_ui_output_stops_on_none(monkeypatch) -> None:
+    ch = Channel()
+    recv = Receiver(ch)
+    ws = _WS()
+    stop_event = asyncio.Event()
+
+    async def run_one():
+        monkeypatch.setattr(recv._channel, "_wait_and_get", lambda *_args: None)
+        await ui_controller._read_ui_output(ws, "n1", "slot", recv, None, stop_event)
+
+    asyncio.run(run_one())
+    assert ws.sent_json == []
+    assert ws.sent_bytes == []
+
+
 def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
     ch = Channel()
     recv = Receiver(ch)
@@ -210,3 +225,39 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
     assert sent[0][0] == "m" and isinstance(sent[0][1], _Model)
     assert sent[1][0] == "t" and isinstance(sent[1][1], TextFrame)
     assert sent[2] == ("o", 7)
+
+
+def test_ui_ws_cancels_spawned_tasks(monkeypatch) -> None:
+    class _SlowWS(_WS):
+        async def receive_text(self):
+            await asyncio.sleep(0)
+            return await super().receive_text()
+
+    manager = types.SimpleNamespace(
+        _ui_version=0,
+        _ui_changed=asyncio.Event(),
+        ui_receivers=lambda: {},
+        ui_senders=lambda: {},
+        components=lambda: {"n1": _Comp()},
+    )
+    ws = _SlowWS(recv_msgs=[json.dumps({"type": "noop"})])
+    ws.app.state.manager = manager
+    cancelled: list[str] = []
+
+    class _FakeTask:
+        def cancel(self):
+            cancelled.append("task")
+
+        def __await__(self):
+            async def _done():
+                return None
+
+            return _done().__await__()
+
+    async def fake_watch(_ws, _manager, _stop_event, tasks):
+        tasks[("n1", "slot")] = _FakeTask()
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(ui_controller, "_watch_ui_channels", fake_watch)
+    asyncio.run(ui_controller.ui_ws(ws))
+    assert cancelled == ["task"]
