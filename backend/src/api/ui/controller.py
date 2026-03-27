@@ -13,6 +13,7 @@ Outbound:
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import struct
 import threading
@@ -24,6 +25,8 @@ from src.core.channel import Receiver, UISender, UIReceiver
 from src.core.graph import GraphManager
 
 router = APIRouter(prefix="/ui")
+
+_sub_id_counter = itertools.count()
 
 
 def _resolve_ui_output_type(
@@ -87,7 +90,7 @@ async def _read_ui_output(
 ) -> None:
     """Async task: reads from a blocking Receiver and sends to the WebSocket."""
     thread_stop = threading.Event()
-    sub_id = id(object())
+    sub_id = next(_sub_id_counter)
     receiver._channel._register(sub_id)
 
     try:
