@@ -169,22 +169,13 @@ We implemented the top two improvements:
 1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt, pre-loading the tokenizer.
 2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`, reusing the TLS connection across requests.
 
-### Before vs After (Sequential cProfile)
+### Before vs After
 
 | Function | Before | After | Improvement |
 |----------|--------|-------|-------------|
 | LLM TTFT | 540 ms | 331 ms | **-209 ms (39%)** |
 | TTS TTFB | 505 ms | 224 ms | **-281 ms (56%)** |
-| Estimated TTFA | 1,045 ms | 555 ms | **-490 ms (47%)** |
-
-### Before vs After (Pipeline, real TTFA)
-
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| ASR latency | 225 ms | 271 ms | (variance) |
-| LLM TTFT | 768 ms | 466 ms | **-302 ms (39%)** |
-| TTS TTFB | 336 ms | 396 ms | (variance) |
-| **TTFA** | **1,330 ms** | **1,133 ms** | **-197 ms (15%)** |
+| Estimated TTFA (ASR + LLM TTFT + TTS TTFB) | 1,045 ms | 555 ms | **-490 ms (47%)** |
 
 ### What changed in cProfile
 
