@@ -128,30 +128,23 @@ TLS handshake (122ms) is a significant fixed cost per request.
 
 ## Improvement Suggestions
 
-### 1. `LLM` TTFT — Warm up tokenizer and use prompt caching (613ms, 46% of TTFA)
+### 1. `LLM` TTFT — Warm up tokenizer (613ms, 46% of TTFA)
 
 **Problem**: LLM TTFT is the single largest contributor to TTFA. cProfile reveals 312ms of the 540ms is litellm loading the tokenizer via `from_pretrained`. The actual API call is only ~200ms.
 
-**Improvement options**:
-- **Warm up tokenizer**: Call `litellm.completion()` once at startup (with a dummy prompt) so the tokenizer is cached before real requests. This alone saves ~312ms on the first call.
-- **Prompt caching**: Groq and OpenAI support prompt caching for repeated system prompts. The system message is identical every turn — caching avoids re-processing it.
-- **Smaller model**: `llama-3.1-8b` on Groq has ~100ms TTFT vs ~390ms for 70b.
+**Improvement**: Call `litellm.completion()` once at startup (with a dummy prompt) so the tokenizer is cached before real requests.
 
 ### 2. `TTS` `requests.post` — Pre-warm TLS connection (406ms, 31% of TTFA)
 
 **Problem**: TLS handshake to Inworld costs 122ms per request. Each TTS sentence creates a new connection.
 
-**Improvement options**:
-- **Persistent connection**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests, eliminating the 122ms handshake after the first call.
-- **Smaller chunk threshold**: Send to TTS after a clause boundary (comma, dash) or after N tokens, not just sentence boundaries. This trades naturalness for speed.
+**Improvement**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests, eliminating the 122ms handshake after the first call.
 
-### 3. `ASR._transcribe_audio` — Use streaming ASR or local model (310ms, 23% of TTFA)
+### 3. `ASR._transcribe_audio` — Use streaming ASR (310ms, 23% of TTFA)
 
 **Problem**: Each API call to Groq Whisper takes ~550ms, and it processes the entire segment at once (batch, not streaming).
 
-**Improvement options**:
-- **Streaming ASR**: Use a WebSocket-based ASR service (e.g., Deepgram, AssemblyAI) that transcribes incrementally as audio arrives, eliminating the segment-level batch delay.
-- **Local Whisper**: Run `whisper.cpp` or `faster-whisper` locally. For short utterances (<3s), local inference on Apple Silicon can be faster than a network round-trip.
+**Improvement**: Use a WebSocket-based ASR service (e.g., Deepgram, AssemblyAI) that transcribes incrementally as audio arrives, eliminating the segment-level batch delay.
 
 ### 4. `VAD._process_audio_frame` — Reduce Smart Turn frequency (<5ms/chunk, minimal TTFA impact)
 
