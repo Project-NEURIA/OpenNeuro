@@ -177,31 +177,3 @@ We implemented the top two improvements:
 | TTS TTFB | 405 ms | 377 ms | -28 ms |
 | **TTFA** | **1,154 ms** | **1,119 ms** | **-35 ms (3%)** |
 
-The pipeline TTFA improvement is modest because external API response times dominate and vary significantly between runs (LLM range: 333–759ms). The improvements are more clearly visible in isolated per-function profiling where there is no API variance noise:
-
-| Function | Before | After | Improvement |
-|----------|--------|-------|-------------|
-| LLM TTFT | 540 ms | 331 ms | **-209 ms (39%)** |
-| TTS TTFB | 505 ms | 224 ms | **-281 ms (56%)** |
-
-### What changed in cProfile
-
-**LLM**: The `from_pretrained` tokenizer initialization (312ms before) is now done during `setup()` before the first real request. cProfile of the profiled call still shows `from_pretrained` at 274ms — this is litellm's internal post-response token counting, which uses a different tokenizer path. The actual wall-clock TTFT dropped because the HTTP connection setup is now faster (tokenizer cached from warmup).
-
-**TTS**: The TLS handshake (`urllib3.connection.connect`) that cost 122ms before is completely gone from the cProfile output. The `requests.Session` reuses the established connection, so the profiled call goes straight to `http.client.getresponse` → `ssl.read`.
-
-### cProfile: LLM.TTFT (after warmup)
-
-| Function | Before | After |
-|----------|--------|-------|
-| `litellm.utils.wrapper` (total) | 535 ms | 327 ms |
-| `httpx.Client.send` (API call) | 198 ms | 153 ms |
-| `from_pretrained` (token counter) | 312 ms | 274 ms |
-
-### cProfile: TTS.requests.post (after session reuse)
-
-| Function | Before | After |
-|----------|--------|-------|
-| `requests.sessions.post` (total) | 495 ms | 214 ms |
-| `urllib3.connection.connect` (TLS) | 122 ms | **0 ms (eliminated)** |
-| `http.client._read_status` (API wait) | 368 ms | 211 ms |
