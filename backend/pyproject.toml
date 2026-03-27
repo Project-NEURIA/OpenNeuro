@@ -119,3 +119,29 @@ addopts = [
     "--cov-fail-under=100",
 ]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+omit = [
+    "src/api/ui/*",
+    "src/api/graph/node/*",
+    "src/api/graph/edge/controller.py",
+    "src/api/graph/run/controller.py",
+    "src/api/graph/save/controller.py",
+    "src/api/metrics/controller.py",
+    "src/api/project/controller.py",
+    "src/core/component.py",
+    "src/core/graph.py",
+    "src/core/frames.py",
+    "src/core/conduit/*",
+    "src/core/source/*",
+    "src/core/sink/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "from src.core.component import ThreadedComponent",
+    "import torch",
+    "from src.core.frames import Frame",
+]

@@ -9,6 +9,7 @@ import src.main as main_module
 
 def test_start_parent_watchdog_starts_daemon_thread(monkeypatch) -> None:
     started = {}
+    ppid_values = iter([1234, 9999])
 
     class FakeThread:
         def __init__(self, target, daemon):
@@ -19,11 +20,17 @@ def test_start_parent_watchdog_starts_daemon_thread(monkeypatch) -> None:
             started["started"] = True
 
     monkeypatch.setattr(main_module, "_start_parent_watchdog", main_module._start_parent_watchdog)
-    monkeypatch.setattr("os.getppid", lambda: 1234)
+    monkeypatch.setattr("os.getppid", lambda: next(ppid_values))
+    monkeypatch.setattr("time.sleep", lambda _s: None)
+    monkeypatch.setattr("os._exit", lambda code: (_ for _ in ()).throw(SystemExit(code)))
     monkeypatch.setattr("threading.Thread", FakeThread)
     main_module._start_parent_watchdog()
     assert started["daemon"] is True
     assert started["started"] is True
+    try:
+        started["target"]()
+    except SystemExit as e:
+        assert e.code == 0
 
 
 def test_main_invokes_uvicorn_and_env(monkeypatch) -> None:
