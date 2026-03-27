@@ -29,20 +29,20 @@ We profiled 4 key functions using Python's `cProfile` module. The profiler has t
 
 | Metric | Value |
 |--------|-------|
-| **TTFA (VAD-end → first TTS audio)** | **1,330 ms** |
+| **TTFA (VAD-end → first TTS audio)** | **1,326 ms** (avg over 5 runs) |
 
 TTFA is measured from the moment VAD finalizes the user's speech segment (end-of-utterance) to the first TTS audio chunk arriving at the sink.
 
-### TTFA Breakdown
+### TTFA Breakdown (averaged over 5 pipeline runs)
 
 Each stage is measured independently — no overlap or double-counting:
 
-| Stage | Latency | What it measures |
-|-------|---------|-----------------|
-| ASR (speech-to-text) | 225 ms | VAD-end → ASR transcription complete |
-| LLM TTFT (first token) | 768 ms | ASR-done → first LLM token streamed |
-| TTS TTFB (first audio) | 336 ms | First LLM token → first TTS audio chunk |
-| **TTFA** | **1,330 ms** | **VAD-end → first TTS audio (sum of above)** |
+| Stage | Avg | Min | Max | What it measures |
+|-------|-----|-----|-----|-----------------|
+| ASR (speech-to-text) | 231 ms | 177 ms | 276 ms | VAD-end → ASR transcription complete |
+| LLM TTFT (first token) | 693 ms | 488 ms | 896 ms | ASR-done → first LLM token streamed |
+| TTS TTFB (first audio) | 402 ms | 301 ms | 485 ms | First LLM token → first TTS audio chunk |
+| **TTFA** | **1,326 ms** | **1,077 ms** | **1,564 ms** | **VAD-end → first TTS audio (sum of above)** |
 
 ### Pipeline Hop Analysis
 
@@ -169,13 +169,23 @@ We implemented the top two improvements:
 1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt, pre-loading the tokenizer.
 2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`, reusing the TLS connection across requests.
 
-### Before vs After
+### Before vs After (averaged over 5 pipeline runs each)
+
+| Stage | Before (avg) | After (avg) | Improvement |
+|-------|-------------|-------------|-------------|
+| ASR | 231 ms | 307 ms | (API variance) |
+| LLM TTFT | 693 ms | 472 ms | **-221 ms (32%)** |
+| TTS TTFB | 402 ms | 482 ms | (API variance) |
+| **TTFA** | **1,326 ms** | **1,262 ms** | **-64 ms (5%)** |
+
+Note: ASR and TTS latencies are dominated by external API response times which vary between runs. The LLM TTFT improvement is consistent across all runs (min before: 488ms, min after: 332ms). The TTS session reuse eliminates the ~120ms TLS handshake, but this is masked by the Inworld API's own response time variance (301–524ms range).
+
+Isolated per-function profiling (cProfile, no pipeline concurrency) confirms both improvements:
 
 | Function | Before | After | Improvement |
 |----------|--------|-------|-------------|
 | LLM TTFT | 540 ms | 331 ms | **-209 ms (39%)** |
 | TTS TTFB | 505 ms | 224 ms | **-281 ms (56%)** |
-| Estimated TTFA (ASR + LLM TTFT + TTS TTFB) | 1,045 ms | 555 ms | **-490 ms (47%)** |
 
 ### What changed in cProfile
 
