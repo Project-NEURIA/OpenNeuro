@@ -22,7 +22,6 @@ from src.core.channel import Channel, Sender, Receiver
 from src.core.conduit.dart_control.component import DartControl, DartControlConfig
 from src.core.frames import GoalFrame, TextFrame
 
-
 SUCCESS_THRESHOLD = 0.3  # meters
 TIMEOUT = 30  # seconds per waypoint
 
