@@ -29,9 +29,9 @@ We profiled 4 key functions using Python's `cProfile` module. The profiler has t
 
 | Metric | Value |
 |--------|-------|
-| **TTFA (VAD-end → first TTS audio)** | **1,154 ms** (avg over 10 runs) |
+| **TTFA (VAD-end → first TTS audio)** | **1,330 ms** (avg over 10 runs) |
 
-TTFA is measured from the moment VAD finalizes the user's speech segment (end-of-utterance) to the first TTS audio chunk arriving at the sink.
+TTFA is measured from the moment VAD finalizes the user's speech segment (end-of-utterance) to the first TTS audio chunk arriving at the sink. Each run is a separate process to avoid caching effects.
 
 ### TTFA Breakdown (averaged over 10 pipeline runs)
 
@@ -39,10 +39,10 @@ Each stage is measured independently — no overlap or double-counting:
 
 | Stage | Avg | Min | Max | What it measures |
 |-------|-----|-----|-----|-----------------|
-| ASR (speech-to-text) | 264 ms | 180 ms | 338 ms | VAD-end → ASR transcription complete |
-| LLM TTFT (first token) | 485 ms | 333 ms | 759 ms | ASR-done → first LLM token streamed |
-| TTS TTFB (first audio) | 405 ms | 326 ms | 529 ms | First LLM token → first TTS audio chunk |
-| **TTFA** | **1,154 ms** | **1,034 ms** | **1,469 ms** | **VAD-end → first TTS audio (sum of above)** |
+| ASR (speech-to-text) | 310 ms | 169 ms | 820 ms | VAD-end → ASR transcription complete |
+| LLM TTFT (first token) | 613 ms | 453 ms | 732 ms | ASR-done → first LLM token streamed |
+| TTS TTFB (first audio) | 406 ms | 305 ms | 589 ms | First LLM token → first TTS audio chunk |
+| **TTFA** | **1,330 ms** | **1,033 ms** | **1,873 ms** | **VAD-end → first TTS audio (sum of above)** |
 
 ### Pipeline Hop Analysis
 
@@ -128,7 +128,7 @@ TLS handshake (122ms) is a significant fixed cost per request.
 
 ## Improvement Suggestions
 
-### 1. `LLM` TTFT — Warm up tokenizer and use prompt caching (768ms, 58% of TTFA)
+### 1. `LLM` TTFT — Warm up tokenizer and use prompt caching (613ms, 46% of TTFA)
 
 **Problem**: LLM TTFT is the single largest contributor to TTFA. cProfile reveals 312ms of the 540ms is litellm loading the tokenizer via `from_pretrained`. The actual API call is only ~200ms.
 
@@ -137,7 +137,7 @@ TLS handshake (122ms) is a significant fixed cost per request.
 - **Prompt caching**: Groq and OpenAI support prompt caching for repeated system prompts. The system message is identical every turn — caching avoids re-processing it.
 - **Smaller model**: `llama-3.1-8b` on Groq has ~100ms TTFT vs ~390ms for 70b.
 
-### 2. `TTS` `requests.post` — Pre-warm TLS connection (336ms, 25% of TTFA)
+### 2. `TTS` `requests.post` — Pre-warm TLS connection (406ms, 31% of TTFA)
 
 **Problem**: TLS handshake to Inworld costs 122ms per request. Each TTS sentence creates a new connection.
 
@@ -145,7 +145,7 @@ TLS handshake (122ms) is a significant fixed cost per request.
 - **Persistent connection**: Use `requests.Session()` with connection pooling to reuse the TLS session across requests, eliminating the 122ms handshake after the first call.
 - **Smaller chunk threshold**: Send to TTS after a clause boundary (comma, dash) or after N tokens, not just sentence boundaries. This trades naturalness for speed.
 
-### 3. `ASR._transcribe_audio` — Use streaming ASR or local model (225ms, 17% of TTFA)
+### 3. `ASR._transcribe_audio` — Use streaming ASR or local model (310ms, 23% of TTFA)
 
 **Problem**: Each API call to Groq Whisper takes ~550ms, and it processes the entire segment at once (batch, not streaming).
 
@@ -168,12 +168,12 @@ We implemented the top two improvements:
 1. **LLM tokenizer warmup**: Added `setup()` to `LLM` that calls `litellm.completion()` once at startup with a dummy prompt, pre-loading the tokenizer.
 2. **TTS persistent session**: Replaced `requests.post()` with `self._session.post()` using a `requests.Session()`, reusing the TLS connection across requests.
 
-### Before vs After (averaged over 10 pipeline runs each)
+### Before vs After (averaged over 10 pipeline runs, separate processes)
 
 | Stage | Before (avg) | After (avg) | Improvement |
 |-------|-------------|-------------|-------------|
-| ASR | 264 ms | 239 ms | -25 ms |
-| LLM TTFT | 485 ms | 502 ms | (API variance) |
-| TTS TTFB | 405 ms | 377 ms | -28 ms |
-| **TTFA** | **1,154 ms** | **1,119 ms** | **-35 ms (3%)** |
+| ASR | 310 ms | 280 ms | -30 ms |
+| LLM TTFT | 613 ms | 448 ms | **-165 ms (27%)** |
+| TTS TTFB | 406 ms | 427 ms | +21 ms (API variance) |
+| **TTFA** | **1,330 ms** | **1,155 ms** | **-175 ms (13%)** |
 
