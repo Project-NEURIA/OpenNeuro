@@ -356,6 +356,7 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
         decoder_dim=4,
         head_dim=4,
         codebook_dim=4,
+        rope_theta=10000.0,
         rope_scaling={"type": "default"},
     )
     cfg._attn_implementation = "eager"
@@ -373,6 +374,7 @@ def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_compat(
     import transformers.utils.generic as transformers_generic
     import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
 
+    # Test the fallback path: when check_model_inputs doesn't exist
     original = getattr(transformers_generic, "check_model_inputs", None)
     monkeypatch.delattr(transformers_generic, "check_model_inputs", raising=False)
     tokv2_mod = importlib.reload(tokv2_mod)
@@ -384,10 +386,12 @@ def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_compat(
 
     assert identity(_sample_func) is _sample_func
 
-    if original is not None:
-        monkeypatch.setattr(transformers_generic, "check_model_inputs", original)
-    tokv2_mod = importlib.reload(tokv2_mod)
-
+    # Test the wrapper path: mock _check_model_inputs on the reloaded module
     monkeypatch.setattr(tokv2_mod, "_check_model_inputs", lambda func: func)
     compat = tokv2_mod.check_model_inputs()
     assert compat(_sample_func) is _sample_func
+
+    # Restore original if it existed
+    if original is not None:
+        monkeypatch.setattr(transformers_generic, "check_model_inputs", original)
+        tokv2_mod = importlib.reload(tokv2_mod)
