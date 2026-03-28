@@ -34,6 +34,7 @@ bun tauri build
 
 ## Test Coverage
 
+- A Windows operating system with NVIDIA is highly recommended for coverage reports.
 - Run both suites and refresh both badges locally: `bun run coverage:update`
 - Run only backend coverage and refresh the backend badge: `bun run coverage:backend`
 - Run only frontend coverage and refresh the frontend badge: `bun run coverage:frontend`
