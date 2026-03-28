@@ -39,7 +39,10 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import ModelOutput, auto_docstring, logging
 from transformers.utils.deprecation import deprecate_kwarg
-from transformers.utils.generic import check_model_inputs
+try:
+    from transformers.utils.generic import check_model_inputs as _check_model_inputs
+except ImportError:
+    _check_model_inputs = None
 
 from .configuration_qwen3_tts_tokenizer_v2 import (
     Qwen3TTSTokenizerV2Config,
@@ -47,6 +50,16 @@ from .configuration_qwen3_tts_tokenizer_v2 import (
 )
 
 logger = logging.get_logger(__name__)
+
+
+def check_model_inputs():
+    if _check_model_inputs is None:
+        return lambda func: func
+
+    try:
+        return _check_model_inputs()
+    except TypeError:
+        return lambda func: _check_model_inputs(func)
 
 
 @dataclass

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib
+
 from types import SimpleNamespace
 
 import pytest
@@ -363,3 +365,29 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
     transformer = tokv2_mod.Qwen3TTSTokenizerV2DecoderTransformerModel(cfg)
     with pytest.raises(ValueError):
         transformer()
+
+
+def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_compat(
+    monkeypatch,
+) -> None:
+    import transformers.utils.generic as transformers_generic
+    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
+
+    original = getattr(transformers_generic, "check_model_inputs", None)
+    monkeypatch.delattr(transformers_generic, "check_model_inputs", raising=False)
+    tokv2_mod = importlib.reload(tokv2_mod)
+
+    identity = tokv2_mod.check_model_inputs()
+
+    def _sample_func():
+        return "ok"
+
+    assert identity(_sample_func) is _sample_func
+
+    if original is not None:
+        monkeypatch.setattr(transformers_generic, "check_model_inputs", original)
+    tokv2_mod = importlib.reload(tokv2_mod)
+
+    monkeypatch.setattr(tokv2_mod, "_check_model_inputs", lambda func: func)
+    compat = tokv2_mod.check_model_inputs()
+    assert compat(_sample_func) is _sample_func

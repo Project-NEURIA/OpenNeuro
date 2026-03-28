@@ -578,3 +578,10 @@ def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
         ),
     )
     assert run_comp._task_queue.drained is True
+
+
+def test_qwen_tts_package_missing_attr() -> None:
+    import src.core.conduit.qwen_tts as qwen_pkg
+
+    with pytest.raises(AttributeError):
+        _ = qwen_pkg.missing_attr
