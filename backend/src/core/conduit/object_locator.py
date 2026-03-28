@@ -41,7 +41,6 @@ class ObjectLocator(ThreadedComponent[ObjectLocatorInputs, ObjectLocatorOutputs]
     def run(self, inputs: ObjectLocatorInputs, outputs: ObjectLocatorOutputs) -> None:
         inputs.depth.newest = True
         inputs.camera_params.newest = True
-        inputs.segmentations.newest = True
 
         for seg_frame in inputs.segmentations:
             if seg_frame is None:

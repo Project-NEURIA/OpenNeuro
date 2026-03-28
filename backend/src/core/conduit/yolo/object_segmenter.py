@@ -102,10 +102,6 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
     def setup(self) -> None:
         from ultralytics import YOLOE
 
-        # Reset state from any previous run.
-        self._model = None
-        self._prompts = []
-
         checkpoint = _MODEL_MAP[self.config.model]
         print(f"[ObjectSegmenter] Loading YOLOE {checkpoint} on {self._device}")
 
@@ -113,16 +109,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
 
         self._tracker_yaml = self._build_tracker_yaml()
 
-        self._warmup()
         print("[ObjectSegmenter] Model loaded")
-
-    def _warmup(self) -> None:
-        """Run first inference to front-load slow model compilation."""
-        print("[ObjectSegmenter] Warming up (first inference)...")
-        self._set_phrases(["warmup"])
-        dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-        self._infer(dummy)
-        self._prompts = []
 
     def _set_phrases(self, phrases: list[str]) -> None:
         phrases = [p.strip() for p in phrases if p and p.strip()]
@@ -140,12 +127,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         prev_cwd = os.getcwd()
         os.chdir(_YOLO_DIR)
         try:
-            # set_classes runs text embeddings in float32, but _infer uses
-            # half=True which may have converted weights to float16.
-            # Temporarily restore float32, then convert back.
-            self._model.model.float()
             self._model.set_classes(dedup)
-            self._model.model.half()
         finally:
             os.chdir(prev_cwd)
 
