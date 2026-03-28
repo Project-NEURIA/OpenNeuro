@@ -165,6 +165,32 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert interrupt_tokens[-1] is EOS.END
 
 
+def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.core.conduit.llm as llm_mod
+
+    calls = []
+
+    def fake_completion(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 2:
+            raise RuntimeError("warmup failed")
+        return object()
+
+    monkeypatch.setattr(llm_mod, "completion", fake_completion)
+
+    llm = llm_mod.LLM(llm_mod.LLMConfig(model="warmup-model"))
+    llm.setup()
+    llm.setup()
+
+    assert len(calls) == 2
+    assert calls[0] == {
+        "model": "warmup-model",
+        "messages": [{"role": "user", "content": "hi"}],
+        "max_tokens": 1,
+        "stream": False,
+    }
+
+
 def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     import src.core.conduit.memory as memory_mod
 
@@ -368,7 +394,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             return _Response()
         raise RuntimeError("network")
 
-    monkeypatch.setattr(tts_mod.requests, "post", fake_post)
+    monkeypatch.setattr(ok_tts._session, "post", fake_post)
     sequence = [(1, "stale"), (0, "speak"), (0, "boom")]
     calls = {"count": 0}
 
@@ -392,6 +418,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mismatch_tts = tts_mod.TTS(tts_mod.TTSConfig())
     monkeypatch.setenv("INWORLD_API_KEY", "abc12345token")
+    mismatch_text = []
 
     class _MismatchResponse:
         def raise_for_status(self):
@@ -409,7 +436,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             yield payload
 
     monkeypatch.setattr(
-        tts_mod.requests, "post", lambda *args, **kwargs: _MismatchResponse()
+        mismatch_tts._session, "post", lambda *args, **kwargs: _MismatchResponse()
     )
     monkeypatch.setattr(
         mismatch_tts._task_queue,
@@ -423,9 +450,10 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
     mismatch_tts._worker(
         tts_mod.TTSOutputs(
             audio=SimpleNamespace(send=flip_generation),
-            text=SimpleNamespace(send=lambda value: text_out.append(value)),
+            text=SimpleNamespace(send=lambda value: mismatch_text.append(value)),
         )
     )
+    assert mismatch_text == []
 
     run_tts = tts_mod.TTS(tts_mod.TTSConfig())
     puts = []
