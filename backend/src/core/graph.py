@@ -394,10 +394,14 @@ class GraphManager:
                 if ident is not None:
                     get_log_store().register_thread(node_id=node_id, ident=ident)
 
-        # Notify WS listeners that UI channels are ready
+        # Notify WS listeners that UI channels are ready.
+        # Save old event, replace with fresh one, *then* wake waiters.
+        # This avoids a race where a coroutine calling wait() between
+        # set() and reassignment would block on the now-orphaned event.
         self._ui_version += 1
-        self._ui_changed.set()
+        old_event = self._ui_changed
         self._ui_changed = asyncio.Event()
+        old_event.set()
 
     @staticmethod
     def _build_tuple(tp: type | None, handles: dict[str, Any]) -> tuple[Any, ...]:
