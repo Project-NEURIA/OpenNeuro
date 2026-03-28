@@ -2,9 +2,9 @@ name: Coverage
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ A5, main ]
   push:
-    branches: [ main ]
+    branches: [ A5, main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Run backend tests with coverage
         working-directory: backend
-        run: uv run pytest
+        run: uv run pytest --ignore=tests/conduit/dart_control
 
       - name: Run frontend tests with coverage
         working-directory: frontend

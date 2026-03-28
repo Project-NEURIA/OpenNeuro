@@ -40,5 +40,6 @@ bun tauri build
 - Run only frontend coverage and refresh the frontend badge: `bun run coverage:frontend`
 - Refresh both badges from existing coverage reports: `bun run coverage:badges`
 - CI workflow: `.github/workflows/coverage.yml`
+- CI backend coverage skips `tests/conduit/dart_control` to keep GitHub Actions runtime down; the local coverage commands above still run the full backend suite.
 - Pushes to `main` refresh both README badges automatically.
 - PRs get an automatic sticky coverage comment with frontend and backend coverage.
