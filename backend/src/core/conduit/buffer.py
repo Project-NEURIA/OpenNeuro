@@ -21,7 +21,7 @@ class Buffer[T](ThreadedComponent[BufferInputs[T], BufferOutputs[T]]):
 
     def run(self, inputs: BufferInputs[T], outputs: BufferOutputs[T]) -> None:
         buf: list[object] = []
-        for item in inputs.data(self):
+        for item in inputs.data:
             if item is None:
                 break
             if item is EOS.END:

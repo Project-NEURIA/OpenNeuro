@@ -21,7 +21,7 @@ _COLORS: list[tuple[int, int, int]] = [
     (0, 255, 255),  # yellow
 ]
 
-_SCORE_THRESHOLD = 0.4
+_SCORE_THRESHOLD = 0.0
 _LINE_THICKNESS = 2
 _FONT_SCALE = 0.5
 
@@ -91,12 +91,11 @@ class ObjectLocatorVisualizer(
         inputs: ObjectLocatorVisualizerInputs,
         outputs: ObjectLocatorVisualizerOutputs,
     ) -> None:
-        video_iter = inputs.video(self)
-        for loc_frame in inputs.locations(self):
+        for loc_frame in inputs.locations:
             if loc_frame is None:
                 break
 
-            video = next(video_iter, None)
+            video = next(inputs.video, None)
             if video is None:
                 break
 

@@ -321,7 +321,7 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
         self._ensure_resources()
         device = self.config.device
 
-        for frame in inputs.pose(self):
+        for frame in inputs.pose:
             if frame is None:
                 break
 

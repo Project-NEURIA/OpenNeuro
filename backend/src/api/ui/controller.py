@@ -92,9 +92,7 @@ async def _read_ui_output(
 
     try:
         while not stop_event.is_set():
-            item = await asyncio.to_thread(
-                receiver._channel._wait_and_get, sub_id, thread_stop
-            )
+            item = await asyncio.to_thread(receiver._channel._get, sub_id, thread_stop)
             if item is None:
                 break
             try:

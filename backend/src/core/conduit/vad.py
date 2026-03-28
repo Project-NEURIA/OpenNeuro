@@ -265,7 +265,7 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
         monitor_thread.start()
 
         try:
-            for frame in inputs.audio(self):
+            for frame in inputs.audio:
                 if frame is None:
                     break
                 self._process_audio_frame(frame, outputs)

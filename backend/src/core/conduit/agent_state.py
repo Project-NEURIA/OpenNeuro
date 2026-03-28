@@ -115,38 +115,36 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
 
         # Read initial prompts once (constant component, e.g. CharacterCard)
         if inputs.initial_msgs is not None:
-            frame = next(inputs.initial_msgs(self, latest=False))
+            frame = next(inputs.initial_msgs)
             if frame is not None:
                 self._history = frame + self._history
                 print(f"[AgentState] Initial messages loaded ({len(frame)} msgs)")
 
-        # Upfront iterators (cursors persist across drains)
-        speech_it = inputs.speech(self, no_block=True) if inputs.speech else None
-        feedback_it = inputs.feedback(self, no_block=True) if inputs.feedback else None
-        vision_it = inputs.vision(self, no_block=True) if inputs.vision else None
-        memory_it = inputs.memory(self, no_block=True) if inputs.memory else None
-        tool_call_it = (
-            inputs.tool_call(self, no_block=True) if inputs.tool_call else None
-        )
-        tool_result_it = (
-            inputs.tool_result(self, no_block=True) if inputs.tool_result else None
-        )
-        objects_it = (
-            inputs.objects(self, newest=True, no_block=True)
-            if inputs.objects is not None
-            else None
-        )
-        pose_it = (
-            inputs.pose(self, newest=True, no_block=True)
-            if inputs.pose is not None
-            else None
-        )
+        # Configure receiver modes for optional inputs
+        if inputs.speech:
+            inputs.speech.blocking = False
+        if inputs.feedback:
+            inputs.feedback.blocking = False
+        if inputs.vision:
+            inputs.vision.blocking = False
+        if inputs.memory:
+            inputs.memory.blocking = False
+        if inputs.tool_call:
+            inputs.tool_call.blocking = False
+        if inputs.tool_result:
+            inputs.tool_result.blocking = False
+        if inputs.objects is not None:
+            inputs.objects.newest = True
+            inputs.objects.blocking = False
+        if inputs.pose is not None:
+            inputs.pose.newest = True
+            inputs.pose.blocking = False
 
         # Buffer tool_calls until their matching tool_result arrives
         pending_tool_calls: dict[str, ToolCall] = {}
 
         # Block on request, drain others on each trigger
-        for req in inputs.request(self):
+        for req in inputs.request:
             if req is None:
                 break
 
@@ -159,12 +157,12 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                 )
 
             for speech, feedback, vision, memory, tc, tr in drain(
-                speech_it,
-                feedback_it,
-                vision_it,
-                memory_it,
-                tool_call_it,
-                tool_result_it,
+                inputs.speech,
+                inputs.feedback,
+                inputs.vision,
+                inputs.memory,
+                inputs.tool_call,
+                inputs.tool_result,
             ):
                 if speech is not None:
                     ts = datetime.fromtimestamp(speech.pts / 1e9).strftime("%H:%M:%S")
@@ -210,8 +208,8 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     )
 
             # Diff objects against previous state
-            if objects_it is not None:
-                obj_frame = next(objects_it)
+            if inputs.objects is not None:
+                obj_frame = next(inputs.objects)
                 if obj_frame is not None:
                     self._diff_objects(obj_frame)
 
@@ -224,8 +222,8 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                 msgs.append(visible_msg)
 
             # Read agent spatial state (position + direction)
-            if pose_it is not None:
-                pose_frame = next(pose_it)
+            if inputs.pose is not None:
+                pose_frame = next(inputs.pose)
                 if pose_frame is not None:
                     poses = pose_frame.get()
                     waist = poses.get("waist")

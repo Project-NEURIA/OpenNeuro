@@ -36,7 +36,7 @@ class Speaker(ThreadedComponent[SpeakerInputs, tuple[()]]):
             channels=self._channels,
             dtype="int16",
         ) as stream:
-            for frame in inputs.audio(self):
+            for frame in inputs.audio:
                 if frame is None:
                     break
 

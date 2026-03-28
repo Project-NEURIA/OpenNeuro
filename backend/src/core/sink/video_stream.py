@@ -26,7 +26,8 @@ class VideoStream(ThreadedComponent[VideoStreamInputs, VideoStreamOutputs]):
     def run(self, inputs: VideoStreamInputs, outputs: VideoStreamOutputs) -> None:
         import cv2
 
-        for frame in inputs.video(self, newest=True):
+        inputs.video.newest = True
+        for frame in inputs.video:
             if frame is None:
                 break
             _, buf = cv2.imencode(

@@ -166,14 +166,15 @@ class StereoDepthEstimator(
         inputs: StereoDepthEstimatorInputs,
         outputs: StereoDepthEstimatorOutputs,
     ) -> None:
-        cam_iter = inputs.camera_params(self, newest=True)
+        inputs.camera_params.newest = True
 
         print("[StereoDepthEstimator] Running inference loop")
-        for stereo_frame in inputs.stereo_video(self, newest=True):
+        inputs.stereo_video.newest = True
+        for stereo_frame in inputs.stereo_video:
             if stereo_frame is None:
                 break
 
-            cam_frame = next(cam_iter, None)
+            cam_frame = next(inputs.camera_params, None)
             if cam_frame is None:
                 break
 

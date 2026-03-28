@@ -147,7 +147,7 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         window_count = 0
         last_submit_time = 0.0
 
-        for frame in inputs.video(self):
+        for frame in inputs.video:
             if frame is None:
                 break
 

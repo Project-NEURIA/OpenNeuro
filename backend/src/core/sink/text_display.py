@@ -24,7 +24,7 @@ class TextDisplay(ThreadedComponent[TextDisplayInputs, TextDisplayOutputs]):
     tags = Tag(io={"sink"}, functionality={"misc"})
 
     def run(self, inputs: TextDisplayInputs, outputs: TextDisplayOutputs) -> None:
-        for frame in inputs.text(self):
+        for frame in inputs.text:
             if frame is None:
                 break
             outputs.ui_text.send(frame)

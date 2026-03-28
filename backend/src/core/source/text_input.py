@@ -24,7 +24,7 @@ class TextInput(ThreadedComponent[TextInputInputs, TextInputOutputs]):
     tags = Tag(io={"source"}, functionality={"misc"})
 
     def run(self, inputs: TextInputInputs, outputs: TextInputOutputs) -> None:
-        for frame in inputs.ui_text(self):
+        for frame in inputs.ui_text:
             if frame is None:
                 break
             outputs.text.send(frame)

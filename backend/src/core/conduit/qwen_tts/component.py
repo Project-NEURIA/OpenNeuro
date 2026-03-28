@@ -159,7 +159,7 @@ class QwenTTS(ThreadedComponent[QwenTTSInputs, QwenTTSOutputs]):
             interrupt_recv = inputs.interrupt
 
             def handle_interrupts() -> None:
-                for frame in interrupt_recv(self):
+                for frame in interrupt_recv:
                     if frame is None:
                         break
                     print(f"[QwenTTS] Interrupt received: {frame.reason}")
@@ -174,7 +174,7 @@ class QwenTTS(ThreadedComponent[QwenTTSInputs, QwenTTSOutputs]):
 
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        for frame in inputs.text(self):
+        for frame in inputs.text:
             if frame is None:
                 break
             if frame is EOS.END:

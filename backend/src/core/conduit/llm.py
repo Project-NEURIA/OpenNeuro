@@ -54,16 +54,14 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
     def run(self, inputs: LLMInputs, outputs: LLMOutputs) -> None:
         print("[LLM] Starting LLM generation")
 
-        interrupt_it = (
-            inputs.interrupt(self, no_block=True)
-            if inputs.interrupt is not None
-            else None
-        )
+        if inputs.interrupt is not None:
+            inputs.interrupt.blocking = False
 
         # Collect tool definitions (drain once, tools are registered at start)
         tool_defs: list[dict[str, Any]] = []
         if inputs.tools is not None:
-            for td in inputs.tools(self, no_block=True, latest=False):
+            inputs.tools.blocking = False
+            for td in inputs.tools:
                 if td is None:
                     break
                 tool_defs.append(
@@ -83,7 +81,7 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
             else "[LLM] No tools"
         )
 
-        for messages in inputs.messages(self):
+        for messages in inputs.messages:
             if messages is None:
                 break
 
@@ -138,8 +136,8 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                 if not isinstance(chunk, ModelResponseStream):
                     continue
 
-                if interrupt_it is not None:
-                    irq = next(interrupt_it)
+                if inputs.interrupt is not None:
+                    irq = next(inputs.interrupt)
                     if irq is not None:
                         print(f"[LLM] Interrupt: {irq.reason}")
                         if full_text and outputs.text is not None:

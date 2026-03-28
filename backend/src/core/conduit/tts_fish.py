@@ -48,7 +48,7 @@ class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
             interrupt_recv = inputs.interrupt
 
             def handle_interrupts() -> None:
-                for frame in interrupt_recv(self):
+                for frame in interrupt_recv:
                     if frame is None:
                         break
                     interrupted.set()
@@ -56,7 +56,7 @@ class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
         def text_stream():
-            for frame in inputs.text(self):
+            for frame in inputs.text:
                 if frame is None or interrupted.is_set():
                     break
                 yield frame.text

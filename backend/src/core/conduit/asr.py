@@ -148,7 +148,7 @@ class ASR(ThreadedComponent[ASRInputs, ASROutputs]):
         self._worker_thread.start()
 
         try:
-            for frame in inputs.audio(self):
+            for frame in inputs.audio:
                 if frame is None:
                     break
 
