@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from fishaudio import FishAudio  # type: ignore[import-untyped]
 
 from src.core.channel import Receiver, Sender
-from src.core.component import ThreadedComponent
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 
@@ -31,6 +31,7 @@ class FishTTSOutputs(NamedTuple):
 class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
     """Text-to-Speech using Fish Audio WebSocket streaming."""
 
+    tags = Tag(io={"conduit"}, functionality={"audio"})
     description = "**Streaming TTS** via *Fish Audio* WebSocket API. Converts `TextFrame` tokens into `AudioFrame` output using configurable *voice references* and the `s2-pro` model."
 
     def __init__(self, config: FishTTSConfig) -> None:

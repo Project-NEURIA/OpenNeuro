@@ -157,10 +157,18 @@ async def _watch_ui_channels(
                     _read_ui_output(ws, node_id, slot, receiver, inner_type, stop_event)
                 )
 
+        # Capture the event reference BEFORE checking the version.
+        # run() (in a thread-pool) does: version++, event.set(), event=new.
+        # Without this, the watcher can see the old version, then read the
+        # *new* (unset) event after replacement, and block forever.
+        event = manager._ui_changed
         if manager._ui_version == last_version:
-            # Wait until run() fires the event
             try:
-                await manager._ui_changed.wait()
+                # Timeout guards against asyncio.Event.set() called from a
+                # non-event-loop thread (call_soon, not call_soon_threadsafe).
+                await asyncio.wait_for(event.wait(), timeout=0.5)
+            except asyncio.TimeoutError:
+                continue
             except asyncio.CancelledError:
                 return
 

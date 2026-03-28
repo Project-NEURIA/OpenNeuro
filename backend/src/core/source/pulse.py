@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from src.core.channel import Sender
 from src.core.component import ThreadedComponent, Tag
-from src.core.frames import Frame
+from src.core.frames import RequestFrame
 
 
 class PulseConfig(BaseModel):
@@ -14,7 +14,7 @@ class PulseConfig(BaseModel):
 
 
 class PulseOutputs(NamedTuple):
-    pulse: Sender[Frame]
+    pulse: Sender[RequestFrame]
 
 
 class Pulse(ThreadedComponent[tuple[()], PulseOutputs]):
@@ -27,5 +27,5 @@ class Pulse(ThreadedComponent[tuple[()], PulseOutputs]):
 
     def run(self, inputs: tuple[()], outputs: PulseOutputs) -> None:
         while not self.stop_event.is_set():
-            outputs.pulse.send(Frame(pts=0, id=0))
+            outputs.pulse.send(RequestFrame.new())
             self.stop_event.wait(self.config.interval)

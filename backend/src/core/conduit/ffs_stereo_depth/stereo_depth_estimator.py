@@ -50,6 +50,7 @@ class StereoDepthEstimator(
     plus the resized/cropped StereoVideoFrame.
     """
 
+    description = "Estimates depth from stereo video frames"
     tags = Tag(io={"conduit"}, functionality={"image"}, gpu={"cpu", "nvidia", "apple"})
 
     def __init__(self, config: StereoDepthEstimatorConfig) -> None:
@@ -106,25 +107,25 @@ class StereoDepthEstimator(
         x0 = (w_s - width) // 2
         return resized[y0 : y0 + height, x0 : x0 + width]
 
-    def _infer(self, left_rgb: np.ndarray, right_rgb: np.ndarray) -> np.ndarray:
+    def _infer(self, left: np.ndarray, right: np.ndarray) -> np.ndarray:
         """Run FFS inference on resize_width x resize_height images and return disparity."""
         import torch
 
         rw, rh = self.config.resize_width, self.config.resize_height
-        left_rgb = self._resize_for_inference(left_rgb, rw, rh)
-        right_rgb = self._resize_for_inference(right_rgb, rw, rh)
+        left = self._resize_for_inference(left, rw, rh)
+        right = self._resize_for_inference(right, rw, rh)
 
-        H, W = left_rgb.shape[:2]
+        H, W = left.shape[:2]
         self._ensure_buffers(H, W)
 
         self._t0_buf.copy_(
-            torch.as_tensor(left_rgb, device=self._device)
+            torch.as_tensor(left, device=self._device)
             .float()
             .permute(2, 0, 1)
             .unsqueeze(0)
         )
         self._t1_buf.copy_(
-            torch.as_tensor(right_rgb, device=self._device)
+            torch.as_tensor(right, device=self._device)
             .float()
             .permute(2, 0, 1)
             .unsqueeze(0)
@@ -152,10 +153,8 @@ class StereoDepthEstimator(
     ) -> tuple[np.ndarray, np.ndarray]:
         """Resize/crop both video eyes to the configured dimensions."""
         rw, rh = self.config.resize_width, self.config.resize_height
-        import cv2
-
-        left_bgr = cv2.cvtColor(stereo_frame.left, cv2.COLOR_RGB2BGR)
-        right_bgr = cv2.cvtColor(stereo_frame.right, cv2.COLOR_RGB2BGR)
+        left_bgr = stereo_frame.get("left", VideoDataFormat.BGR)
+        right_bgr = stereo_frame.get("right", VideoDataFormat.BGR)
         return (
             resize_and_crop(left_bgr, rw, rh),
             resize_and_crop(right_bgr, rw, rh),
@@ -178,7 +177,10 @@ class StereoDepthEstimator(
             if cam_frame is None:
                 break
 
-            disp = self._infer(stereo_frame.left, stereo_frame.right)
+            disp = self._infer(
+                stereo_frame.get("left", VideoDataFormat.RGB),
+                stereo_frame.get("right", VideoDataFormat.RGB),
+            )
 
             # Disparity → metric depth.
             K = cam_frame.intrinsics.astype(np.float32)
