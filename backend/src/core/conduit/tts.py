@@ -47,6 +47,7 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
         self._generation = 0
         self._gen_lock = threading.Lock()
         self._task_queue: Queue[tuple[int, str]] = Queue()
+        self._session = requests.Session()
 
     def _worker(self, outputs: TTSOutputs) -> None:
         print("[TTS] Worker thread started")
@@ -83,7 +84,7 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                 }
 
                 try:
-                    r = requests.post(
+                    r = self._session.post(
                         self.config.url,
                         json=payload,
                         headers=headers,

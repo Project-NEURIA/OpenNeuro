@@ -51,6 +51,19 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
         super().__init__()
         self.config = config
 
+    def setup(self) -> None:
+        """Warm up litellm's tokenizer so the first real call doesn't pay the
+        ~300ms from_pretrained cost."""
+        try:
+            completion(
+                model=self.config.model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+                stream=False,
+            )
+        except Exception:
+            pass  # Warmup failure is non-fatal
+
     def run(self, inputs: LLMInputs, outputs: LLMOutputs) -> None:
         print("[LLM] Starting LLM generation")
 
