@@ -213,7 +213,7 @@ Channel has slightly lower median latency and better tail (30µs max vs 103µs).
 
 **Problem**: Channel is 2–7x slower than Queue on throughput. cProfile identifies `_gc()` on every receive, `notify_all()` on every send, and `sys.getsizeof()`/`time.time()` per-message metrics as the main overhead.
 
-**Improvement**: Replace Channel's Python `list` + `threading.Condition` with a fixed-size ring buffer implemented in Rust via PyO3. The ring buffer eliminates per-message GC (old slots are simply overwritten), and Rust's `parking_lot::Mutex` + `Condvar` is significantly faster than Python's `threading.Condition`.
+**Improvement**: Replace Channel's Python `list` + `threading.Condition` with a fixed-size ring buffer implemented in Rust via PyO3. The producer advances a write sequence counter via atomic `fetch_add` (CAS), and consumers advance their cursors via `compare_exchange` (CAS) — no mutex on the hot path. The ring buffer eliminates per-message GC (old slots are simply overwritten when the ring wraps).
 
 ### Results After Implementing FastChannel
 
