@@ -4,7 +4,11 @@
   "workspaces": ["frontend"],
   "scripts": {
     "dev": "bun run scripts/dev.ts",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "coverage:update": "bun run scripts/coverage.ts all",
+    "coverage:backend": "bun run scripts/coverage.ts backend",
+    "coverage:frontend": "bun run scripts/coverage.ts frontend",
+    "coverage:badges": "bun run scripts/coverage.ts badges"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",

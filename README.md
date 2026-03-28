@@ -1,5 +1,6 @@
 # OpenNeuro
-[![Backend Coverage](docs/backend-coverage.svg)](./docs/backend-coverage.svg)
+[![Frontend Test Coverage](docs/frontend-coverage.svg)](./docs/frontend-coverage.svg)
+[![Backend Test Coverage](docs/backend-coverage.svg)](./docs/backend-coverage.svg)
 
 ## Prerequisites
 
@@ -31,8 +32,12 @@ bun tauri dev
 bun tauri build
 ```
 
-## Backend Test Coverage
+## Test Coverage
 
-- Run locally: `cd backend && uv run pytest`
-- CI workflow: `.github/workflows/backend_coverage.yml`
-- PRs get an automatic sticky coverage comment.
+- Run both suites and refresh both badges locally: `bun run coverage:update`
+- Run only backend coverage and refresh the backend badge: `bun run coverage:backend`
+- Run only frontend coverage and refresh the frontend badge: `bun run coverage:frontend`
+- Refresh both badges from existing coverage reports: `bun run coverage:badges`
+- CI workflow: `.github/workflows/coverage.yml`
+- Pushes to `main` refresh both README badges automatically.
+- PRs get an automatic sticky coverage comment with frontend and backend coverage.

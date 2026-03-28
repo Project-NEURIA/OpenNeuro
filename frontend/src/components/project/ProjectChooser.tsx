@@ -99,28 +99,34 @@ export function ProjectChooser({
       <div className="flex-1 overflow-y-auto px-12">
         <div className="mx-auto grid max-w-5xl grid-cols-4 gap-4">
           {projects.map((p) => (
-            <button
+            <div
               key={p.name}
               className={cn(
                 "group relative flex flex-col items-center rounded-2xl border p-4 transition-all duration-200",
                 "bg-glass backdrop-blur-xs backdrop-saturate-150",
                 "border-glass-border hover:border-conduit/30 hover:bg-glass-hover",
               )}
-              onClick={() => handleOpen(p.name)}
             >
-              <div className="mb-3 h-28 w-full overflow-hidden rounded-xl bg-accent">
-                {p.has_thumbnail && (
-                  <img
-                    src={projectThumbnailUrl(p.name)}
-                    alt={p.name}
-                    className="h-full w-full object-cover"
-                  />
-                )}
-              </div>
-              <span className="text-[13px] font-medium truncate w-full text-center tracking-tight text-white/80">
-                {p.name}
-              </span>
               <button
+                type="button"
+                className="flex w-full flex-col items-center"
+                onClick={() => handleOpen(p.name)}
+              >
+                <div className="mb-3 h-28 w-full overflow-hidden rounded-xl bg-accent">
+                  {p.has_thumbnail && (
+                    <img
+                      src={projectThumbnailUrl(p.name)}
+                      alt={p.name}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </div>
+                <span className="text-[13px] font-medium truncate w-full text-center tracking-tight text-white/80">
+                  {p.name}
+                </span>
+              </button>
+              <button
+                type="button"
                 className={cn(
                   "absolute top-2.5 right-2.5 p-1.5 rounded-lg",
                   "opacity-0 transition-all duration-200 group-hover:opacity-100",
@@ -130,7 +136,7 @@ export function ProjectChooser({
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
-            </button>
+            </div>
           ))}
 
           {/* New project card */}

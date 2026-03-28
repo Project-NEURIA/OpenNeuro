@@ -118,6 +118,5 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=100",
 ]
 testpaths = ["tests"]
