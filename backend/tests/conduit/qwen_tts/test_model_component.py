@@ -34,6 +34,9 @@ class _FakeRecv:
 
 
 def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None:
+    # Prevent real CUDA usage — CI runners may have mismatched drivers
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
     import transformers.utils.generic as transformers_generic
 
     if not hasattr(transformers_generic, "check_model_inputs"):
@@ -254,6 +257,9 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(model_mod.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(
         model_mod.torch, "set_float32_matmul_precision", lambda value: None
+    )
+    monkeypatch.setattr(
+        model_mod.torch.cuda, "Stream", lambda: SimpleNamespace(synchronize=lambda: None)
     )
     loaded_cuda = model_mod.SimpleStreamingTTS.load("demo", "cuda")
     assert loaded_cuda._decode_stream is not None
@@ -578,3 +584,10 @@ def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
         ),
     )
     assert run_comp._task_queue.drained is True
+
+
+def test_qwen_tts_package_missing_attr() -> None:
+    import src.core.conduit.qwen_tts as qwen_pkg
+
+    with pytest.raises(AttributeError):
+        _ = qwen_pkg.missing_attr

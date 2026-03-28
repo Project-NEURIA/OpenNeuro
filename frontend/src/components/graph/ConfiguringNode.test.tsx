@@ -241,7 +241,7 @@ describe("ConfiguringNode", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Browse" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/upload", expect.any(Object)));
-    expect(screen.getByText("demo.txt")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("demo.txt")).toBeInTheDocument());
   });
 
   it("covers helper branches and default create mode behavior", async () => {
