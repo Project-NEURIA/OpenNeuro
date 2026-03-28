@@ -18,13 +18,14 @@ audio/ML pipeline components.  Its responsibilities are:
 Contract:
   - Every node maps to exactly one Component instance.
   - Edges declare (source_node, source_slot) → (target_node, target_slot)
-    connections.  The reconciler groups receivers by their *identical sender
-    set* so that multiple consumers of the same output share one Channel.
-  - When the graph mutates (add/delete node/edge, update init args), the
-    reconciler diffs against the existing channel map and *reuses* channels
-    whose sender-set key has not changed — preserving any in-flight data.
+    connections.  The channel layout is always minimal: the fewest channels
+    such that every receiver's attached channel carries data from exactly the
+    set of senders specified by the graph's edges — no more (which would
+    introduce unwanted input) and no fewer (which would silently drop
+    connections).  Channels from the previous layout are reused where possible
+    to preserve in-flight data.
   - Deleting a node cascades: all edges touching that node are removed,
-    affected neighbours are stopped, and a full reconcile runs.
+    affected downstream components are stopped, and a full reconcile runs.
   - run() wires Sender/Receiver handles into each Component via NamedTuples,
     then starts every component.  stop() is idempotent.
 
