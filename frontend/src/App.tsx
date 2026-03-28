@@ -52,9 +52,10 @@ import {
     type ComponentInfo,
     type Graph,
     type GraphEdge,
+    type MetricsSnapshot,
     type SlotType
 } from "@/lib/types";
-import {checkTypes, collectLeafNames, typeToString, warmSubtypeCache} from "@/lib/typecheck";
+import {checkTypes, collectLeafNames, typeToString, warmSubtypeCache, type Type, type TypeError} from "@/lib/typecheck";
 
 export function parseSlot(handleId: string | null | undefined): string {
     if (!handleId) return "";
@@ -73,10 +74,7 @@ export function toReactFlowNode(
     n: NodeResponse,
     position: { x: number; y: number },
     componentMap: Record<string, ComponentInfo>,
-    componentTypeInfo: {
-        inputs: Record<string, Record<string, SlotType>>;
-        outputs: Record<string, Record<string, SlotType>>
-    },
+    componentTypeInfo: ComponentTypeInfo,
 ): Node<GraphNodeData> {
     const isComposite = n.is_composite;
     const info = componentMap[n.type];
@@ -116,6 +114,172 @@ export function toReactFlowNode(
         } satisfies GraphNodeData,
     };
 }
+
+type ComponentTypeInfo = {
+    inputs: Record<string, Record<string, SlotType>>;
+    outputs: Record<string, Record<string, SlotType>>;
+};
+
+export function buildResolvedTypeMap(types: Map<string, Type>): Map<string, Record<string, string>> {
+    const nodeResolved = new Map<string, Record<string, string>>();
+    for (const [key, typ] of types) {
+        if (typ.kind === "var") continue;
+        const firstDot = key.indexOf(".");
+        const nodeId = key.slice(0, firstDot);
+        const rest = key.slice(firstDot + 1);
+        let resolved = nodeResolved.get(nodeId);
+        if (!resolved) {
+            resolved = {};
+            nodeResolved.set(nodeId, resolved);
+        }
+        resolved[rest] = typeToString(typ);
+    }
+    return nodeResolved;
+}
+
+export function applyResolvedTypesToNodes(
+    nodes: Node[],
+    nodeResolved: Map<string, Record<string, string>>,
+): Node[] {
+    return nodes.map((n) => {
+        const resolvedTypes = nodeResolved.get(n.id);
+        if (!resolvedTypes) return n;
+        return {...n, data: {...(n.data as GraphNodeData), resolvedTypes}};
+    });
+}
+
+export function buildTypeErrorMap(errors: TypeError[]): Map<string, string> {
+    const errorMap = new Map<string, string>();
+    for (const err of errors) {
+        const {sourceNode, sourceSlot, targetNode, targetSlot} = err.constraint.origin;
+        const edgeId = `${sourceNode}:${sourceSlot}->${targetNode}:${targetSlot}`;
+        errorMap.set(edgeId, `${typeToString(err.left)} ≠ ${typeToString(err.right)}`);
+    }
+    return errorMap;
+}
+
+export function applyTypeErrorsToEdges(edges: Edge[], errorMap: Map<string, string>): Edge[] {
+    return edges.map((e) => {
+        const srcSlot = parseSlot(e.sourceHandle);
+        const tgtSlot = parseSlot(e.targetHandle);
+        const key = `${e.source}:${srcSlot}->${e.target}:${tgtSlot}`;
+        return {
+            ...e,
+            data: {
+                ...(e.data as Record<string, unknown>),
+                typeError: errorMap.get(key) || undefined,
+            },
+        };
+    });
+}
+
+export function buildGraphNodeData(
+    nodeId: string,
+    componentName: string,
+    status: string,
+    componentMap: Record<string, ComponentInfo>,
+    componentTypeInfo: ComponentTypeInfo,
+    onEditConfig: () => void,
+    initArgs: Record<string, unknown> = {},
+): GraphNodeData {
+    const info = componentMap[componentName];
+    return {
+        id: nodeId,
+        label: componentName,
+        category: info ? categoryFromTags(info.tags) : "conduit",
+        initArgs,
+        onEditConfig,
+        inputs: info ? Object.keys(info.inputs) : [],
+        outputs: info ? Object.keys(info.outputs) : [],
+        inputTypes: componentTypeInfo.inputs[componentName] ?? {},
+        outputTypes: componentTypeInfo.outputs[componentName] ?? {},
+        status,
+        nodeMetrics: null,
+        ui_inputs: info?.ui_inputs ?? {},
+        ui_outputs: info?.ui_outputs ?? {},
+    };
+}
+
+export function applyMetricsToNodes(nodes: Node[], metrics: MetricsSnapshot): Node[] {
+    return nodes.map((n) => {
+        const nodeMetrics = metrics.nodes[n.id] ?? null;
+        const status = nodeMetrics?.status ?? (n.data as GraphNodeData).status;
+        return {
+            ...n,
+            data: {
+                ...(n.data as GraphNodeData),
+                status,
+                nodeMetrics,
+            },
+        };
+    });
+}
+
+export function applyMetricsToEdges(edges: Edge[], metrics: MetricsSnapshot): Edge[] {
+    return edges.map((e) => {
+        const targetSlot = parseSlot(e.targetHandle);
+        const recv = metrics.nodes[e.target]?.receivers?.[targetSlot];
+        return {
+            ...e,
+            data: {...(e.data as Record<string, unknown>), byteDelta: recv?.byte_count_delta ?? 0},
+        };
+    });
+}
+
+export function hasConfigSchema(init: Record<string, unknown>): boolean {
+    return Object.values(init).some((schema) => {
+        if (!schema || typeof schema !== "object") return false;
+        const s = schema as Record<string, unknown>;
+        if (s.properties) return true;
+        if (s.$ref) return true;
+        if (Array.isArray(s.anyOf)) {
+            return (s.anyOf as Record<string, unknown>[]).some(
+                (branch) => branch.type === "object" || branch.$ref,
+            );
+        }
+        return false;
+    });
+}
+
+export function getSelectedLoggingNode(nodes: Node[], selectedNodeIds: string[]): Node | null {
+    const selectedId = selectedNodeIds[0];
+    if (!selectedId) return null;
+    const selected = nodes.find((n) => n.id === selectedId && n.type === "graph");
+    return selected ?? null;
+}
+
+export function getContextMenuNodeIds(selectedNodeIds: string[], nodeId: string): string[] {
+    return selectedNodeIds.includes(nodeId) ? selectedNodeIds : [nodeId];
+}
+
+export function getEditableConfigTarget(
+    nodes: Node[],
+    nodeId: string,
+    componentMap: Record<string, ComponentInfo>,
+): { target: Node; info: ComponentInfo } | null {
+    const target = nodes.find((n) => n.id === nodeId && n.type === "graph");
+    if (!target) return null;
+
+    const targetData = target.data as GraphNodeData;
+    const info = componentMap[targetData.label];
+    if (!info) return null;
+
+    return {target, info};
+}
+
+export const __test__ = {
+    applyMetricsToEdges,
+    applyMetricsToNodes,
+    applyResolvedTypesToNodes,
+    applyTypeErrorsToEdges,
+    buildGraphNodeData,
+    buildResolvedTypeMap,
+    buildTypeErrorMap,
+    getEditableConfigTarget,
+    getContextMenuNodeIds,
+    getSelectedLoggingNode,
+    hasConfigSchema,
+};
 
 export function AppInner({
                       projectName,
@@ -220,63 +384,18 @@ export function AppInner({
                 types
             } = checkTypes(graph, componentTypeInfo.inputs, componentTypeInfo.outputs, concreteTypes);
 
-            // Build per-node resolved type maps (only for vars that resolved to non-var types)
-            const nodeResolved = new Map<string, Record<string, string>>();
-            for (const [key, typ] of types) {
-                if (typ.kind === "var") continue;
-                // key format: "nodeId.in.slot" or "nodeId.out.slot"
-                const firstDot = key.indexOf(".");
-                const nodeId = key.slice(0, firstDot);
-                const rest = key.slice(firstDot + 1); // "in.slot" or "out.slot"
-                let resolved = nodeResolved.get(nodeId);
-                if (!resolved) {
-                    resolved = {};
-                    nodeResolved.set(nodeId, resolved);
-                }
-                resolved[rest] = typeToString(typ);
-            }
-
-            // Update nodes with resolved types
-            setNodes((prev) =>
-                prev.map((n) => {
-                    const r = nodeResolved.get(n.id);
-                    if (!r) return n;
-                    return {...n, data: {...(n.data as GraphNodeData), resolvedTypes: r}};
-                }),
-            );
-
-            const errorMap = new Map<string, string>();
-            for (const err of errors) {
-                if (err.constraint.origin.kind === "edge") {
-                    const {sourceNode, sourceSlot, targetNode, targetSlot} = err.constraint.origin;
-                    const edgeId = `${sourceNode}:${sourceSlot}->${targetNode}:${targetSlot}`;
-                    errorMap.set(edgeId, `${typeToString(err.left)} ≠ ${typeToString(err.right)}`);
-                }
-            }
-
-            return currentEdges.map((e) => {
-                const srcSlot = parseSlot(e.sourceHandle);
-                const tgtSlot = parseSlot(e.targetHandle);
-                const key = `${e.source}:${srcSlot}->${e.target}:${tgtSlot}`;
-                return {
-                    ...e,
-                    data: {
-                        ...(e.data as Record<string, unknown>),
-                        typeError: errorMap.get(key) || undefined,
-                    },
-                };
-            });
+            const nodeResolved = buildResolvedTypeMap(types);
+            setNodes((prev) => applyResolvedTypesToNodes(prev, nodeResolved));
+            return applyTypeErrorsToEdges(currentEdges, buildTypeErrorMap(errors));
         });
     }, [setEdges, setNodes, componentTypeInfo, concreteTypes]);
 
     const openNodeConfigEditor = useCallback(
         (nodeId: string) => {
-            const target = nodesRef.current.find((n) => n.id === nodeId && n.type === "graph");
-            if (!target) return;
-
+            const editable = getEditableConfigTarget(nodesRef.current, nodeId, componentMap);
+            if (!editable) return;
+            const {target, info} = editable;
             const targetData = target.data as GraphNodeData;
-            const info = componentMap[targetData.label];
-            if (!info) return;
 
             const tempId = `configuring-edit-${nodeId}-${Date.now()}`;
             const position = {
@@ -292,7 +411,7 @@ export function AppInner({
                     componentInfo: info,
                     mode: "edit",
                     submitLabel: "Save",
-                    initialValues: targetData.initArgs ?? {},
+                    initialValues: targetData.initArgs,
                     onConfirm: (initArgs: Record<string, unknown>) => {
                         setNodes((nds) => nds.filter((n) => n.id !== tempId));
                         apiUpdateNodeInitArgs(nodeId, initArgs)
@@ -322,29 +441,22 @@ export function AppInner({
         [componentMap, setNodes, triggerSave],
     );
 
-    const buildGraphNodeData = useCallback(
+    const makeGraphNodeData = useCallback(
         (
             nodeId: string,
             componentName: string,
             status: string,
-            initArgs: Record<string, unknown> = {},
+            initArgs: Record<string, unknown>,
         ): GraphNodeData => {
-            const info = componentMap[componentName];
-            return {
-                id: nodeId,
-                label: componentName,
-                category: info ? categoryFromTags(info.tags) : "conduit",
-                initArgs,
-                onEditConfig: () => openNodeConfigEditor(nodeId),
-                inputs: info ? Object.keys(info.inputs) : [],
-                outputs: info ? Object.keys(info.outputs) : [],
-                inputTypes: componentTypeInfo.inputs[componentName] ?? {},
-                outputTypes: componentTypeInfo.outputs[componentName] ?? {},
+            return buildGraphNodeData(
+                nodeId,
+                componentName,
                 status,
-                nodeMetrics: null,
-                ui_inputs: info?.ui_inputs ?? {},
-                ui_outputs: info?.ui_outputs ?? {},
-            };
+                componentMap,
+                componentTypeInfo,
+                () => openNodeConfigEditor(nodeId),
+                initArgs,
+            );
         },
         [componentMap, componentTypeInfo.inputs, componentTypeInfo.outputs, openNodeConfigEditor],
     );
@@ -385,7 +497,7 @@ export function AppInner({
                             type: "graph",
                             position: {x: pos.x, y: pos.y},
                             data: {
-                                ...buildGraphNodeData(n.id, n.type, n.status, n.init_args ?? {}),
+                                ...makeGraphNodeData(n.id, n.type, n.status, n.init_args ?? {}),
                             } satisfies GraphNodeData,
                         };
                     }),
@@ -408,7 +520,7 @@ export function AppInner({
                 console.error("[graph] Init failed:", err);
             }
         })();
-    }, [components, componentMap, setNodes, setEdges, runTypeCheck, buildGraphNodeData]);
+    }, [components, componentMap, setNodes, setEdges, runTypeCheck, makeGraphNodeData]);
 
     // Re-run type checking when concreteTypes finishes loading after init
   useEffect(() => {
@@ -419,31 +531,8 @@ export function AppInner({
   // Update node and edge data with metrics
     useEffect(() => {
         if (!initialized.current || !metrics) return;
-        setNodes((prev) =>
-            prev.map((n) => {
-                const nodeMetrics = metrics.nodes[n.id] ?? null;
-                const status = nodeMetrics?.status ?? (n.data as GraphNodeData).status;
-
-                return {
-                    ...n,
-                    data: {
-                        ...(n.data as GraphNodeData),
-                        status,
-                        nodeMetrics,
-                    },
-                };
-            }),
-        );
-        setEdges((prev) =>
-            prev.map((e) => {
-                const targetSlot = parseSlot(e.targetHandle);
-                const recv = metrics.nodes[e.target]?.receivers?.[targetSlot];
-                return {
-                    ...e,
-                    data: {...(e.data as Record<string, unknown>), byteDelta: recv?.byte_count_delta ?? 0},
-                };
-            }),
-        );
+        setNodes((prev) => applyMetricsToNodes(prev, metrics));
+        setEdges((prev) => applyMetricsToEdges(prev, metrics));
     }, [metrics, setNodes, setEdges]);
 
     // Wrap node changes — detect removals and call backend
@@ -453,26 +542,24 @@ export function AppInner({
             onNodesChangeRaw(changes);
 
             for (const r of removals) {
-                if (r.type === "remove") {
-                    if (r.id.startsWith("configuring-")) continue;
+                if (r.id.startsWith("configuring-")) continue;
 
-                    setEdges((currentEdges) => {
-                        for (const e of currentEdges) {
-                            if (e.source === r.id || e.target === r.id) {
-                                deleteEdgeFromReactFlow(e);
-                            }
+                setEdges((currentEdges) => {
+                    for (const e of currentEdges) {
+                        if (e.source === r.id || e.target === r.id) {
+                            deleteEdgeFromReactFlow(e);
                         }
-                        return currentEdges.filter(
-                            (e) => e.source !== r.id && e.target !== r.id,
-                        );
-                    });
-                    apiDeleteNode(r.id)
-                        .then(() => {
-                            runTypeCheck();
-                            triggerSave();
-                        })
-                        .catch(console.error);
-                }
+                    }
+                    return currentEdges.filter(
+                        (e) => e.source !== r.id && e.target !== r.id,
+                    );
+                });
+                apiDeleteNode(r.id)
+                    .then(() => {
+                        runTypeCheck();
+                        triggerSave();
+                    })
+                    .catch(console.error);
             }
         },
         [onNodesChangeRaw, setEdges, triggerSave, runTypeCheck],
@@ -554,7 +641,7 @@ export function AppInner({
                         type: "graph",
                         position,
                         data: {
-                            ...buildGraphNodeData(res.id, item.type_, "startup", initArgs ?? {}),
+                            ...makeGraphNodeData(res.id, item.type_, "startup", initArgs ?? {}),
                         },
                     };
                     setNodes((nds) => [...nds, newNode]);
@@ -563,7 +650,7 @@ export function AppInner({
                 })
                 .catch(console.error);
         },
-        [setNodes, triggerSave, runTypeCheck, buildGraphNodeData],
+        [setNodes, triggerSave, runTypeCheck, makeGraphNodeData],
     );
 
     const onDrop = useCallback(
@@ -599,18 +686,7 @@ export function AppInner({
             const item = parsed as unknown as ComponentInfo;
             const position = screenToFlowPosition({x: e.clientX, y: e.clientY});
 
-            const hasConfig = Object.values(item.init).some((schema) => {
-                if (!schema || typeof schema !== "object") return false;
-                const s = schema as Record<string, unknown>;
-                if (s.properties) return true;
-                if (s.$ref) return true;
-                if (Array.isArray(s.anyOf)) {
-                    return (s.anyOf as Record<string, unknown>[]).some(
-                        (branch) => branch.type === "object" || branch.$ref,
-                    );
-                }
-                return false;
-            });
+            const hasConfig = hasConfigSchema(item.init);
 
             if (!hasConfig) {
                 createGraphNode(item, position);
@@ -672,10 +748,7 @@ export function AppInner({
 
     const selectedLoggingNode = useMemo(
         () => {
-            const selectedId = selectedNodeIds[0];
-            if (!selectedId) return null;
-            const selected = nodes.find((n) => n.id === selectedId && n.type === "graph");
-            return selected ?? null;
+            return getSelectedLoggingNode(nodes, selectedNodeIds);
         },
         [nodes, selectedNodeIds],
     );
@@ -686,7 +759,7 @@ export function AppInner({
             const data = node.data as GraphNodeData;
             const isComposite = data.category === "composite";
             // If node is part of selection, use full selection; otherwise just this node
-            const ids = selectedNodeIds.includes(node.id) ? selectedNodeIds : [node.id];
+            const ids = getContextMenuNodeIds(selectedNodeIds, node.id);
             setContextMenu({
                 x: event.clientX,
                 y: event.clientY,
@@ -699,15 +772,13 @@ export function AppInner({
     );
 
     const handleGroupClick = useCallback(() => {
-        if (!contextMenu || contextMenu.nodeIds.length < 2) return;
         setSubgraphName("Subgraph");
-        setContextMenu({...contextMenu, naming: true});
+        setContextMenu({...contextMenu!, naming: true});
     }, [contextMenu]);
 
     const handleGroupConfirm = useCallback(async () => {
-        if (!contextMenu) return;
         const name = subgraphName.trim() || "Subgraph";
-        const ids = contextMenu.nodeIds;
+        const ids = contextMenu!.nodeIds;
         setContextMenu(null);
         try {
             await apiCreateSubgraph(ids, name);
@@ -719,10 +790,9 @@ export function AppInner({
     }, [contextMenu, subgraphName, refreshGraph, triggerSave]);
 
     const handleUngroup = useCallback(async () => {
-        if (!contextMenu || contextMenu.nodeIds.length !== 1) return;
         setContextMenu(null);
         try {
-            await apiUngroupNode(contextMenu.nodeIds[0]!);
+            await apiUngroupNode(contextMenu!.nodeIds[0]!);
             await refreshGraph();
             triggerSave();
         } catch (err) {

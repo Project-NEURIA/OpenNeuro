@@ -98,6 +98,12 @@ describe("useUIChannelManager", () => {
     });
     expect(binaryHandler).toHaveBeenCalledWith(expect.any(ArrayBuffer));
 
+    unsubscribeBinary();
+    await act(async () => {
+      socket.onmessage?.({ data: buffer.buffer } as MessageEvent);
+    });
+    expect(binaryHandler).toHaveBeenCalledTimes(1);
+
     await act(async () => {
       result.current.sendUIInput("node-1", "text", { ping: true });
     });
@@ -255,5 +261,8 @@ describe("ui input/output hooks", () => {
 
     const idle = renderHook(() => useUIVideoOutput(null, "video"));
     expect(idle.result.current).toBeNull();
+
+    const unsubscribed = renderHook(() => useUIVideoOutput("node-2", "video"));
+    unsubscribed.unmount();
   });
 });

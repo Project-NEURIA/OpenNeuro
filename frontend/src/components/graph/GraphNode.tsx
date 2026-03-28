@@ -273,6 +273,10 @@ function displaySlotName(name: string): string {
   return dot >= 0 ? name.slice(dot + 1) : name;
 }
 
+export const __test__ = {
+  displaySlotName,
+  UIWidgets,
+};
 
 function GraphNodeComponent({ id, data, selected }: NodeProps) {
   const d = data as GraphNodeData;

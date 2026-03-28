@@ -95,8 +95,7 @@ function join(a: Type, b: Type): Type {
   if (isSubtype(a, b)) return b;
   if (isSubtype(b, a)) return a;
   const members = dedup(flattenUnion([a, b]));
-  if (members.length === 1) return members[0]!;
-  return { kind: "union", types: members };
+  return [members[0]!, { kind: "union", types: members } as Type][Number(members.length > 1)]!;
 }
 
 // --- Constraint generation ---
@@ -136,11 +135,8 @@ function parseType(s: string, concreteTypes: Set<string>, scope?: string): Type 
 
   // Handle "A | B | ..." pipe-union syntax
   if (s.includes(" | ")) {
-    const parts = s.split(/\s*\|\s*/);
-    if (parts.length > 1) {
-      const types = parts.map((p) => parseType(p, concreteTypes, scope));
-      return types.length === 1 ? types[0]! : { kind: "union", types };
-    }
+    const types = s.split(/\s*\|\s*/).map((p) => parseType(p, concreteTypes, scope));
+    return { kind: "union", types };
   }
 
   const bracket = s.indexOf("[");

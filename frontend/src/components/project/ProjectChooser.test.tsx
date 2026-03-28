@@ -18,6 +18,7 @@ describe("ProjectChooser", () => {
     });
     const createProject = vi.spyOn(api, "createProject").mockResolvedValue();
     const deleteProject = vi.spyOn(api, "deleteProject").mockResolvedValue();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const onOpen = vi.fn();
     const onCancel = vi.fn();
 
@@ -26,6 +27,9 @@ describe("ProjectChooser", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("button", { name: /alpha/i })).toBeInTheDocument());
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("<button> cannot be a descendant of <button>"),
+    );
     expect(screen.getByRole("img", { name: "Alpha" })).toHaveAttribute(
       "src",
       "/projects/Alpha/thumbnail",
@@ -39,7 +43,7 @@ describe("ProjectChooser", () => {
     expect(onOpen).toHaveBeenCalledWith("Alpha");
 
     const betaCard = screen.getByRole("button", { name: /beta/i });
-    fireEvent.click(betaCard.querySelector("button")!);
+    fireEvent.click(betaCard.parentElement?.querySelector("button.absolute") as HTMLButtonElement);
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("Beta"));
 
     fireEvent.click(screen.getByRole("button", { name: /new project/i }));
@@ -54,6 +58,16 @@ describe("ProjectChooser", () => {
     fireEvent.click(screen.getByRole("button", { name: /new project/i }));
     fireEvent.click(container.querySelector(".fixed.inset-0.z-60")!);
     expect(screen.queryByPlaceholderText("Project name")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new project/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByPlaceholderText("Project name")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /new project/i }));
+    const blankInput = screen.getByPlaceholderText("Project name");
+    fireEvent.change(blankInput, { target: { value: "   " } });
+    fireEvent.keyDown(blankInput, { key: "Enter" });
+    expect(createProject).toHaveBeenCalledTimes(1);
   });
 
   it("hides cancel without previous project and resets creating state on create failure", async () => {

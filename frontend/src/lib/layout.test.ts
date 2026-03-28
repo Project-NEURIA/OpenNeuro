@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { layoutNodes } from "./layout";
 
 describe("layoutNodes", () => {
@@ -39,5 +39,32 @@ describe("layoutNodes", () => {
     );
 
     expect(positions.map((node) => node.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("handles edges pointing to nodes outside the layout set", () => {
+    const positions = layoutNodes(
+      [{ id: "a" }],
+      [{ source: "a", target: "ghost" }],
+    );
+
+    expect(positions[0]).toMatchObject({ id: "a", x: 80 });
+  });
+
+  it("uses the missing in-degree fallback when a queued target cannot be read back", () => {
+    const realGet = Map.prototype.get;
+    const getSpy = vi.spyOn(Map.prototype, "get").mockImplementation(function (key: string) {
+      if (key === "ghost") {
+        return undefined;
+      }
+      return realGet.call(this, key);
+    });
+
+    const positions = layoutNodes(
+      [{ id: "a" }],
+      [{ source: "a", target: "ghost" }],
+    );
+
+    getSpy.mockRestore();
+    expect(positions[0]).toMatchObject({ id: "a", x: 80 });
   });
 });

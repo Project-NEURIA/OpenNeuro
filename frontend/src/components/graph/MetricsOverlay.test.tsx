@@ -66,4 +66,22 @@ describe("MetricsOverlay", () => {
     fireEvent.click(screen.getAllByRole("button")[1]!);
     expect(stopAll).toHaveBeenCalled();
   });
+
+  it("renders the inactive logging button style when logging is closed", () => {
+    render(
+      <MetricsOverlay
+        connected
+        metrics={{
+          timestamp: 1,
+          nodes: {
+            a: { name: "A", status: "running", senders: {}, receivers: {} },
+          },
+        }}
+        loggingOpen={false}
+        onToggleLogging={() => {}}
+      />,
+    );
+
+    expect(screen.getByTitle("Open component logging")).toBeInTheDocument();
+  });
 });

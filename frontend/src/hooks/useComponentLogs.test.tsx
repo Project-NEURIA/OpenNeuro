@@ -105,4 +105,13 @@ describe("useComponentLogs", () => {
 
     expect(result.current.error).toBeNull();
   });
+
+  it("falls back to a generic error message for non-Error rejections", async () => {
+    vi.spyOn(api, "fetchComponentLogs").mockRejectedValue("bad");
+
+    const { result } = renderHook(() => useComponentLogs("node-4"));
+    await act(async () => {});
+
+    expect(result.current.error).toBe("Failed to load logs");
+  });
 });

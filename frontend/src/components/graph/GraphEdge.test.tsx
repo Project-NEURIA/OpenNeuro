@@ -58,5 +58,24 @@ describe("GraphEdge", () => {
     );
     expect(screen.getByText("A != B")).toBeInTheDocument();
   });
+
+  it("renders idle edges with default throughput styling when data is missing", () => {
+    render(
+      <GraphEdge
+        id="edge-3"
+        sourceX={0}
+        sourceY={0}
+        targetX={10}
+        targetY={10}
+        sourcePosition={"right" as never}
+        targetPosition={"left" as never}
+      />,
+    );
+
+    expect(screen.getByTestId("edge-edge-3")).toHaveAttribute(
+      "data-stroke",
+      "var(--edge)",
+    );
+  });
 });
 

@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MetricsDashboard } from "./MetricsDashboard";
+import { __test__ as metricsDashboardTest, MetricsDashboard } from "./MetricsDashboard";
+import { NodePanel } from "./NodePanel";
+import { ReceiverSection } from "./ReceiverSection";
+import { SenderSection } from "./SenderSection";
+import { SystemTotals } from "./SystemTotals";
 import { Waveform } from "./Waveform";
 import type { MetricsHistory } from "@/hooks/useMetricsHistory";
 import type { ComponentInfo } from "@/lib/types";
@@ -176,5 +180,220 @@ describe("metrics components", () => {
     expect(screen.getByText("-10s")).toBeInTheDocument();
     expect(screen.getByText("now")).toBeInTheDocument();
     expect(screen.getByText("10x")).toBeInTheDocument();
+  });
+
+  it("sorts nodes alphabetically when categories match", () => {
+    render(
+      <MetricsDashboard
+        connected
+        history={{
+          current: {
+            timestamp: 1,
+            nodes: {
+              b: { name: "SourceNode", status: "running", senders: {}, receivers: {} },
+              a: { name: "AnotherSource", status: "running", senders: {}, receivers: {} },
+            },
+          },
+          snapshots: [{ timestamp: 1, nodes: {} }],
+          snapshotRate: 1,
+          dt: 1,
+          nodeHistory: {
+            a: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+            b: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+          },
+        }}
+        componentMap={{
+          ...componentMap,
+          AnotherSource: {
+            type_: "AnotherSource",
+            tags: { io: ["source"], functionality: ["audio"], gpu: ["cpu"] },
+            init: {},
+            inputs: {},
+            outputs: {},
+            ui_inputs: {},
+            ui_outputs: {},
+          },
+        }}
+        onClose={() => {}}
+      />,
+    );
+
+    const labels = screen.getAllByText(/Source/).map((node) => node.textContent);
+    expect(labels.indexOf("AnotherSource")).toBeLessThan(labels.indexOf("SourceNode"));
+  });
+
+  it("covers fallback branches in metric subcomponents", () => {
+    render(
+      <>
+        <MetricsDashboard
+          connected
+          history={{
+            current: {
+              timestamp: 1,
+              nodes: {
+                sink: { name: "SinkNode", status: "running", senders: {}, receivers: {} },
+                unknown: { name: "MissingNode", status: "startup", senders: {}, receivers: {} },
+              },
+            },
+            snapshots: [{ timestamp: 1, nodes: {} }, { timestamp: 4, nodes: {} }],
+            snapshotRate: 1,
+            dt: 1,
+            nodeHistory: {},
+          }}
+          componentMap={{
+            ...componentMap,
+            SinkNode: {
+              ...componentMap.SinkNode!,
+              tags: { io: ["weird" as never], functionality: ["video"], gpu: ["cpu"] },
+            },
+          }}
+          onClose={() => {}}
+        />
+        <NodePanel
+          nodeId="unknown"
+          metrics={{ name: "MissingNode", status: "mystery", senders: {}, receivers: {} }}
+          history={{ msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} }}
+          dt={0}
+          duration={0}
+          componentMap={{
+            MissingNode: {
+              type_: "MissingNode",
+              tags: { io: [] as never[], functionality: ["misc"], gpu: ["cpu"] },
+              init: {},
+              inputs: {},
+              outputs: {},
+              ui_inputs: {},
+              ui_outputs: {},
+            },
+          }}
+          allNodes={{}}
+        />
+        <ReceiverSection
+          receiver={{ name: "idle", msg_count_delta: 2, byte_count_delta: 128, lag: 0 }}
+          dt={0}
+          duration={2}
+        />
+        <ReceiverSection
+          receiver={{ name: "warm", msg_count_delta: 2, byte_count_delta: 128, lag: 3 }}
+          dt={1}
+          duration={2}
+          receiverHistory={{ msgThroughput: [1], byteThroughput: [2] }}
+        />
+        <SenderSection
+          sender={{ name: "sender", msg_count_delta: 0, byte_count_delta: 0, last_send_time: 0, buffer_depth: 0 }}
+          dt={0}
+          duration={2}
+        />
+        <SystemTotals
+          history={{
+            current: null,
+            snapshots: [{ timestamp: 1, nodes: {} }, { timestamp: 2, nodes: {} }],
+            snapshotRate: 1,
+            dt: 1,
+            nodeHistory: {
+              a: { msgThroughput: [1, 2], byteThroughput: [3, 4], senderHistory: {}, receiverHistory: {} },
+              b: { msgThroughput: [5], byteThroughput: [6], senderHistory: {}, receiverHistory: {} },
+            },
+          }}
+        />
+        <Waveform data={[5]} showAxes />
+      </>,
+    );
+
+    expect(screen.getAllByText("No channels").length).toBeGreaterThan(0);
+    expect(screen.getByText("idle")).toBeInTheDocument();
+    expect(screen.getByText("warm")).toBeInTheDocument();
+    expect(screen.getByText("sender")).toBeInTheDocument();
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+  });
+
+  it("falls back to conduit ordering when component categories are unknown or missing", () => {
+    render(
+      <MetricsDashboard
+        connected
+        history={{
+          current: {
+            timestamp: 3,
+            nodes: {
+              zed: { name: "ZedNode", status: "running", senders: {}, receivers: {} },
+              alpha: { name: "AlphaNode", status: "running", senders: {}, receivers: {} },
+            },
+          },
+          snapshots: [{ timestamp: 3, nodes: {} }],
+          snapshotRate: 1,
+          dt: 1,
+          nodeHistory: {
+            zed: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+            alpha: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+          },
+        }}
+        componentMap={{
+          ZedNode: {
+            type_: "ZedNode",
+            tags: { io: ["weird" as never], functionality: ["misc"], gpu: ["cpu"] },
+            init: {},
+            inputs: {},
+            outputs: {},
+            ui_inputs: {},
+            ui_outputs: {},
+          },
+        }}
+        onClose={() => {}}
+      />,
+    );
+
+    const labels = screen.getAllByText(/Node$/).map((node) => node.textContent);
+    expect(labels.indexOf("AlphaNode")).toBeLessThan(labels.indexOf("ZedNode"));
+  });
+
+  it("falls back for the compared node category when the second item is missing", () => {
+    render(
+      <MetricsDashboard
+        connected
+        history={{
+          current: {
+            timestamp: 4,
+            nodes: {
+              source: { name: "SourceNode", status: "running", senders: {}, receivers: {} },
+              missing: { name: "MissingNode", status: "running", senders: {}, receivers: {} },
+            },
+          },
+          snapshots: [{ timestamp: 4, nodes: {} }],
+          snapshotRate: 1,
+          dt: 1,
+          nodeHistory: {
+            source: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+            missing: { msgThroughput: [], byteThroughput: [], senderHistory: {}, receiverHistory: {} },
+          },
+        }}
+        componentMap={componentMap}
+        onClose={() => {}}
+      />,
+    );
+
+    const labels = screen.getAllByText(/Node$/).map((node) => node.textContent);
+    expect(labels.indexOf("SourceNode")).toBeLessThan(labels.indexOf("MissingNode"));
+  });
+
+  it("sorts metric node ids with fallback categories directly", () => {
+    expect(metricsDashboardTest.sortMetricNodeIds(
+      {
+        a: { name: "SourceNode", status: "running", senders: {}, receivers: {} },
+        b: { name: "MissingNode", status: "running", senders: {}, receivers: {} },
+        c: { name: "WeirdNode", status: "running", senders: {}, receivers: {} },
+      },
+      {
+        ...componentMap,
+        WeirdNode: {
+          type_: "WeirdNode",
+          tags: { io: ["odd" as never], functionality: ["misc"], gpu: ["cpu"] },
+          init: {},
+          inputs: {},
+          outputs: {},
+          ui_inputs: {},
+          ui_outputs: {},
+        },
+      },
+    )).toEqual(["a", "b", "c"]);
   });
 });

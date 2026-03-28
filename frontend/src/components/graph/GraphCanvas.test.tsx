@@ -56,8 +56,14 @@ describe("GraphCanvas", () => {
     fireEvent.keyUp(window, { key: "Shift" });
     expect(screen.getByTestId("selection")).toHaveTextContent("false");
 
+    fireEvent.keyDown(window, { key: "A" });
+    fireEvent.keyUp(window, { key: "A" });
+    expect(screen.getByTestId("selection")).toHaveTextContent("false");
+
     fireEvent.click(screen.getByText("viewport"));
     expect(viewport.style.transform).toBe("translate(10px, 6px) scale(1.5)");
+    viewport.remove();
+    fireEvent.click(screen.getByText("viewport"));
 
     fireEvent.click(screen.getByText("drop"));
     fireEvent.click(screen.getByText("dragover"));

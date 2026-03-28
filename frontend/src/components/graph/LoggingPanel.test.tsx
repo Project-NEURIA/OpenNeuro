@@ -43,5 +43,24 @@ describe("LoggingPanel", () => {
     expect(screen.getByText("oops")).toBeInTheDocument();
     expect(screen.getByText(/failed to load logs/i)).toBeInTheDocument();
   });
+
+  it("renders the empty selected-node log state", () => {
+    vi.spyOn(logsHook, "useComponentLogs").mockReturnValue({
+      entries: [],
+      error: null,
+    });
+
+    render(
+      <LoggingPanel
+        selectedNode={{
+          id: "node-2",
+          data: { label: "Speaker", status: "stopped" },
+        } as never}
+      />,
+    );
+
+    expect(screen.getByText("Speaker")).toBeInTheDocument();
+    expect(screen.getByText(/no logs captured yet/i)).toBeInTheDocument();
+  });
 });
 

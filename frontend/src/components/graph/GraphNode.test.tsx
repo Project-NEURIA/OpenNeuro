@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphNode } from "./GraphNode";
+import { __test__, GraphNode } from "./GraphNode";
 import * as textHook from "@/hooks/useUITextOutput";
 import * as videoHook from "@/hooks/useUIVideoOutput";
 import * as outputHook from "@/hooks/useUIOutput";
@@ -158,6 +158,202 @@ describe("GraphNode", () => {
 
     expect(screen.getByText("awaiting data")).toBeInTheDocument();
     expect(screen.queryByTitle("Edit settings")).not.toBeInTheDocument();
+  });
+
+  it("covers fallback widget branches, blank submits, and plain slot names", () => {
+    const sendGeneric = vi.fn();
+    const sendUIInput = vi.fn();
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue(null);
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue(null);
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(sendGeneric);
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput,
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    const { container } = render(
+      <GraphNode
+        id="node-3"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "SinkNode",
+          category: "sink",
+          onEditConfig: vi.fn(),
+          inputs: ["typedInput", "untypedInput"],
+          outputs: ["typedOutput", "untypedOutput"],
+          inputTypes: { typedInput: { name: "ExactInput", optional: true } },
+          outputTypes: { typedOutput: { name: "ExactOutput", optional: false } },
+          resolvedTypes: {
+            "in.typedInput": "ExactInput",
+          },
+          status: "mystery",
+          nodeMetrics: { name: "SinkNode", status: "mystery", senders: {}, receivers: {} },
+          ui_outputs: {
+            videoOut: "UIVideoSender",
+            textOut: "UITextSender",
+            dataOut: "UICustomSender",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("no signal")).toBeInTheDocument();
+    expect(screen.queryByTitle("Edit settings")).not.toBeInTheDocument();
+    expect(screen.getByText("typedInput")).toBeInTheDocument();
+    expect(screen.getByText("ExactOutput")).toBeInTheDocument();
+    expect(screen.getByTestId("in-untypedInput")).toBeInTheDocument();
+    expect(screen.getByTestId("out-untypedOutput")).toBeInTheDocument();
+    expect(container.querySelector("pre")?.textContent).toBe("");
+
+    expect(__test__.displaySlotName("plain")).toBe("plain");
+  });
+
+  it("renders unknown category and ignores empty input submissions", () => {
+    const sendGeneric = vi.fn();
+    const sendUIInput = vi.fn();
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue("status");
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue("raw text");
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(sendGeneric);
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput,
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    render(
+      <GraphNode
+        id="node-4"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "AlienNode",
+          category: "alien",
+          inputs: [],
+          outputs: [],
+          inputTypes: {},
+          outputTypes: {},
+          status: "offline",
+          nodeMetrics: { name: "AlienNode", status: "offline", senders: {}, receivers: {} },
+          ui_inputs: {
+            textIn: "UIKeystrokeReceiver",
+            genericIn: "UICustomReceiver",
+          },
+          ui_outputs: {
+            rawOut: "UICustomSender",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("raw text")).toBeInTheDocument();
+    expect(screen.getByText("alien")).toBeInTheDocument();
+
+    const textInput = screen.getByPlaceholderText("textIn...");
+    fireEvent.change(textInput, { target: { value: "   " } });
+    fireEvent.keyDown(textInput, { key: "Escape" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
+
+    const genericInput = screen.getByPlaceholderText("genericIn (JSON)...");
+    fireEvent.change(genericInput, { target: { value: "   " } });
+    fireEvent.keyDown(genericInput, { key: "Escape" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Send" })[1]!);
+
+    expect(sendUIInput).not.toHaveBeenCalled();
+    expect(sendGeneric).not.toHaveBeenCalled();
+  });
+
+  it("renders widget fallback nulls directly and uses ui output defaults inside the node", () => {
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue(null);
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue(null);
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(vi.fn());
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    const empty = render(<__test__.UIWidgets nodeId="node-empty" uiInputs={{}} uiOutputs={{}} />);
+    expect(empty.container).toBeEmptyDOMElement();
+
+    render(
+      <GraphNode
+        id="node-5"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "InputOnlyNode",
+          category: "conduit",
+          inputs: [],
+          outputs: [],
+          inputTypes: {},
+          outputTypes: {},
+          status: "startup",
+          nodeMetrics: { name: "InputOnlyNode", status: "startup", senders: {}, receivers: {} },
+          ui_inputs: {
+            textIn: "UITextReceiver",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("textIn...")).toBeInTheDocument();
+  });
+
+  it("falls back when ui input and output maps are omitted entirely", () => {
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue(null);
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue(null);
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(vi.fn());
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    render(
+      <GraphNode
+        id="node-6"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "BareNode",
+          category: "source",
+          inputs: [],
+          outputs: [],
+          inputTypes: {},
+          outputTypes: {},
+          status: "stopped",
+          nodeMetrics: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("awaiting data")).toBeInTheDocument();
   });
 });
 
