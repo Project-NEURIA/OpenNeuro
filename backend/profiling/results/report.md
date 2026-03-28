@@ -184,13 +184,38 @@ We implemented the top two improvements:
 
 ---
 
-## 3. Channel vs threading.Queue vs FastChannel Throughput Benchmark
+## 3. Channel Throughput Benchmark
 
-We benchmarked our custom `Channel`/`Sender`/`Receiver` (function 5) against Python's `threading.Queue` and a new **FastChannel** implementation (Rust ring buffer via PyO3) using methodology adapted from the [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor) perftest suite: 100K messages per run, 7 runs per test, `gc.collect()` between runs, correctness checksums on every run.
-
-FastChannel replaces Channel's Python `list` + `_gc()` + `threading.Condition` with a fixed-size ring buffer protected by a Rust `parking_lot::Mutex` + `Condvar`, exposed to Python via PyO3. No per-message GC — old slots are simply overwritten when the ring wraps.
+We benchmarked our custom `Channel`/`Sender`/`Receiver` (function 5) against Python's `threading.Queue` using methodology adapted from the [LMAX Disruptor](https://github.com/LMAX-Exchange/disruptor) perftest suite: 100K messages per run, 7 runs per test, `gc.collect()` between runs, correctness checksums on every run.
 
 ### Throughput (median of 7 runs)
+
+| Topology | Channel | Queue | Ratio |
+|----------|---------|-------|-------|
+| 1P1C (unicast) | 512K ops/s | 1,244K ops/s | Queue 2.4x faster |
+| 1P3C (multicast) | 215K ops/s | 414K ops/s | Queue 1.9x faster |
+| 3P1C (fan-in) | 158K ops/s | 1,188K ops/s | Queue 7.5x faster |
+| Pipeline (P→S1→S2→S3) | 120K ops/s | 405K ops/s | Queue 3.4x faster |
+
+### Latency (ping-pong round-trip, best of 5 runs)
+
+| Percentile | Channel | Queue |
+|------------|---------|-------|
+| p50 | 8.4 µs | 9.0 µs |
+| p90 | 10.5 µs | 9.6 µs |
+| p99 | 13.8 µs | 12.0 µs |
+| p99.9 | 22.5 µs | 23.3 µs |
+| max | 29.7 µs | 103.0 µs |
+
+Channel has slightly lower median latency and better tail (30µs max vs 103µs).
+
+### Improvement: Rust Ring Buffer (FastChannel)
+
+**Problem**: Channel is 2–7x slower than Queue on throughput. cProfile identifies `_gc()` on every receive, `notify_all()` on every send, and `sys.getsizeof()`/`time.time()` per-message metrics as the main overhead.
+
+**Improvement**: Replace Channel's Python `list` + `threading.Condition` with a fixed-size ring buffer implemented in Rust via PyO3. The ring buffer eliminates per-message GC (old slots are simply overwritten), and Rust's `parking_lot::Mutex` + `Condvar` is significantly faster than Python's `threading.Condition`.
+
+### Results After Implementing FastChannel
 
 | Topology | Channel | Queue | FastChannel |
 |----------|---------|-------|-------------|
@@ -199,9 +224,7 @@ FastChannel replaces Channel's Python `list` + `_gc()` + `threading.Condition` w
 | 3P1C (fan-in) | 158K ops/s | 1,188K ops/s | **2,664K ops/s** |
 | Pipeline (P→S1→S2→S3) | 120K ops/s | 405K ops/s | **981K ops/s** |
 
-FastChannel is **2–4x faster than Queue** and **5–8x faster than the original Channel** across all topologies.
-
-### Latency (ping-pong round-trip, best of 5 runs)
+FastChannel is **2–4x faster than Queue** and **5–8x faster than the original Channel**.
 
 | Percentile | Channel | Queue | FastChannel |
 |------------|---------|-------|-------------|
