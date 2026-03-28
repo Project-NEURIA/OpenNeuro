@@ -1,4 +1,4 @@
-name: Backend Coverage
+name: Coverage
 
 on:
   pull_request:
@@ -11,16 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend-coverage:
+  coverage:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     env:
       UV_CACHE_DIR: /home/runner/.cache/uv
-    defaults:
-      run:
-        working-directory: backend
 
     steps:
       - uses: actions/checkout@v4
@@ -32,43 +29,55 @@ jobs:
 
       - uses: astral-sh/setup-uv@v4
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Restore uv cache
         uses: actions/cache@v4
         with:
           path: |
             /home/runner/.cache/uv
             backend/.venv
-          key: backend-coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/uv.lock') }}
+          key: coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/uv.lock') }}
           restore-keys: |
-            backend-coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+            coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libportaudio2
 
-      - name: Install dependencies
+      - name: Install backend dependencies
+        working-directory: backend
         run: uv sync --group dev
 
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
       - name: Run backend tests with coverage
+        working-directory: backend
         run: uv run pytest
 
-      - name: Build text coverage report
+      - name: Run frontend tests with coverage
+        working-directory: frontend
+        run: bun run coverage
+
+      - name: Generate coverage badges and PR summary
         run: |
-          uv run coverage report -m > coverage.txt
-          {
-            echo "## Backend Coverage"
-            echo ""
-            echo '```text'
-            cat coverage.txt
-            echo '```'
-          } > ../coverage-comment.md
+          python scripts/generate_coverage_badges.py \
+            --backend-xml backend/coverage.xml \
+            --backend-svg docs/backend-coverage.svg \
+            --frontend-lcov frontend/coverage/lcov.info \
+            --frontend-svg docs/frontend-coverage.svg \
+            --comment coverage-comment.md
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage
+          name: coverage-reports
           path: |
             backend/coverage.xml
-            backend/coverage.txt
+            frontend/coverage/lcov.info
+            coverage-comment.md
 
       - name: Post PR coverage comment
         if: github.event_name == 'pull_request'
@@ -76,13 +85,11 @@ jobs:
         with:
           path: coverage-comment.md
 
-      - name: Generate coverage badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: uv run --with coverage-badge coverage-badge -o ../docs/backend-coverage.svg -f
-
-      - name: Commit coverage badge
+      - name: Commit coverage badges
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "ci: update backend coverage badge"
-          file_pattern: docs/backend-coverage.svg
+          commit_message: "ci: update coverage badges"
+          file_pattern: |
+            docs/backend-coverage.svg
+            docs/frontend-coverage.svg
