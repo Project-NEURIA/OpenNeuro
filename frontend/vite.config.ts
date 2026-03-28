@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -63,6 +65,20 @@ function uploadPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), uploadPlugin()],
+  test: {
+    environment: "jsdom",
+    setupFiles: "./src/test/setup.ts",
+    coverage: {
+      provider: "istanbul",
+      all: true,
+      reporter: ["text", "lcov"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.d.ts",
+        "src/test/**",
+      ],
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from src.core.frames import TextFrame
 
-if TYPE_CHECKING:
-    from src.core.component import ThreadedComponent
+if TYPE_CHECKING:  # pragma: no cover
+    from src.core.component import ThreadedComponent  # pragma: no cover
 
 
 class Channel[T]:

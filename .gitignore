@@ -18,3 +18,5 @@ backend/src/core/conduit/yolo/*.pt
 
 # uv lock file — generated per-machine (GPU-dependent)
 backend/uv.lock
+backend/.coverage
+backend/coverage.xml
