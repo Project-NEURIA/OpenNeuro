@@ -2,9 +2,9 @@ name: Backend Coverage
 
 on:
   pull_request:
-    branches: [ A5, main ]
+    branches: [ main ]
   push:
-    branches: [ A5, main ]
+    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -13,7 +13,6 @@ concurrency:
 jobs:
   backend-coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write
