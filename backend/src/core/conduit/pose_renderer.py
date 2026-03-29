@@ -91,7 +91,7 @@ def _project(
     height: int,
     scale: float = 150.0,
 ) -> tuple[int, int]:
-    """Project a 3D bone position to 2D pixel coords (front view: X right, Y up)."""
+    """Project a 3D bone position to 2D pixel coords (rear view: +X right, +Y up)."""
     px = int(width / 2 + bone.pos_x * scale)
     py = int(height * 0.75 - bone.pos_y * scale)  # Y is up; anchor at 75% down
     return px, py
