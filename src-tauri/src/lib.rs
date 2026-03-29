@@ -14,7 +14,7 @@ fn kill_backend() {
 }
 
 /// Detect GPU vendor and return the uv extra name.
-/// Returns Some("cu126") for NVIDIA, Some("rocm") for AMD, None for other/Mac.
+/// Returns Some("cu128") for NVIDIA, Some("rocm") for AMD, None for other/Mac.
 fn detect_gpu_extra() -> Option<&'static str> {
     if cfg!(target_os = "macos") {
         return None; // Mac uses default PyPI torch (MPS)
@@ -62,9 +62,9 @@ pub fn run() {
             let mut sync_args: Vec<&str> = vec!["sync"];
             match extra {
                 Some("rocm") => {
-                    sync_args.extend(["--no-group", "cuda", "--group", "rocm"]);
+                    sync_args.extend(["--no-group", "cuda12", "--group", "rocm"]);
                 }
-                _ => {} // CUDA is default-group, Mac has no group needed
+                _ => {} // cuda12 is default-group, Mac has no group needed
             }
 
             println!("[tauri] Running: uv {}", sync_args.join(" "));

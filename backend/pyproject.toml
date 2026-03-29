@@ -73,6 +73,11 @@ url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[[tool.uv.index]]
 name = "pytorch-rocm"
 url = "https://download.pytorch.org/whl/rocm6.4"
 explicit = true
@@ -81,21 +86,24 @@ explicit = true
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
 conflicts = [
-    [{ group = "cuda" }, { group = "rocm" }],
+    [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
-default-groups = ["cuda"]
+default-groups = ["cuda12"]
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu128", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchaudio = [
-    { index = "pytorch-cu128", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchvision = [
-    { index = "pytorch-cu128", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 pytorch-triton-rocm = [
@@ -106,5 +114,6 @@ pytorch-triton-rocm = [
 dev = [
     "ruff>=0.15.1",
 ]
-cuda = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0"]
-rocm = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0", "pytorch-triton-rocm"]
+cuda12 = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0"]
+cuda13 = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0"]
+rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
