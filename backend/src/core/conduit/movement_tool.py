@@ -4,7 +4,7 @@ import json
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import EmitOnStart, ThreadedComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import GoalFrame, TextFrame, ToolCall, ToolDef, ToolResult
 
 
@@ -21,12 +21,11 @@ class MovementToolOutputs(NamedTuple):
 
 class MovementTool(
     ThreadedComponent[MovementToolInputs, MovementToolOutputs],
-    EmitOnStart[MovementToolOutputs],
 ):
     description = "Translates LLM tool calls into movement commands for DartControl"
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
-    def emit(self, outputs: MovementToolOutputs) -> None:
+    def setup(self, outputs: MovementToolOutputs) -> None:
         outputs.tool_def.send(
             ToolDef.new(
                 name="move",
