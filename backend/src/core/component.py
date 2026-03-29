@@ -34,6 +34,7 @@ class Status(Enum):
     STARTUP = "startup"
     SETUP = "setup"
     RUNNING = "running"
+    STOPPING = "stopping"
     STOPPED = "stopped"
 
 
@@ -51,6 +52,7 @@ class Component[
 
     def __init__(self) -> None:
         self._status = Status.STARTUP
+        self._inputs: I | None = None
 
     @property
     @abstractmethod
@@ -60,12 +62,30 @@ class Component[
     def status(self) -> Status:
         return self._status
 
+    def setup(self, outputs: O) -> None:
+        """Called synchronously by GraphManager before threads start.
+
+        Override to perform initialization or emit initial values into outputs.
+        """
+
+    def destruct(self, inputs: I) -> None:
+        """Called during shutdown (STOPPING phase).
+
+        Override to perform cleanup with access to input receivers.
+        """
+
     def start(self, inputs: I, outputs: O) -> None:
         """Start the component. Subclasses override with their execution model."""
+        self._inputs = inputs
         self._status = Status.RUNNING
 
     def stop(self) -> None:
         """Idempotent. Signals the component to stop."""
+        if self._status == Status.STOPPED:
+            return
+        self._status = Status.STOPPING
+        if self._inputs is not None:
+            self.destruct(self._inputs)
         self._status = Status.STOPPED
 
     # --- Reflection / introspection ---
@@ -292,7 +312,6 @@ class PrimitiveComponent[
         skip = {
             PrimitiveComponent,
             ThreadedComponent,
-            EmitOnStart,
         }
 
         def walk(subclass: type[PrimitiveComponent[Any, Any]]) -> None:
@@ -332,20 +351,18 @@ class ThreadedComponent[
     @abstractmethod
     def run(self, inputs: I, outputs: O) -> None: ...
 
-    def setup(self) -> None:
-        """Override to perform heavy initialization before run()."""
-
     def _safe_run(self, inputs: I, outputs: O) -> None:
         try:
-            self._status = Status.SETUP
-            self.setup()
-            if self._stop_event.is_set():
-                return
             self._status = Status.RUNNING
             self.run(inputs, outputs)
         except Exception:
             traceback.print_exc()
         finally:
+            self._status = Status.STOPPING
+            try:
+                self.destruct(inputs)
+            except Exception:
+                traceback.print_exc()
             # Registration happens in GraphManager when start() is called.
             # Unregister here to ensure buffered partial lines are flushed.
             get_log_store().unregister_thread()
@@ -356,6 +373,7 @@ class ThreadedComponent[
             return
         if self._thread is not None:
             self._thread.join(timeout=5.0)
+        self._inputs = inputs
         self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._safe_run, args=(inputs, outputs), daemon=True
@@ -369,23 +387,7 @@ class ThreadedComponent[
         if self.status == Status.STOPPED:
             return
         self._stop_event.set()
-
-
-# ---------------------------------------------------------------------------
-# EmitOnStart — mixin for components that send values synchronously on start
-# ---------------------------------------------------------------------------
-
-
-class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
-    """Mixin for components that need to send values before threads start.
-
-    GraphManager calls emit(outputs) synchronously during run(),
-    before start() is called. This guarantees values are in channels
-    before any downstream component's thread reads them.
-    """
-
-    @abstractmethod
-    def emit(self, outputs: E) -> None: ...
+        # destruct is called in _safe_run's finally block (in the thread)
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +477,7 @@ class CompositeComponent(Component[Any, Any]):
     def start(self, inputs: Any, outputs: Any) -> None:
         if self.status == Status.RUNNING:
             return
+        self._inputs = inputs
         self._status = Status.SETUP
 
         from src.core.graph import GraphManager

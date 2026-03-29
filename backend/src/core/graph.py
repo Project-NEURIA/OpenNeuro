@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from src.core.channel import Channel, Receiver, Sender
 from src.core.component import (
     Component,
-    EmitOnStart,
     PrimitiveComponent,
     ThreadedComponent,
 )
@@ -375,7 +374,7 @@ class GraphManager:
                 # Server keeps a Receiver to read from
                 self._ui_receivers[(node_id, slot)] = Receiver(ch)
 
-            # Wire all receivers (registers cursors before EmitOnStart)
+            # Wire all receivers (registers cursors before setup)
             if isinstance(comp, ThreadedComponent):
                 for handle in input_handles.values():
                     if isinstance(handle, Receiver):
@@ -390,11 +389,10 @@ class GraphManager:
 
             start_queue.append((node_id, comp, built_inputs, built_outputs))
 
-        # Emit AFTER all receivers are wired, so EmitOnStart data lands
-        # behind every cursor regardless of node processing order.
+        # Call setup() on all components AFTER all receivers are wired,
+        # so initial data lands behind every cursor regardless of node order.
         for _, comp, _, built_outputs in start_queue:
-            if isinstance(comp, EmitOnStart):
-                comp.emit(built_outputs)
+            comp.setup(built_outputs)
 
         # Start all components after all emits are done
         for node_id, comp, inputs, outputs in start_queue:

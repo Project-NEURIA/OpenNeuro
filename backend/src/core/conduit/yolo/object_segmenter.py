@@ -97,7 +97,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         tmp.close()
         return tmp.name
 
-    def setup(self) -> None:
+    def setup(self, outputs: ObjectSegmenterOutputs) -> None:
         from ultralytics import YOLOE
 
         checkpoint = _MODEL_MAP[self.config.model]
