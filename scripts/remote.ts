@@ -83,14 +83,16 @@ console.log("[remote] Waiting for backend to be ready...");
 await waitForBackend("http://localhost:8000/component");
 console.log("[remote] Backend is ready, starting frontend.\n");
 
-// Use bunx vite (without --bun) so Vite runs on Node's runtime,
-// avoiding Bun's broken node:http proxy (oven-sh/bun#28396).
-const frontend = Bun.spawn(["bunx", "vite"], {
-  cwd: "./frontend",
-  stdout: "inherit",
-  stderr: "inherit",
-  env,
-});
+// Run Vite on Node to avoid Bun's broken node:http proxy (oven-sh/bun#28396).
+const frontend = Bun.spawn(
+  ["node", "./node_modules/vite/bin/vite.js"],
+  {
+    cwd: "./frontend",
+    stdout: "inherit",
+    stderr: "inherit",
+    env,
+  },
+);
 
 process.on("SIGINT", () => {
   frontend.kill();
