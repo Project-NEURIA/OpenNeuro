@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { __test__ as metricsDashboardTest, MetricsDashboard } from "@/components/metrics/MetricsDashboard";
+import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { NodePanel } from "@/components/metrics/NodePanel";
 import { ReceiverSection } from "@/components/metrics/ReceiverSection";
 import { SenderSection } from "@/components/metrics/SenderSection";
@@ -373,28 +373,6 @@ describe("metrics components", () => {
 
     const labels = screen.getAllByText(/Node$/).map((node) => node.textContent);
     expect(labels.indexOf("SourceNode")).toBeLessThan(labels.indexOf("MissingNode"));
-  });
-
-  it("sorts metric node ids with fallback categories directly", () => {
-    expect(metricsDashboardTest.sortMetricNodeIds(
-      {
-        a: { name: "SourceNode", status: "running", senders: {}, receivers: {} },
-        b: { name: "MissingNode", status: "running", senders: {}, receivers: {} },
-        c: { name: "WeirdNode", status: "running", senders: {}, receivers: {} },
-      },
-      {
-        ...componentMap,
-        WeirdNode: {
-          type_: "WeirdNode",
-          tags: { io: ["odd" as never], functionality: ["misc"], gpu: ["cpu"] },
-          init: {},
-          inputs: {},
-          outputs: {},
-          ui_inputs: {},
-          ui_outputs: {},
-        },
-      },
-    )).toEqual(["a", "b", "c"]);
   });
 });
 

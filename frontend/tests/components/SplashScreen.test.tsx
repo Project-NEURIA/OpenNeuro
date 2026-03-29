@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { __test__, SplashScreen } from "@/components/SplashScreen";
+import { SplashScreen } from "@/components/SplashScreen";
 
 describe("SplashScreen", () => {
   it("renders the loading status and draws svg letters once", () => {
@@ -15,15 +15,13 @@ describe("SplashScreen", () => {
     expect(svg.querySelectorAll("text")).toHaveLength("OpenNeuro".length * 2);
   });
 
-  it("short-circuits splash animation when svg is missing or already animated", () => {
-    const animated = { current: false };
-    expect(__test__.animateSplashSvg(null, animated)).toBeUndefined();
-    expect(animated.current).toBe(false);
+  it("renders the drag region and progress bar chrome", () => {
+    const { container } = render(<SplashScreen status="Booting..." />);
 
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg") as SVGSVGElement;
-    animated.current = true;
-    __test__.animateSplashSvg(svg, animated);
-    expect(svg.querySelectorAll("text")).toHaveLength(0);
+    expect(screen.getByText("Booting...")).toBeInTheDocument();
+    expect(container.querySelector("[data-tauri-drag-region='true']")).toBeTruthy();
+    expect(container.querySelector("svg#logo")).toBeTruthy();
+    expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 });
 

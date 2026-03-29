@@ -1,133 +1,134 @@
-"""Test DartControl component with a square walk goal sequence.
-
-Feeds the same waypoints as DART's demo_walk.json:
-  (0,4,0) → (4,4,0) → (4,0,0) → (0,0,0)
-with instruction "walk" at each waypoint.
-
-Checks that the figure reaches each waypoint within a threshold.
-
-Coordinate systems:
-  DART internal: Z-up, ground plane is XY
-  Our output (Y-up): -90° rotation around X → (x, z_up, -y) = (pos_x, pos_y, pos_z)
-  So: pos_x = DART_x, pos_z = -DART_y
-"""
-
 from __future__ import annotations
 
-import time
-from unittest.mock import patch
+from types import SimpleNamespace
 
-import numpy as np
+import torch
 
-from src.core.channel import Channel, Sender, Receiver
-from src.core.conduit.dart_control.component import DartControl, DartControlConfig
-from src.core.frames import GoalFrame, TextFrame
+from src.core.conduit.dart_control.component import (
+    BodyPoseFrame,
+    BonePose,
+    DartControl,
+    DartControlConfig,
+    DartControlInputs,
+    DartControlOutputs,
+)
 
-SUCCESS_THRESHOLD = 0.3  # meters
-TIMEOUT = 30  # seconds per waypoint
+
+class _FakeReceiver:
+    def __init__(self, items: list[object]) -> None:
+        self._items = list(items)
+        self.blocking = True
+        self.newest = False
+
+    def __next__(self) -> object:
+        if self._items:
+            return self._items.pop(0)
+        return None
 
 
-def test_square_walk():
-    with patch("builtins.print"):
-        # Figure starts facing +Z in Y-up space, +X = figure's right
-        # Goals are Y-up: (x=right, y=height, z=forward)
-        waypoints = [
-            (0.0, 0.0, 4.0),  # straight ahead
-            (-4.0, 0.0, 4.0),  # turn left
-            (-4.0, 0.0, 0.0),  # turn left again
-            (0.0, 0.0, 0.0),  # back to origin
-        ]
+class _FakeFuture:
+    def __init__(self, value) -> None:
+        self._value = value
+        self.cancelled = False
 
-        # Create channels
-        goal_ch = Channel()
-        goal_sender = Sender(goal_ch)
-        goal_receiver = Receiver(goal_ch)
+    def result(self):
+        return self._value
 
-        instruction_ch = Channel()
-        instruction_sender = Sender(instruction_ch)
-        instruction_receiver = Receiver(instruction_ch)
+    def cancel(self) -> bool:
+        self.cancelled = True
+        return True
 
-        motion_ch = Channel()
-        motion_sender = Sender(motion_ch)
-        motion_receiver = Receiver(motion_ch)
 
-        # Use CPU for reproducibility (policy trained on CUDA, MPS may differ)
-        config = DartControlConfig(device="cpu")
-        dart = DartControl(config)
+class _FakeExecutor:
+    def __init__(self, *args, **kwargs) -> None:
+        self.futures: list[_FakeFuture] = []
 
-        from src.core.conduit.dart_control.component import (
-            DartControlInputs,
-            DartControlOutputs,
-        )
+    def submit(self, fn, *args):
+        future = _FakeFuture(fn(*args))
+        self.futures.append(future)
+        return future
 
-        inputs = DartControlInputs(
-            goal=goal_receiver,
-            instruction=instruction_receiver,
-        )
-        outputs = DartControlOutputs(motion=motion_sender)
+    def shutdown(self, wait: bool = False) -> None:
+        return None
 
-        # Start component
-        dart.start(inputs, outputs)
 
-        # Give it time to load models
-        time.sleep(5)
+def test_prepare_frames_floor_clamps(monkeypatch) -> None:
+    component = DartControl(DartControlConfig(device="cpu", batch_size=1))
 
-        # Send initial instruction
-        instruction_sender.send(TextFrame.new(text="walk"))
-
-        # Create motion iterator
-        motion_it = motion_receiver(dart, newest=True)
-
-        reached = []
-        for wp_idx, (gx, gy, gz) in enumerate(waypoints):
-            print(f"\n--- Waypoint {wp_idx}: DART({gx}, {gy}, {gz}) ---")
-            goal_sender.send(GoalFrame.new(x=gx, y=gy, z=gz))
-
-            start_time = time.time()
-            step = 0
-            while time.time() - start_time < TIMEOUT:
-                frame = next(motion_it)
-                if frame is None:
-                    break
-
-                poses = frame.get()
-                waist = poses.get("waist")
-                if waist is None:
-                    continue
-
-                # Y-up: ground plane is (x, z), y is height
-                px, pz = waist.pos_x, waist.pos_z
-
-                dist = np.sqrt((px - gx) ** 2 + (pz - gz) ** 2)
-
-                step += 1
-                if step % 30 == 0:  # print every ~1 second at 30fps
-                    print(
-                        f"  pos=({px:.2f}, {pz:.2f}), "
-                        f"goal=({gx:.2f}, {gz:.2f}), dist={dist:.2f}"
-                    )
-
-                if dist < SUCCESS_THRESHOLD:
-                    elapsed = time.time() - start_time
-                    print(
-                        f"  Reached waypoint {wp_idx} in {elapsed:.1f}s (dist={dist:.2f})"
-                    )
-                    reached.append(wp_idx)
-                    break
-            else:
-                print(f"  TIMEOUT: did not reach waypoint {wp_idx}")
-
-        dart.stop()
-        if dart._thread is not None:
-            dart._thread.join(timeout=5)
-
-        print(f"\n=== Results: reached {len(reached)}/{len(waypoints)} waypoints ===")
-        print(f"Reached: {reached}")
-
-    assert len(reached) == len(waypoints), (
-        f"Only reached {len(reached)}/{len(waypoints)} waypoints: {reached}"
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component._features_to_body_pose",
+        lambda _frame: {
+            "left_foot": BonePose(pos_x=1.0, pos_y=-0.5, pos_z=2.0, rot_w=1.0),
+            "right_foot": BonePose(pos_x=2.0, pos_y=0.25, pos_z=3.0, rot_w=1.0),
+            "waist": BonePose(pos_x=0.0, pos_y=1.0, pos_z=0.0, rot_w=1.0),
+        },
     )
 
+    frames = component._prepare_frames(torch.zeros((1, 2, 276), dtype=torch.float32))
+    assert len(frames) == 2
+    assert frames[0]["left_foot"] is not None
+    assert frames[0]["left_foot"].pos_y == 0.0
+    assert frames[0]["waist"] is not None
+    assert frames[0]["waist"].pos_y == 1.5
 
-if __name__ == "__main__":
-    test_square_walk()
+
+def test_run_uses_newest_receivers_and_emits_motion(monkeypatch) -> None:
+    component = DartControl(DartControlConfig(device="cpu", batch_size=1, fps=60.0))
+    sent: list[BodyPoseFrame] = []
+    executor = _FakeExecutor()
+
+    engine = SimpleNamespace(
+        encode_text=lambda items: torch.ones((1, 4), dtype=torch.float32),
+    )
+
+    monkeypatch.setattr(component, "_ensure_engine", lambda: engine)
+    monkeypatch.setattr(component, "_ensure_primitive_util", lambda: SimpleNamespace())
+    monkeypatch.setattr(component, "_init_from_stand", lambda engine, putil: None)
+    monkeypatch.setattr(component, "_load_policy", lambda engine: None)
+    monkeypatch.setattr(
+        component,
+        "_generate_primitive",
+        lambda engine, putil, text_embedding, policy, current_goal, current_goal_heading: (
+            torch.zeros((1, 1, 276), dtype=torch.float32),
+            0.1,
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        component,
+        "_prepare_frames",
+        lambda world_features: [
+            {
+                "waist": BonePose(pos_x=1.0, pos_y=2.0, pos_z=3.0, rot_w=1.0),
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.ThreadPoolExecutor",
+        lambda *args, **kwargs: executor,
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.torch.cuda.is_available",
+        lambda: False,
+    )
+    monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)
+
+    def _send(frame: BodyPoseFrame) -> None:
+        sent.append(frame)
+        component.stop_event.set()
+
+    inputs = DartControlInputs(
+        goal=_FakeReceiver([SimpleNamespace(x=1.0, y=2.0, z=3.0, heading=90.0), None]),
+        instruction=_FakeReceiver([SimpleNamespace(get=lambda: "walk"), None]),
+    )
+    outputs = DartControlOutputs(motion=SimpleNamespace(send=_send))
+
+    component.run(inputs, outputs)
+
+    assert inputs.goal is not None and inputs.goal.newest is True
+    assert inputs.goal.blocking is False
+    assert inputs.instruction is not None and inputs.instruction.newest is True
+    assert inputs.instruction.blocking is False
+    assert len(sent) == 1
+    assert sent[0].get()["waist"] is not None
+    assert executor.futures

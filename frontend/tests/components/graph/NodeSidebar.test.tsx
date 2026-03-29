@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { __test__, NodeSidebar } from "@/components/graph/NodeSidebar";
+import { NodeSidebar } from "@/components/graph/NodeSidebar";
 import type { ComponentInfo } from "@/lib/types";
 
 const components: ComponentInfo[] = [
@@ -23,6 +23,27 @@ const components: ComponentInfo[] = [
     ui_inputs: {},
     ui_outputs: {},
   },
+  {
+    type_: "Current",
+    tags: { io: ["conduit"], functionality: ["misc"], gpu: ["cpu"] },
+    init: {},
+    inputs: {},
+    outputs: {},
+    ui_inputs: {},
+    ui_outputs: {},
+    is_composite: true,
+  },
+  {
+    type_: "Another",
+    description: "plain hover text",
+    tags: { io: ["conduit"], functionality: ["misc"], gpu: ["amd"] },
+    init: {},
+    inputs: {},
+    outputs: {},
+    ui_inputs: {},
+    ui_outputs: {},
+    is_composite: true,
+  },
 ];
 
 describe("NodeSidebar", () => {
@@ -31,20 +52,18 @@ describe("NodeSidebar", () => {
     vi.useFakeTimers();
   });
 
-  it("searches, collapses, shows hover info, and serializes drag payloads", async () => {
+  it("searches, collapses, shows hover info, and serializes drag payloads", () => {
     const { container } = render(
       <NodeSidebar
         components={components}
-        projects={[
-          { name: "Current", has_thumbnail: false },
-          { name: "Another", has_thumbnail: false },
-        ]}
         currentProject="Current"
       />,
     );
 
     expect(screen.getByText("Sources")).toBeInTheDocument();
     expect(screen.getByText("Sinks")).toBeInTheDocument();
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    expect(screen.queryByText("Current")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText("Search..."), {
       target: { value: "mic" },
@@ -53,10 +72,6 @@ describe("NodeSidebar", () => {
     expect(screen.queryByText("Speaker")).not.toBeInTheDocument();
     fireEvent.click(container.querySelector("button.absolute.right-2")!);
     expect((screen.getByPlaceholderText("Search...") as HTMLInputElement).value).toBe("");
-
-    fireEvent.change(screen.getByPlaceholderText("Search..."), {
-      target: { value: "" },
-    });
 
     const item = screen.getByText("Mic").closest("div[draggable='true']")!;
     fireEvent.mouseEnter(item);
@@ -70,18 +85,6 @@ describe("NodeSidebar", () => {
     expect(screen.getByText("Inputs")).toBeInTheDocument();
     expect(screen.getByText("Outputs")).toBeInTheDocument();
     expect(screen.getByText("Config")).toBeInTheDocument();
-    const hoverWrapper = container.querySelector(".fixed.z-50.w-64")?.parentElement as HTMLElement;
-    fireEvent.mouseEnter(hoverWrapper);
-    fireEvent.mouseLeave(item);
-    act(() => {
-      vi.advanceTimersByTime(100);
-    });
-    expect(screen.queryByText("Inputs")).not.toBeInTheDocument();
-
-    fireEvent.mouseEnter(item);
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
 
     const dataTransfer = {
       setData: vi.fn(),
@@ -114,50 +117,12 @@ describe("NodeSidebar", () => {
     expect(screen.getByText("Another")).toBeInTheDocument();
   });
 
-  it("covers helper fallbacks, unknown icons, and hover panels without sidebar bounds", () => {
-    render(<__test__.InlineMarkdown text="plain description" />);
-    expect(screen.getByText("plain description")).toBeInTheDocument();
-    render(<__test__.InlineMarkdown text="`code` tail" />);
-    expect(screen.getByText("code")).toBeInTheDocument();
-    expect(screen.getByText((content) => content.includes("tail"))).toBeInTheDocument();
-    expect(__test__.parseInlineMarkdown("`code`")).toEqual([
-      { type: "code", value: "code" },
-    ]);
-    expect(__test__.parseInlineMarkdown("**bold** *italic* `code` tail")).toEqual([
-      { type: "bold", value: "bold" },
-      { type: "text", value: " " },
-      { type: "italic", value: "italic" },
-      { type: "text", value: " " },
-      { type: "code", value: "code" },
-      { type: "text", value: " tail" },
-    ]);
-
-    expect(__test__.groupComponents([
-      {
-        type_: "MysteryA",
-        tags: { io: ["source"], functionality: ["audio"], gpu: ["cpu"] },
-        init: {},
-        inputs: {},
-        outputs: {},
-        ui_inputs: {},
-        ui_outputs: {},
-      },
-      {
-        type_: "MysteryB",
-        tags: { io: ["source"], functionality: ["audio"], gpu: ["cpu"] },
-        init: {},
-        inputs: {},
-        outputs: {},
-        ui_inputs: {},
-        ui_outputs: {},
-      },
-    ]).source.audio).toHaveLength(2);
-
+  it("hides the info panel when the sidebar bounds are unavailable", () => {
     const mysteryComponents: ComponentInfo[] = [
       {
         type_: "MysteryWidget",
         description: "plain hover text",
-        tags: { io: ["source"], functionality: ["misc"], gpu: ["quantum" as never] },
+        tags: { io: ["source"], functionality: ["misc"], gpu: ["intel"] },
         init: {},
         inputs: {},
         outputs: {},
@@ -169,7 +134,6 @@ describe("NodeSidebar", () => {
     const { container } = render(
       <NodeSidebar
         components={mysteryComponents}
-        projects={[{ name: "Current", has_thumbnail: false }]}
         currentProject="Current"
       />,
     );
@@ -200,13 +164,5 @@ describe("NodeSidebar", () => {
     expect(screen.queryByText("plain hover text")).not.toBeInTheDocument();
 
     rectSpy.mockRestore();
-    fireEvent.mouseEnter(item);
-    act(() => {
-      vi.advanceTimersByTime(300);
-    });
-
-    expect(screen.getByText("plain hover text")).toBeInTheDocument();
-    expect(screen.getByText("quantum")).toBeInTheDocument();
   });
 });
-

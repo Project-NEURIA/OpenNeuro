@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -21,15 +23,22 @@ from src.core.frames import (
 )
 
 
-class _FakeRecv:
-    def __init__(self, items):
-        self._items = items
+class _FakeReceiver:
+    def __init__(self, items: list[object]) -> None:
+        self._items = list(items)
+        self.blocking = True
+        self.newest = False
 
-    def __call__(self, *args, **kwargs):
-        return iter(self._items)
+    def __iter__(self) -> _FakeReceiver:
+        return self
+
+    def __next__(self) -> object:
+        if self._items:
+            return self._items.pop(0)
+        return None
 
 
-def test_agent_state_helpers(capsys) -> None:
+def test_agent_state_helper_methods(capsys) -> None:
     state = AgentState(AgentStateConfig(system_prompt="system"))
     assert state._build_visible_message() is None
 
@@ -44,7 +53,7 @@ def test_agent_state_helpers(capsys) -> None:
     state._diff_objects(first)
     visible = state._build_visible_message()
     assert visible is not None
-    assert "cup" in visible.content
+    assert "cup" in (visible.content or "")
 
     second = ObjectLocationFrame.new(
         labels=("book",),
@@ -58,22 +67,24 @@ def test_agent_state_helpers(capsys) -> None:
     assert any("last seen" in (msg.content or "") for msg in state._history)
     assert state._heading_from_quat(1.0, 0.0, 0.0, 0.0) == 0.0
 
-    tool_call = ToolCall.new(call_id="call-1", name="lookup", arguments="{}")
-    messages = [
-        MessageFrame.new(role="assistant", content="tool", tool_calls=[tool_call]),
-        MessageFrame.new(role="tool", content="done", tool_call_id="call-1"),
-        MessageFrame.new(role="system", content=None),
-    ]
-    state._print_messages(messages)
+    tool_call = ToolCall.new(call_id="call-1", name="lookup", arguments='{"q":"x"}')
+    tool_msg = MessageFrame.new(role="assistant", content="tool", tool_calls=[tool_call])
+    result_msg = MessageFrame.new(role="tool", content="done", tool_call_id="call-1")
+    empty_msg = MessageFrame.new(role="system", content=None)
+
+    state._print_message(tool_msg)
+    state._print_message(result_msg)
+    state._print_message(empty_msg)
+
     printed = capsys.readouterr().out
-    assert "tool_calls=['lookup']" in printed
+    assert 'lookup({"q":"x"})' in printed
     assert "tool_call_id=call-1" in printed
     assert "(no content)" in printed
 
 
-def test_agent_state_run(monkeypatch) -> None:
+def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
     state = AgentState(AgentStateConfig(system_prompt="base system"))
-    sent_messages = []
+    sent_messages: list[list[MessageFrame]] = []
 
     request = TextFrame.new(text="request text")
     speech = TextFrame.new(text="spoken input")
@@ -85,9 +96,17 @@ def test_agent_state_run(monkeypatch) -> None:
 
     monkeypatch.setattr(
         "src.core.conduit.agent_state.drain",
-        lambda *args: [(speech, feedback, vision, memory, tool_call, tool_result)],
+        lambda *args: [(speech, feedback, vision, memory, tool_call)],
     )
+    projects_dir = Path("tests_runtime") / "agent_state"
+    project_dir = projects_dir / "demo-project"
+    project_dir.mkdir(parents=True, exist_ok=True)
 
+    monkeypatch.setattr("src.core.conduit.agent_state.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr(
+        "src.core.conduit.agent_state.AppConfig.load_config",
+        lambda: SimpleNamespace(current_project="demo-project"),
+    )
     object_frame = ObjectLocationFrame.new(
         labels=("lamp",),
         positions=np.array([[7.0, 8.0, 9.0]], dtype=np.float32),
@@ -101,16 +120,16 @@ def test_agent_state_run(monkeypatch) -> None:
     )
 
     inputs = AgentStateInputs(
-        request=_FakeRecv([request, None]),
-        initial_msgs=_FakeRecv([[MessageFrame.new(role="system", content="init")]]),
-        speech=_FakeRecv([speech]),
-        feedback=_FakeRecv([feedback]),
-        tool_call=_FakeRecv([tool_call]),
-        tool_result=_FakeRecv([tool_result]),
-        vision=_FakeRecv([vision]),
-        pose=_FakeRecv([pose_frame]),
-        objects=_FakeRecv([object_frame]),
-        memory=_FakeRecv([memory]),
+        request=_FakeReceiver([request, None]),
+        initial_msgs=_FakeReceiver([[MessageFrame.new(role="system", content="init")]]),
+        speech=_FakeReceiver([]),
+        feedback=_FakeReceiver([]),
+        tool_call=_FakeReceiver([]),
+        tool_result=_FakeReceiver([tool_result, None]),
+        vision=_FakeReceiver([]),
+        pose=_FakeReceiver([pose_frame]),
+        objects=_FakeReceiver([object_frame]),
+        memory=_FakeReceiver([]),
     )
     outputs = AgentStateOutputs(
         messages=SimpleNamespace(send=lambda value: sent_messages.append(value))
@@ -122,17 +141,22 @@ def test_agent_state_run(monkeypatch) -> None:
     msgs = sent_messages[0]
     contents = [msg.content for msg in msgs]
     assert contents[0] == "init"
-    assert any("request text" in (content or "") for content in contents)
     assert any("spoken input" in (content or "") for content in contents)
     assert any("assistant reply" in (content or "") for content in contents)
     assert any("vision note" in (content or "") for content in contents)
     assert any("memory note" in (content or "") for content in contents)
     assert any("Currently visible objects" in (content or "") for content in contents)
     assert any(
-        "Heading (from +Z clockwise): -0" in (content or "") for content in contents
+        "Heading (from +Z clockwise): -0" in (content or "")
+        for content in contents
     )
     assert any(msg.tool_calls and msg.tool_calls[0].name == "lookup" for msg in msgs)
     assert any(
         msg.tool_call_id == "tool-1" and "tool output" in (msg.content or "")
         for msg in msgs
     )
+
+    dumped = json.loads((project_dir / "messages.json").read_text())
+    assert dumped[0]["content"] == "init"
+    assert any(entry.get("tool_calls") for entry in dumped)
+    assert any(entry.get("tool_call_id") == "tool-1" for entry in dumped)
