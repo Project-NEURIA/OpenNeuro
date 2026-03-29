@@ -2,9 +2,9 @@ name: Coverage
 
 on:
   pull_request:
-    branches: [ A5, main ]
+    branches: [ A5 ]
   push:
-    branches: [ A5, main ]
+    branches: [ A5 ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
