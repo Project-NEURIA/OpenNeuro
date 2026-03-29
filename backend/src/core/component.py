@@ -351,6 +351,11 @@ class ThreadedComponent[
         except Exception:
             traceback.print_exc()
         finally:
+            self._status = Status.STOPPING
+            try:
+                self.destruct(inputs)
+            except Exception:
+                traceback.print_exc()
             # Registration happens in GraphManager when start() is called.
             # Unregister here to ensure buffered partial lines are flushed.
             get_log_store().unregister_thread()
@@ -374,8 +379,7 @@ class ThreadedComponent[
         if self.status == Status.STOPPED:
             return
         self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
+        # destruct is called in _safe_run's finally block (in the thread)
 
 
 # ---------------------------------------------------------------------------
