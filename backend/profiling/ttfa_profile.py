@@ -23,10 +23,11 @@ import time
 import wave
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 from dotenv import load_dotenv  # type: ignore[import-untyped]
+from requests import Response
 
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -161,7 +162,7 @@ def run_sequential(wav_path: str):
     log("── 1. Profiling VAD._process_audio_frame ──")
     vad = VAD(config=VADConfig())
     vad._stop_event = threading.Event()
-    vad_out_channel = Channel()
+    vad_out_channel: Channel[AudioFrame] = Channel()
     vad_out_sender = Sender(vad_out_channel)
     vad_outputs = vad_mod.VADOutputs(audio=vad_out_sender)
 
@@ -180,15 +181,7 @@ def run_sequential(wav_path: str):
     _profilers["VAD._process_audio_frame"].append(profiler)
 
     # Collect VAD output frames
-    vad_frames: list[AudioFrame] = []
-    while True:
-        item = vad_out_channel._try_get(0) if 0 in vad_out_channel._cursors else None
-        if item is None:
-            # Manually drain
-            break
-        vad_frames.append(item)
-    # Alternative: read items directly from channel
-    vad_frames = list(vad_out_channel._items)
+    vad_frames: list[AudioFrame] = list(vad_out_channel._items)
 
     n_chunks = audio_data.shape[1] // chunk_samples
     log(
@@ -332,17 +325,17 @@ def run_sequential(wav_path: str):
     profiler = cProfile.Profile()
     t0 = time.perf_counter()
     profiler.enable()
-    r = session.post(
+    response: Response = session.post(
         tts_config.url,
         json=payload,
         headers=headers,
         stream=True,
         timeout=10,
     )
-    r.raise_for_status()
+    response.raise_for_status()
     tts_frames: list[AudioFrame] = []
     t_first_audio = None
-    for line in r.iter_lines():
+    for line in response.iter_lines():
         if not line:
             continue
         msg = json.loads(line)
@@ -384,7 +377,7 @@ def run_sequential(wav_path: str):
         if profs:
             s = io.StringIO()
             st = pstats.Stats(profs[0], stream=s)
-            total = st.total_tt
+            total = cast(float, getattr(st, "total_tt", 0.0))
             log(f"  {name:<30} {total * 1000:>10.0f}ms (cProfile)")
 
     log()
@@ -583,83 +576,18 @@ def run_pipeline(wav_path: str):
 
     TTS._worker = ts_tts
 
-    # Wire pipeline
-    ch1 = Channel()
-    ch2 = Channel()
-    ch3 = Channel()
-    ch4 = Channel()
-    ch5 = Channel()
-
-    file_source = FileSource(wav_path=wav_path)
-    vad = VAD(config=VADConfig())
-    asr = ASR(config=ASRConfig())
-    llm = LLM(config=LLMConfig())
-    tts = TTS(config=TTSConfig())
-    null_sink = NullSink()
-
-    # Adapter thread
-    def adapter():
-        comp = _Stub()
-        comp._stop_event = threading.Event()
-        for tf in Receiver(ch3)(comp):
-            if tf is None:
-                break
-            msgs = [
-                MessageFrame.new(
-                    role="system",
-                    content="You are a helpful voice assistant. Keep responses brief.",
-                ),
-                MessageFrame.new(role="user", content=tf.text),
-            ]
-            Sender(ch4).send(msgs)
-
-    # Need a persistent sender for ch4
-    adapter_sender = Sender(ch4)
-
-    def adapter2():
-        comp = _Stub()
-        comp._stop_event = threading.Event()
-        for tf in Receiver(ch3)(comp):
-            if tf is None:
-                break
-            msgs = [
-                MessageFrame.new(
-                    role="system",
-                    content="You are a helpful voice assistant. Keep responses brief.",
-                ),
-                MessageFrame.new(role="user", content=tf.text),
-            ]
-            adapter_sender.send(msgs)
-
-    threading.Thread(target=adapter2, daemon=True).start()
-
-    null_sink.start(NullSinkInputs(audio=Receiver(ch5)), ())
-    tts.start(
-        tts_mod.TTSInputs(text=Receiver(ch4)),
-        tts_mod.TTSOutputs(audio=Sender(ch5), text=Sender()),
-    )
-    llm.start(
-        llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch4))
-    )
-
-    # Wait — LLM reads from ch4, but adapter also writes to ch4. That's wrong.
-    # LLM reads messages, TTS reads tokens. They need separate channels.
-
-    # Let me re-wire properly:
     # ch1: FileSource → VAD (audio)
     # ch2: VAD → ASR (audio)
     # ch3: ASR → Adapter (text)
     # ch4: Adapter → LLM (messages)
     # ch5: LLM → TTS (tokens)
     # ch6: TTS → NullSink (audio)
-
-    # Restart with correct wiring
-    ch1 = Channel()
-    ch2 = Channel()
-    ch3 = Channel()
-    ch4 = Channel()
-    ch5 = Channel()
-    ch6 = Channel()
+    ch1: Channel[AudioFrame] = Channel()
+    ch2: Channel[AudioFrame] = Channel()
+    ch3: Channel[TextFrame] = Channel()
+    ch4: Channel[list[MessageFrame]] = Channel()
+    ch5: Channel[TextFrame] = Channel()
+    ch6: Channel[AudioFrame] = Channel()
 
     adapter_sender_2 = Sender(ch4)
 
@@ -782,7 +710,7 @@ def main():
 
     wav_path = str(Path(__file__).parent / "assets" / "test_audio.wav")
     if not Path(wav_path).exists():
-        from profiling.generate_test_audio import generate
+        from .generate_test_audio import generate  # type: ignore[import-not-found]
 
         generate()
 

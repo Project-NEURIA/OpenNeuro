@@ -22,16 +22,19 @@ import threading
 import time
 from pathlib import Path
 from queue import Queue
+from typing import Any, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.channel import Channel, Sender
 
 try:
-    from fast_channel import Channel as FastChannel, Sender as FastSender
+    from fast_channel import Channel as FastChannel, Sender as FastSender  # type: ignore[import-not-found]
 
     HAS_FAST_CHANNEL = True
 except ImportError:
+    FastChannel = cast(Any, None)
+    FastSender = cast(Any, None)
     HAS_FAST_CHANNEL = False
     print("WARNING: fast_channel not installed, skipping FastChannel benchmarks")
 
@@ -61,7 +64,7 @@ def percentiles(data: list[float]) -> dict[str, float]:
 
 
 def bench_1p1c_channel(n: int) -> tuple[float, bool]:
-    ch = Channel()
+    ch: Channel[int] = Channel()
     sender = Sender(ch)
     stop = threading.Event()
     latch = threading.Event()
@@ -140,7 +143,7 @@ class CountDownLatch:
 
 
 def bench_1p3c_channel(n: int) -> tuple[float, bool]:
-    ch = Channel()
+    ch: Channel[int] = Channel()
     sender = Sender(ch)
     stop = threading.Event()
     latch = CountDownLatch(3)
@@ -176,7 +179,7 @@ def bench_1p3c_channel(n: int) -> tuple[float, bool]:
 
 
 def bench_1p3c_queue(n: int) -> tuple[float, bool]:
-    queues = [Queue() for _ in range(3)]
+    queues: list[Queue[int]] = [Queue() for _ in range(3)]
     latch = CountDownLatch(3)
     sums = [[0], [0], [0]]
 
@@ -212,7 +215,7 @@ def bench_1p3c_queue(n: int) -> tuple[float, bool]:
 
 
 def bench_3p1c_channel(n: int) -> tuple[float, bool]:
-    ch = Channel()
+    ch: Channel[int] = Channel()
     senders = [Sender(ch) for _ in range(3)]
     stop = threading.Event()
     latch = threading.Event()
@@ -311,9 +314,9 @@ def bench_3p1c_queue(n: int) -> tuple[float, bool]:
 
 
 def bench_pipeline_channel(n: int) -> tuple[float, bool]:
-    ch1 = Channel()
-    ch2 = Channel()
-    ch3 = Channel()
+    ch1: Channel[int] = Channel()
+    ch2: Channel[int] = Channel()
+    ch3: Channel[int] = Channel()
     sender = Sender(ch1)
     stop = threading.Event()
     latch = threading.Event()
@@ -623,8 +626,8 @@ FAST_VARIANTS = _make_fast_variants()
 
 
 def bench_latency_channel(n: int) -> list[float]:
-    ch_ping = Channel()
-    ch_pong = Channel()
+    ch_ping: Channel[int] = Channel()
+    ch_pong: Channel[int] = Channel()
     stop = threading.Event()
     ready = threading.Event()
 

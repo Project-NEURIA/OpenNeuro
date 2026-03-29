@@ -211,16 +211,16 @@ def run_test(model: str):
     llm = LLM(config=LLMConfig(model=model))
 
     # Wire: FileSource -> VAD -> ASR -> Adapter -> LLM -> NullSink
-    ch1 = Channel()
+    ch1: Channel[AudioFrame] = Channel()
     s1 = Sender(ch1)
     r1 = Receiver(ch1)
-    ch2 = Channel()
+    ch2: Channel[AudioFrame] = Channel()
     s2 = Sender(ch2)
     r2 = Receiver(ch2)
-    ch3 = Channel()
+    ch3: Channel[TextFrame] = Channel()
     s3 = Sender(ch3)
     r3 = Receiver(ch3)
-    ch4 = Channel()
+    ch4: Channel[list[MessageFrame]] = Channel()
     s4 = Sender(ch4)
     r4 = Receiver(ch4)
 
@@ -247,7 +247,7 @@ def run_test(model: str):
     threading.Thread(target=adapter, daemon=True).start()
 
     # LLM input from adapter (ch4), output tokens to ch5
-    ch5 = Channel()
+    ch5: Channel[TextFrame] = Channel()
     s5 = Sender(ch5)
 
     # Start components
