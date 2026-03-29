@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Dropdown } from "./Dropdown";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 describe("Dropdown", () => {
   it("opens, selects an option, and closes on outside click", () => {
@@ -82,3 +82,4 @@ describe("Dropdown", () => {
     expect(selectedOption).toHaveClass("bg-conduit/20");
   });
 });
+

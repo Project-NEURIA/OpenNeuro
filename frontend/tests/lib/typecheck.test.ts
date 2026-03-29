@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as api from "./api";
+import * as api from "@/lib/api";
 import {
   __test__,
   checkTypes,
@@ -7,9 +7,9 @@ import {
   getConstraints,
   typeToString,
   warmSubtypeCache,
-} from "./typecheck";
-import type { Type } from "./typecheck";
-import type { Graph, SlotType } from "./types";
+} from "@/lib/typecheck";
+import type { Type } from "@/lib/typecheck";
+import type { Graph, SlotType } from "@/lib/types";
 
 describe("typecheck", () => {
   beforeEach(() => {
@@ -453,3 +453,4 @@ describe("typecheck", () => {
     ]))).toEqual(new Map());
   });
 });
+

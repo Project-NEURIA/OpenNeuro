@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { __test__, SplashScreen } from "./SplashScreen";
+import { __test__, SplashScreen } from "@/components/SplashScreen";
 
 describe("SplashScreen", () => {
   it("renders the loading status and draws svg letters once", () => {
@@ -26,4 +26,5 @@ describe("SplashScreen", () => {
     expect(svg.querySelectorAll("text")).toHaveLength(0);
   });
 });
+
 

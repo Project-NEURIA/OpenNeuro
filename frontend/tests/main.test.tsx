@@ -6,12 +6,12 @@ describe("main", () => {
     vi.doMock("react-dom/client", () => ({
       createRoot: vi.fn(() => ({ render })),
     }));
-    vi.doMock("./App", () => ({
+    vi.doMock("@/App", () => ({
       default: () => <div>App</div>,
     }));
 
     document.body.innerHTML = '<div id="root"></div>';
-    await import("./main");
+    await import("@/main");
 
     expect(render).toHaveBeenCalledTimes(1);
   });

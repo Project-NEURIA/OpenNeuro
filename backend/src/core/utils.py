@@ -7,9 +7,9 @@ import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Iterator, overload, Literal
 
-if TYPE_CHECKING:  # pragma: no cover
-    import torch  # pragma: no cover
-    from src.core.frames import Frame  # pragma: no cover
+if TYPE_CHECKING:
+    import torch
+    from src.core.frames import Frame
 
 import numpy as np
 

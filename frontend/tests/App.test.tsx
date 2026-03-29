@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App, { __test__, AppInner, deleteEdgeFromReactFlow, parseSlot, toReactFlowNode } from "./App";
+import App, { __test__, AppInner, deleteEdgeFromReactFlow, parseSlot, toReactFlowNode } from "@/App";
 import * as api from "@/lib/api";
 import * as graphDataHook from "@/hooks/useGraphData";
 import * as componentsHook from "@/hooks/useComponents";
@@ -1103,3 +1103,4 @@ describe("App", () => {
   });
 
 });
+

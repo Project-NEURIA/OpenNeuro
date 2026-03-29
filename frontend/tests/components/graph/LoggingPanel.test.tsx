@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LoggingPanel } from "./LoggingPanel";
+import { LoggingPanel } from "@/components/graph/LoggingPanel";
 import * as logsHook from "@/hooks/useComponentLogs";
 
 describe("LoggingPanel", () => {
@@ -63,4 +63,5 @@ describe("LoggingPanel", () => {
     expect(screen.getByText(/no logs captured yet/i)).toBeInTheDocument();
   });
 });
+
 

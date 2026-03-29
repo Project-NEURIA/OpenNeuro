@@ -159,16 +159,10 @@ async def _watch_ui_channels(
 
         if manager._ui_version == last_version:
             # Wait until run() fires the event
-            changed_event = manager._ui_changed
             try:
-                await changed_event.wait()
+                await manager._ui_changed.wait()
             except asyncio.CancelledError:
                 return
-            # GraphManager.run() swaps in a fresh Event after notifying, but
-            # tests and alternate manager implementations may reuse the same
-            # Event instance. Clearing only the reused instance avoids a hot loop.
-            if manager._ui_changed is changed_event:
-                changed_event.clear()
 
         # Cancel all stale tasks — even if the same keys exist, the
         # underlying Receiver objects point to new channels after a restart.

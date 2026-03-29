@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { __test__, NodeSidebar } from "./NodeSidebar";
+import { __test__, NodeSidebar } from "@/components/graph/NodeSidebar";
 import type { ComponentInfo } from "@/lib/types";
 
 const components: ComponentInfo[] = [
@@ -209,3 +209,4 @@ describe("NodeSidebar", () => {
     expect(screen.getByText("quantum")).toBeInTheDocument();
   });
 });
+

@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphEdge } from "./GraphEdge";
+import { GraphEdge } from "@/components/graph/GraphEdge";
 
 const baseEdgeMock = vi.fn(({ id, path, style }) => (
   <div data-testid={`edge-${id}`} data-path={path} data-stroke={style.stroke} data-width={style.strokeWidth} />
@@ -78,4 +78,5 @@ describe("GraphEdge", () => {
     );
   });
 });
+
 

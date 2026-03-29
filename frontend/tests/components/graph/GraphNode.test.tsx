@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { __test__, GraphNode } from "./GraphNode";
+import { __test__, GraphNode } from "@/components/graph/GraphNode";
 import * as textHook from "@/hooks/useUITextOutput";
 import * as videoHook from "@/hooks/useUIVideoOutput";
 import * as outputHook from "@/hooks/useUIOutput";
@@ -356,4 +356,5 @@ describe("GraphNode", () => {
     expect(screen.getByText("awaiting data")).toBeInTheDocument();
   });
 });
+
 

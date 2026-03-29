@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatBytes, formatCount, formatUptime } from "./format";
+import { formatBytes, formatCount, formatUptime } from "@/lib/format";
 
 describe("format", () => {
   it("formats counts across thresholds", () => {
@@ -27,4 +27,5 @@ describe("format", () => {
     vi.useRealTimers();
   });
 });
+
 

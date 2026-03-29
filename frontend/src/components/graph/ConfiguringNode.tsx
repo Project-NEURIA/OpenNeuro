@@ -131,69 +131,6 @@ function flattenInitValues(initValues: Record<string, unknown>): Record<string, 
   return flat;
 }
 
-function normalizeFetchedOptions(raw: Record<string, unknown>): Record<string, Option[]> {
-  const flat: Record<string, Option[]> = {};
-  for (const [key, val] of Object.entries(raw)) {
-    if (Array.isArray(val)) {
-      flat[key] = val as Option[];
-    } else if (val && typeof val === "object") {
-      for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
-        if (Array.isArray(subVal)) {
-          flat[`${key}.${subKey}`] = subVal as Option[];
-        }
-      }
-    }
-  }
-  return flat;
-}
-
-function applyOptionDefaults(
-  prev: Record<string, unknown>,
-  options: Record<string, Option[]>,
-): Record<string, unknown> {
-  const updated = { ...prev };
-  for (const [fieldKey, opts] of Object.entries(options)) {
-    if (opts.length > 0 && (updated[fieldKey] === "" || updated[fieldKey] === undefined)) {
-      updated[fieldKey] = opts[0]!.value;
-    }
-  }
-  return updated;
-}
-
-function resolveFieldFormat(prop: SchemaObj): string | undefined {
-  return prop.format ?? prop.anyOf?.find((b) => b.format)?.format;
-}
-
-function resolveEnumValues(prop: SchemaObj): unknown[] | undefined {
-  return prop.enum ?? prop.anyOf?.find((b) => b.enum)?.enum;
-}
-
-function parseFieldValue(propType: string, raw: string): string | number {
-  if (propType === "number" || propType === "integer") {
-    return raw === "" ? "" : Number(raw);
-  }
-  return raw;
-}
-
-function resolveSubmitLabel(submitLabel: string | undefined, mode: "create" | "edit"): string {
-  return submitLabel ?? (mode === "edit" ? "Save" : "Create");
-}
-
-export const __test__ = {
-  hasProps,
-  resolveSchema,
-  getDefaultValue,
-  collectFields,
-  buildInitValues,
-  flattenInitValues,
-  normalizeFetchedOptions,
-  applyOptionDefaults,
-  resolveFieldFormat,
-  resolveEnumValues,
-  parseFieldValue,
-  resolveSubmitLabel,
-};
-
 function ConfiguringNodeComponent({ data }: NodeProps) {
   const d = data as unknown as ConfiguringNodeData;
   const { componentInfo, onConfirm, onCancel, initialValues, mode = "create" } = d;
@@ -214,9 +151,30 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
   useEffect(() => {
     fetchOptions(componentInfo.type_)
       .then((raw) => {
-        const flat = normalizeFetchedOptions(raw);
+        // Flatten nested dict: {"config": {"field": [...]}} → {"config.field": [...]}
+        const flat: Record<string, Option[]> = {};
+        for (const [key, val] of Object.entries(raw)) {
+          if (Array.isArray(val)) {
+            flat[key] = val as Option[];
+          } else if (val && typeof val === "object") {
+            for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
+              if (Array.isArray(subVal)) {
+                flat[`${key}.${subKey}`] = subVal as Option[];
+              }
+            }
+          }
+        }
         setOptions(flat);
-        setValues((prev) => applyOptionDefaults(prev, flat));
+        // Set default values for fields with options
+        setValues((prev) => {
+          const updated = { ...prev };
+          for (const [fieldKey, opts] of Object.entries(flat)) {
+            if (opts.length > 0 && (updated[fieldKey] === "" || updated[fieldKey] === undefined)) {
+              updated[fieldKey] = opts[0]!.value;
+            }
+          }
+          return updated;
+        });
       })
       .catch(() => {});
   }, [componentInfo.type_]);
@@ -273,8 +231,8 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
               <label key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
                 <Dropdown
-                  value={String(values[key])}
-                  options={opts}
+                  value={String(values[key] ?? "")}
+                  options={opts ?? []}
                   onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
                 />
               </label>
@@ -282,9 +240,9 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
           }
 
           // File path field — show filename + browse button
-          const format = resolveFieldFormat(prop);
+          const format = prop.format ?? prop.anyOf?.find((b) => b.format)?.format;
           if (format === "path") {
-            const currentPath = String(values[key]);
+            const currentPath = String(values[key] ?? "");
             const displayName = currentPath ? currentPath.split(/[/\\]/).pop() : "No file selected";
             return (
               <div key={key} className="flex flex-col gap-1">
@@ -329,13 +287,13 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
           }
 
           // Unwrap enum from anyOf (e.g. Literal[...] | None → anyOf with enum branch)
-          const enumValues = resolveEnumValues(prop);
+          const enumValues = prop.enum ?? prop.anyOf?.find((b) => b.enum)?.enum;
           if (enumValues) {
             return (
               <div key={key} className="flex flex-col gap-1">
                 <span className="text-[12px] font-mono text-white/60">{key}</span>
                 <Dropdown
-                  value={String(values[key])}
+                  value={String(values[key] ?? "")}
                   options={enumValues.map((val: unknown) => ({ value: String(val), label: String(val) }))}
                   onChange={(v) => setValues((prev) => ({ ...prev, [key]: v }))}
                 />
@@ -352,7 +310,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
               <input
                 type="text"
                 inputMode="decimal"
-                value={String(values[key])}
+                value={String(values[key] ?? "")}
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw === "" || raw === "-" || raw === "." || /^-?\d*\.?\d*$/.test(raw)) {
@@ -408,7 +366,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
               "transition-colors cursor-pointer",
             )}
           >
-            {resolveSubmitLabel(d.submitLabel, mode)}
+            {d.submitLabel ?? (mode === "edit" ? "Save" : "Create")}
           </button>
           <button
             type="button"

@@ -1,10 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useComponents } from "./useComponents";
-import { useGraphData } from "./useGraphData";
-import { useMetricsHistory } from "./useMetricsHistory";
+import { useComponents } from "@/hooks/useComponents";
+import { useGraphData } from "@/hooks/useGraphData";
+import { useMetricsHistory } from "@/hooks/useMetricsHistory";
 import * as api from "@/lib/api";
-import * as sse from "./useSSE";
+import * as sse from "@/hooks/useSSE";
 import type { ComponentInfo, MetricsSnapshot } from "@/lib/types";
 
 const baseComponent: ComponentInfo = {
@@ -146,3 +146,4 @@ describe("data hooks", () => {
     expect(result.current.snapshots).toHaveLength(60);
   });
 });
+

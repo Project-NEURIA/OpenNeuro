@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EnvEditor } from "./EnvEditor";
+import { EnvEditor } from "@/components/EnvEditor";
 import * as api from "@/lib/api";
 
 describe("EnvEditor", () => {
@@ -85,3 +85,4 @@ describe("EnvEditor", () => {
     expect((screen.getByPlaceholderText("value") as HTMLInputElement).type).toBe("password");
   });
 });
+

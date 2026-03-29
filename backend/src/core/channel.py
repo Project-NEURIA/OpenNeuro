@@ -3,12 +3,9 @@ from __future__ import annotations
 import sys
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import Iterator
 
 from src.core.frames import TextFrame
-
-if TYPE_CHECKING:  # pragma: no cover
-    from src.core.component import ThreadedComponent  # pragma: no cover
 
 
 class Channel[T]:
@@ -30,38 +27,13 @@ class Channel[T]:
                 self._items[:] = self._items[-1:]
             self._condition.notify_all()
 
-    def _register(
-        self,
-        sub_id: int,
-        newest: bool = False,
-        latest: bool | None = None,
-    ) -> None:
+    def _register(self, sub_id: int, newest: bool = False) -> None:
         with self._condition:
             head = self._offset + len(self._items)
             if newest:
                 self._newest_subs[sub_id] = head
             else:
-                start = head
-                if latest is False:
-                    start = self._offset
-                self._cursors[sub_id] = start
-
-    def _wait_and_get(self, sub_id: int, stop_event: threading.Event) -> T | None:
-        return self._get(sub_id, stop_event, blocking=True)
-
-    def _try_get(self, sub_id: int) -> T | None:
-        return self._get(sub_id, threading.Event(), blocking=False)
-
-    def _fast_forward(self, sub_id: int) -> None:
-        with self._condition:
-            if sub_id in self._newest_subs:
-                self._newest_subs[sub_id] = self._offset + len(self._items)
-                return
-            cursor = self._cursors.get(sub_id)
-            head = self._offset + len(self._items)
-            if cursor is not None and head > cursor + 1:
-                self._cursors[sub_id] = head - 1
-                self._gc()
+                self._cursors[sub_id] = head
 
     def _unregister(self, sub_id: int) -> None:
         """Idempotent."""
@@ -166,9 +138,6 @@ class Sender[T]:
         self._last_send_time: float = 0.0
         self._stopped: bool = False
 
-    def connect(self, channel: Channel[T]) -> None:
-        self._channels.append(channel)
-
     def send(self, item: T) -> None:
         if self._stopped:
             return
@@ -183,60 +152,6 @@ class Sender[T]:
         return sum(len(ch._items) for ch in self._channels)
 
 
-class ReceiverIterator[T]:
-    """Compatibility iterator returned by ``Receiver.__call__``."""
-
-    def __init__(
-        self,
-        receiver: "Receiver[T]",
-        channel: Channel[T],
-        stop_event: threading.Event,
-        sub_id: int,
-        newest: bool,
-        no_block: bool,
-        latest: bool,
-    ) -> None:
-        self._receiver = receiver
-        self._channel = channel
-        self._stop_event = stop_event
-        self._sub_id = sub_id
-        self._newest = newest
-        self._no_block = no_block
-        self._done = False
-        self._channel._register(sub_id, newest=newest, latest=latest)
-
-    def __iter__(self) -> Iterator[T | None]:
-        return self
-
-    def __next__(self) -> T | None:
-        if self._done:
-            raise StopIteration
-        if self._stop_event.is_set():
-            self._finish()
-            return None
-        if self._newest:
-            self._channel._fast_forward(self._sub_id)
-        if self._no_block:
-            item = self._channel._try_get(self._sub_id)
-        else:
-            item = self._channel._wait_and_get(self._sub_id, self._stop_event)
-        if item is not None:
-            self._receiver._msg_count += 1
-            self._receiver._byte_count += sys.getsizeof(item)
-        return item
-
-    def _finish(self) -> None:
-        if not self._done:
-            self._done = True
-            self._channel._unregister(self._sub_id)
-
-    def close(self) -> None:
-        self._finish()
-
-    def __del__(self) -> None:
-        self._finish()
-
-
 class Receiver[T]:
     """Handle for receiving from a channel. Is itself the iterator."""
 
@@ -249,25 +164,6 @@ class Receiver[T]:
         self._wired: bool = False
         self._newest: bool = False
         self.blocking: bool = True
-
-    def __call__(
-        self,
-        subscriber: "ThreadedComponent[Any, Any]",
-        newest: bool = False,
-        no_block: bool = False,
-        latest: bool = True,
-    ) -> Iterator[T | None]:
-        sub_id = id(subscriber)
-        self._sub_id = sub_id
-        return ReceiverIterator(
-            receiver=self,
-            channel=self._channel,
-            stop_event=subscriber.stop_event,
-            sub_id=sub_id,
-            newest=newest,
-            no_block=no_block,
-            latest=latest,
-        )
 
     @property
     def newest(self) -> bool:

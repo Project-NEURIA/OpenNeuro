@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { __test__ as metricsDashboardTest, MetricsDashboard } from "./MetricsDashboard";
-import { NodePanel } from "./NodePanel";
-import { ReceiverSection } from "./ReceiverSection";
-import { SenderSection } from "./SenderSection";
-import { SystemTotals } from "./SystemTotals";
-import { Waveform } from "./Waveform";
+import { __test__ as metricsDashboardTest, MetricsDashboard } from "@/components/metrics/MetricsDashboard";
+import { NodePanel } from "@/components/metrics/NodePanel";
+import { ReceiverSection } from "@/components/metrics/ReceiverSection";
+import { SenderSection } from "@/components/metrics/SenderSection";
+import { SystemTotals } from "@/components/metrics/SystemTotals";
+import { Waveform } from "@/components/metrics/Waveform";
 import type { MetricsHistory } from "@/hooks/useMetricsHistory";
 import type { ComponentInfo } from "@/lib/types";
 
@@ -397,3 +397,4 @@ describe("metrics components", () => {
     )).toEqual(["a", "b", "c"]);
   });
 });
+

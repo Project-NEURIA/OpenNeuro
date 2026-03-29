@@ -67,7 +67,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), uploadPlugin()],
   test: {
     environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
+    setupFiles: "./tests/setup.ts",
     coverage: {
       provider: "istanbul",
       all: true,
@@ -75,7 +75,7 @@ export default defineConfig({
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.d.ts",
-        "src/test/**",
+        "tests/**",
       ],
     },
   },

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MetricsOverlay } from "./MetricsOverlay";
+import { MetricsOverlay } from "@/components/graph/MetricsOverlay";
 import * as api from "@/lib/api";
 
 describe("MetricsOverlay", () => {
@@ -85,3 +85,4 @@ describe("MetricsOverlay", () => {
     expect(screen.getByTitle("Open component logging")).toBeInTheDocument();
   });
 });
+

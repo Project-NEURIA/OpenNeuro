@@ -64,57 +64,32 @@ const gpuTagColors: Record<string, { bg: string; text: string; border: string }>
   amd: { bg: "bg-tag-amd/15", text: "text-tag-amd", border: "border-tag-amd/30" },
 };
 
-type InlinePart =
-  | { type: "text"; value: string }
-  | { type: "bold"; value: string }
-  | { type: "italic"; value: string }
-  | { type: "code"; value: string };
-
-function parseInlineMarkdown(text: string): InlinePart[] {
-  const parts: InlinePart[] = [];
+/** Render simple inline markdown: **bold**, *italic*, `code` */
+function InlineMarkdown({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
   // Match **bold**, *italic*, `code`
   const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
+  let key = 0;
 
   while ((match = regex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
+      parts.push(text.slice(lastIndex, match.index));
     }
     if (match[2]) {
-      parts.push({ type: "bold", value: match[2] });
+      parts.push(<strong key={key++} className="font-bold text-white/90">{match[2]}</strong>);
     } else if (match[3]) {
-      parts.push({ type: "italic", value: match[3] });
-    } else {
-      parts.push({ type: "code", value: match[4]! });
+      parts.push(<em key={key++} className="italic text-white/70">{match[3]}</em>);
+    } else if (match[4]) {
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{match[4]}</code>);
     }
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) {
-    parts.push({ type: "text", value: text.slice(lastIndex) });
+    parts.push(text.slice(lastIndex));
   }
-  return parts;
-}
-
-/** Render simple inline markdown: **bold**, *italic*, `code` */
-function InlineMarkdown({ text }: { text: string }) {
-  const parts = parseInlineMarkdown(text);
-  return (
-    <>
-      {parts.map((part, index) => {
-        if (part.type === "bold") {
-          return <strong key={index} className="font-bold text-white/90">{part.value}</strong>;
-        }
-        if (part.type === "italic") {
-          return <em key={index} className="italic text-white/70">{part.value}</em>;
-        }
-        if (part.type === "code") {
-          return <code key={index} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{part.value}</code>;
-        }
-        return <span key={index}>{part.value}</span>;
-      })}
-    </>
-  );
+  return <>{parts}</>;
 }
 
 interface NodeSidebarProps {
@@ -227,12 +202,6 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
     </div>
   );
 }
-
-export const __test__ = {
-  InlineMarkdown,
-  groupComponents,
-  parseInlineMarkdown,
-};
 
 export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});

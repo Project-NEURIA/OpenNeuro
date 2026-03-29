@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { __test__, ConfiguringNode } from "./ConfiguringNode";
+import { __test__, ConfiguringNode } from "@/components/graph/ConfiguringNode";
 import * as api from "@/lib/api";
 
 vi.mock("@/components/ui/Dropdown", () => ({
@@ -531,4 +531,5 @@ describe("ConfiguringNode", () => {
     delete tauriWindow.__TAURI__;
   });
 });
+
 

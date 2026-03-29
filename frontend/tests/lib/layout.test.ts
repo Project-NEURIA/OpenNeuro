@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { layoutNodes } from "./layout";
+import { layoutNodes } from "@/lib/layout";
 
 describe("layoutNodes", () => {
   it("lays out nodes in topological order", () => {
@@ -68,3 +68,4 @@ describe("layoutNodes", () => {
     expect(positions[0]).toMatchObject({ id: "a", x: 80 });
   });
 });
+

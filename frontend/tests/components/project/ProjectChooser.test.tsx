@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ProjectChooser } from "./ProjectChooser";
+import { ProjectChooser } from "@/components/project/ProjectChooser";
 import * as api from "@/lib/api";
 
 describe("ProjectChooser", () => {
@@ -93,4 +93,5 @@ describe("ProjectChooser", () => {
     expect(screen.queryByPlaceholderText("Project name")).not.toBeInTheDocument();
   });
 });
+
 

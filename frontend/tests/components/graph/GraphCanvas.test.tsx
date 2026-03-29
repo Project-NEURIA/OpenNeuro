@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { GraphCanvas } from "./GraphCanvas";
+import { GraphCanvas } from "@/components/graph/GraphCanvas";
 
 const reactFlowMock = vi.fn((props: Record<string, unknown>) => (
   <div>
@@ -73,4 +73,5 @@ describe("GraphCanvas", () => {
     expect(onPaneClick).toHaveBeenCalled();
   });
 });
+
 

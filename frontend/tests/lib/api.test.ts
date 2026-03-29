@@ -27,7 +27,7 @@ import {
   ungroupNode,
   updateNode,
   updateNodeInitArgs,
-} from "./api";
+} from "@/lib/api";
 
 type MockResponseInit = {
   ok?: boolean;
@@ -229,3 +229,4 @@ describe("api", () => {
     );
   });
 });
+

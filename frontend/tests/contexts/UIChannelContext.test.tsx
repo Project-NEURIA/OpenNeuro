@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { UIChannelProvider, useUIChannel } from "./UIChannelContext";
+import { UIChannelProvider, useUIChannel } from "@/contexts/UIChannelContext";
 import * as channelHook from "@/hooks/useUIChannel";
 
 function Consumer() {
@@ -31,4 +31,5 @@ describe("UIChannelContext", () => {
     );
   });
 });
+
 

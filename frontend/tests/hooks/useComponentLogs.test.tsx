@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useComponentLogs } from "./useComponentLogs";
+import { useComponentLogs } from "@/hooks/useComponentLogs";
 import * as api from "@/lib/api";
 
 describe("useComponentLogs", () => {
@@ -115,3 +115,4 @@ describe("useComponentLogs", () => {
     expect(result.current.error).toBe("Failed to load logs");
   });
 });
+

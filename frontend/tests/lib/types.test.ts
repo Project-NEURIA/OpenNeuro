@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categoryFromTags, parseSlotType } from "./types";
+import { categoryFromTags, parseSlotType } from "@/lib/types";
 
 describe("types helpers", () => {
   it("derives category from the first io tag or defaults to conduit", () => {
@@ -42,4 +42,5 @@ describe("types helpers", () => {
     });
   });
 });
+
 

@@ -1,10 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useUIChannelManager } from "./useUIChannel";
-import { useUIInput } from "./useUIInput";
-import { useUIOutput } from "./useUIOutput";
-import { useUITextOutput } from "./useUITextOutput";
-import { useUIVideoOutput } from "./useUIVideoOutput";
+import { useUIChannelManager } from "@/hooks/useUIChannel";
+import { useUIInput } from "@/hooks/useUIInput";
+import { useUIOutput } from "@/hooks/useUIOutput";
+import { useUITextOutput } from "@/hooks/useUITextOutput";
+import { useUIVideoOutput } from "@/hooks/useUIVideoOutput";
 import * as channelContext from "@/contexts/UIChannelContext";
 
 class MockWebSocket {
@@ -266,3 +266,4 @@ describe("ui input/output hooks", () => {
     unsubscribed.unmount();
   });
 });
+

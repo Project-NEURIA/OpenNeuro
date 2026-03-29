@@ -39,10 +39,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import ModelOutput, auto_docstring, logging
 from transformers.utils.deprecation import deprecate_kwarg
-try:
-    from transformers.utils.generic import check_model_inputs as _check_model_inputs
-except ImportError:
-    _check_model_inputs = None
+from transformers.utils.generic import check_model_inputs
 
 from .configuration_qwen3_tts_tokenizer_v2 import (
     Qwen3TTSTokenizerV2Config,
@@ -50,16 +47,6 @@ from .configuration_qwen3_tts_tokenizer_v2 import (
 )
 
 logger = logging.get_logger(__name__)
-
-
-def check_model_inputs():
-    if _check_model_inputs is None:
-        return lambda func: func
-
-    try:
-        return _check_model_inputs()
-    except TypeError:
-        return lambda func: _check_model_inputs(func)
 
 
 @dataclass
@@ -526,6 +513,9 @@ class Qwen3TTSTokenizerV2DecoderTransformerModel(Qwen3TTSTokenizerV2DecoderPreTr
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+        
         inputs_embeds = self.input_proj(inputs_embeds)
 
         if use_cache and past_key_values is None:
