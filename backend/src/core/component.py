@@ -34,7 +34,6 @@ class Status(Enum):
     STARTUP = "startup"
     SETUP = "setup"
     RUNNING = "running"
-    STOPPING = "stopping"
     STOPPED = "stopped"
 
 
@@ -65,12 +64,6 @@ class Component[
         """Called synchronously by GraphManager before threads start.
 
         Override to perform initialization or emit initial values into outputs.
-        """
-
-    def destruct(self, inputs: I) -> None:
-        """Called during shutdown (STOPPING phase).
-
-        Override to perform cleanup with access to input receivers.
         """
 
     def start(self, inputs: I, outputs: O) -> None:
@@ -351,11 +344,6 @@ class ThreadedComponent[
         except Exception:
             traceback.print_exc()
         finally:
-            self._status = Status.STOPPING
-            try:
-                self.destruct(inputs)
-            except Exception:
-                traceback.print_exc()
             # Registration happens in GraphManager when start() is called.
             # Unregister here to ensure buffered partial lines are flushed.
             get_log_store().unregister_thread()
