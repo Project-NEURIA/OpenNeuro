@@ -46,7 +46,7 @@ class ThinkTool(
     def run(self, inputs: ThinkToolInputs, outputs: ThinkToolOutputs) -> None:
         import json
 
-        for call in inputs.tool_call(self):
+        for call in inputs.tool_call:
             if call is None:
                 break
             if call.name != "think":
@@ -56,6 +56,4 @@ class ThinkTool(
             except (json.JSONDecodeError, AttributeError):
                 thought = call.arguments
             print(f"[Think] {thought}")
-            outputs.tool_result.send(
-                ToolResult.new(call_id=call.call_id, content="")
-            )
+            outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))

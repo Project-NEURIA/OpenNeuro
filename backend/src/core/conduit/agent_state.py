@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import math
 from datetime import datetime
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from pydantic import BaseModel
 
@@ -17,6 +17,7 @@ from src.core.frames import (
     ToolCall,
     ToolResult,
 )
+from src.core.config import PROJECTS_DIR, AppConfig
 from src.core.utils import drain
 
 
@@ -170,12 +171,16 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     self._print_message(msg)
                 if vision is not None:
                     ts = datetime.fromtimestamp(vision.pts / 1e9).strftime("%H:%M:%S")
-                    msg = MessageFrame.new(role="system", content=f"[{ts}] {vision.text}")
+                    msg = MessageFrame.new(
+                        role="system", content=f"[{ts}] {vision.text}"
+                    )
                     self._history.append(msg)
                     self._print_message(msg)
                 if memory is not None:
                     ts = datetime.fromtimestamp(memory.pts / 1e9).strftime("%H:%M:%S")
-                    msg = MessageFrame.new(role="system", content=f"[{ts}] {memory.text}")
+                    msg = MessageFrame.new(
+                        role="system", content=f"[{ts}] {memory.text}"
+                    )
                     self._history.append(msg)
                     self._print_message(msg)
                 if tc is not None:
@@ -246,6 +251,36 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                             )
                         )
 
+            self._dump_messages(msgs)
             outputs.messages.send(msgs)
 
         print("[AgentState] Agent State management stopped")
+
+    @staticmethod
+    def _dump_messages(msgs: list[MessageFrame]) -> None:
+        """Serialize messages (as the LLM sees them) to the current project dir."""
+        import json
+
+        config = AppConfig.load_config()
+        if not config.current_project:
+            return
+        path = PROJECTS_DIR / config.current_project / "messages.json"
+        serialized = []
+        for m in msgs:
+            msg: dict[str, Any] = {"role": m.role, "content": m.content}
+            if m.tool_calls:
+                msg["tool_calls"] = [
+                    {
+                        "id": tc.call_id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": tc.arguments,
+                        },
+                    }
+                    for tc in m.tool_calls
+                ]
+            if m.tool_call_id:
+                msg["tool_call_id"] = m.tool_call_id
+            serialized.append(msg)
+        path.write_text(json.dumps(serialized, indent=2, ensure_ascii=False))

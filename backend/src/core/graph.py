@@ -388,9 +388,13 @@ class GraphManager:
                 built_inputs = self._build_tuple(input_type, input_handles)
                 built_outputs = self._build_tuple(output_type, output_handles)
 
+            start_queue.append((node_id, comp, built_inputs, built_outputs))
+
+        # Emit AFTER all receivers are wired, so EmitOnStart data lands
+        # behind every cursor regardless of node processing order.
+        for _, comp, _, built_outputs in start_queue:
             if isinstance(comp, EmitOnStart):
                 comp.emit(built_outputs)
-            start_queue.append((node_id, comp, built_inputs, built_outputs))
 
         # Start all components after all emits are done
         for node_id, comp, inputs, outputs in start_queue:

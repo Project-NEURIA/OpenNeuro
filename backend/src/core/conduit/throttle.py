@@ -35,7 +35,8 @@ class Throttle[T](ThreadedComponent[ThrottleInputs[T], ThrottleOutputs[T]]):
         self.config = config
 
     def run(self, inputs: ThrottleInputs[T], outputs: ThrottleOutputs[T]) -> None:
-        for item in inputs.data(self, newest=True):
+        inputs.data.newest = True
+        for item in inputs.data:
             if item is None:
                 break
             outputs.data.send(item)
