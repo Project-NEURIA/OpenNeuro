@@ -77,6 +77,7 @@ export default defineConfig({
     exclude: ["@tauri-apps/plugin-dialog"],
   },
   server: {
+    host: true,
     proxy: {
       "/graph": {
         target: "http://localhost:8000",
@@ -105,6 +106,10 @@ export default defineConfig({
       "/logs": {
         target: "http://localhost:8000",
         changeOrigin: true,
+      },
+      "/ui/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
       },
     },
   },

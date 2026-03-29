@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import threading
 import time
@@ -32,8 +33,11 @@ class _OscClient:
         return
 
 
+_DEFAULT_HOST = os.getenv("VRCHAT_IP", "127.0.0.1")
+
+
 class OSCChatboxConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = _DEFAULT_HOST
     port: int = 9000
 
     # Keep the existing field name to avoid touching other code.

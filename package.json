@@ -4,6 +4,7 @@
   "workspaces": ["frontend"],
   "scripts": {
     "dev": "bun run scripts/dev.ts",
+    "remote": "bun run scripts/remote.ts",
     "tauri": "tauri"
   },
   "devDependencies": {

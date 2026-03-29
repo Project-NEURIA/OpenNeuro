@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from typing import NamedTuple
 
@@ -34,7 +35,7 @@ class VRChatVideo(ThreadedComponent[tuple[()], VRChatVideoOutputs]):
     def __init__(
         self,
         *,
-        host: str = "127.0.0.1",
+        host: str = os.getenv("VRCHAT_IP", "127.0.0.1"),
         port: int = 21213,
         fps: int = 30,
     ) -> None:

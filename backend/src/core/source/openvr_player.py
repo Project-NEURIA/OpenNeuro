@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import NamedTuple
 
 from pydantic import BaseModel
@@ -10,9 +11,11 @@ from ovd_client import Client, Player
 
 from src.core.component import ThreadedComponent, Tag
 
+_DEFAULT_HOST = os.getenv("VRCHAT_IP", "127.0.0.1")
+
 
 class OpenVRPlayerConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = _DEFAULT_HOST
     port: int = 21213
     sensitivity: float = 0.002
     move_speed: float = 0.05

@@ -23,7 +23,7 @@ export function useUIChannelManager(): UIChannelManager {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const url = `ws://localhost:8000/ui/ws`;
+    const url = `ws://${window.location.host}/ui/ws`;
 
     function connect() {
       const ws = new WebSocket(url);

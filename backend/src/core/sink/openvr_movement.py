@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from typing import NamedTuple
 
@@ -57,8 +58,11 @@ _TPOSE: dict[str, Pose] = {
 }
 
 
+_DEFAULT_HOST = os.getenv("VRCHAT_IP", "127.0.0.1")
+
+
 class OpenVRMovementConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = _DEFAULT_HOST
     port: int = 21213
 
 
