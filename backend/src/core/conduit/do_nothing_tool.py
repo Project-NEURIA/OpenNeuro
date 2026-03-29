@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import EmitOnStart, ThreadedComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import ToolCall, ToolDef, ToolResult
 
 
@@ -18,12 +18,11 @@ class DoNothingToolOutputs(NamedTuple):
 
 class DoNothingTool(
     ThreadedComponent[DoNothingToolInputs, DoNothingToolOutputs],
-    EmitOnStart[DoNothingToolOutputs],
 ):
     description = "A do-nothing tool: emits its definition and returns empty results"
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
-    def emit(self, outputs: DoNothingToolOutputs) -> None:
+    def setup(self, outputs: DoNothingToolOutputs) -> None:
         outputs.tool_def.send(
             ToolDef.new(
                 name="do_nothing",

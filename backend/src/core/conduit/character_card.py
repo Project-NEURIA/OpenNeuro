@@ -9,7 +9,7 @@ from typing import Literal, NamedTuple
 from pydantic import BaseModel
 
 from src.core.channel import Sender
-from src.core.component import EmitOnStart, PrimitiveComponent, Tag
+from src.core.component import PrimitiveComponent, Tag
 from src.core.config import ASSETS_DIR
 from src.core.frames import MessageFrame, TextFrame
 
@@ -39,7 +39,6 @@ class CharacterCardOutputs(NamedTuple):
 
 class CharacterCard(
     PrimitiveComponent[tuple[()], CharacterCardOutputs],
-    EmitOnStart[CharacterCardOutputs],
 ):
     """A constant component holding a character card (V2 spec conformant).
 
@@ -133,7 +132,7 @@ class CharacterCard(
         else:
             raise ValueError("CharacterCard requires preset, path, or config")
 
-    def emit(self, outputs: CharacterCardOutputs) -> None:
+    def setup(self, outputs: CharacterCardOutputs) -> None:
         c = self.config
 
         if outputs.prompts is not None:

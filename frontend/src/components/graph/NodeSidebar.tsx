@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo, IOTag, FunctionalityTag, GPUTag } from "@/lib/types";
-import type { ProjectSummary } from "@/lib/api";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Mic,
@@ -95,7 +94,6 @@ function InlineMarkdown({ text }: { text: string }) {
 
 interface NodeSidebarProps {
   components: ComponentInfo[];
-  projects: ProjectSummary[];
   currentProject: string;
 }
 
@@ -205,7 +203,7 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
   );
 }
 
-export function NodeSidebar({ components, projects, currentProject }: NodeSidebarProps) {
+export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [hovered, setHovered] = useState<{ item: ComponentInfo; y: number } | null>(null);
   const [search, setSearch] = useState("");
@@ -224,8 +222,8 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
     setHovered(null);
   }
 
-  function onProjectDragStart(e: React.DragEvent, project: ProjectSummary) {
-    const data = JSON.stringify({ kind: "project", name: project.name });
+  function onCompositeDragStart(e: React.DragEvent, item: ComponentInfo) {
+    const data = JSON.stringify({ kind: "project", name: item.type_ });
     e.dataTransfer.setData("text/plain", data);
     e.dataTransfer.setData("application/openneuro", data);
     e.dataTransfer.effectAllowed = "move";
@@ -243,11 +241,15 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
     hoverTimeout.current = setTimeout(() => setHovered(null), 100);
   }
 
-  const otherProjects = projects.filter((p) => p.name !== currentProject);
+  const primitives = components.filter((c) => !c.is_composite);
+  const composites = components.filter((c) => c.is_composite && c.type_ !== currentProject);
   const query = search.toLowerCase();
   const filtered = query
-    ? components.filter((c) => c.type_.toLowerCase().includes(query))
-    : components;
+    ? primitives.filter((c) => c.type_.toLowerCase().includes(query))
+    : primitives;
+  const filteredComposites = query
+    ? composites.filter((c) => c.type_.toLowerCase().includes(query))
+    : composites;
   const groups = groupComponents(filtered);
 
   return (
@@ -354,7 +356,7 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
         })}
 
         {/* Projects section */}
-        {otherProjects.length > 0 && (
+        {filteredComposites.length > 0 && (
           <div>
             <div className="border-t border-white/10 my-1.5" />
             <button
@@ -364,11 +366,13 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
               {collapsed["projects"] ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               Projects
             </button>
-            {!collapsed["projects"] && otherProjects.map((project) => (
+            {!collapsed["projects"] && filteredComposites.map((item) => (
               <div
-                key={project.name}
+                key={item.type_}
                 draggable
-                onDragStart={(e) => onProjectDragStart(e, project)}
+                onDragStart={(e) => onCompositeDragStart(e, item)}
+                onMouseEnter={(e) => onItemEnter(e, item)}
+                onMouseLeave={onItemLeave}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
                   "transition-all duration-200",
@@ -377,7 +381,7 @@ export function NodeSidebar({ components, projects, currentProject }: NodeSideba
               >
                 <FolderOpen className="w-3.5 h-3.5 shrink-0 text-purple-400/70" />
                 <span className="text-[12px] font-medium text-white/80 tracking-tight">
-                  {project.name}
+                  {item.type_}
                 </span>
               </div>
             ))}

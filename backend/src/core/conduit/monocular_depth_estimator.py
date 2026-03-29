@@ -75,7 +75,7 @@ class MonocularDepthEstimator(
             },
         }
 
-    def setup(self) -> None:
+    def setup(self, outputs: MonocularDepthEstimatorOutputs) -> None:
         import os
 
         os.environ.setdefault("DA3_LOG_LEVEL", "WARN")
