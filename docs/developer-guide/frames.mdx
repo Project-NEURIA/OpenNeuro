@@ -1,0 +1,110 @@
+# Frame Types
+
+All data flowing through channels is a Frame. Frames are frozen dataclasses with nanosecond timestamps.
+
+## Base
+
+```python
+@dataclass(frozen=True, slots=True)
+class Frame:
+    pts: int   # time.time_ns() — creation timestamp
+    id: int    # unique ID from obj_id()
+```
+
+## Audio
+
+**AudioFrame** — Multi-channel audio:
+- `data: np.ndarray` — shape `(channels, samples)`, float32 normalized to [-1, 1]
+- `sample_rate: int`
+- `channels: int`
+- Formats: `FLOAT32`, `PCM16`, `PCM8`
+
+`.get(format, sample_rate, num_channels)` performs three steps in sequence:
+1. **Resample** — linear interpolation via `np.interp()` if target rate differs
+2. **Channel conversion** — mono↔stereo (average/duplicate), expand with silence, or truncate
+3. **Format conversion** — float32 array, interleaved PCM16 bytes, or PCM8 bytes
+
+## Text
+
+**TextFrame** — `text: str`, `language: str | None`
+
+**EOS** — End-of-sequence sentinel. Subclasses TextFrame. `EOS.END` is the singleton instance.
+
+## Interrupts
+
+**InterruptFrame** — `reason: str`. Signals components to abort current processing.
+
+**RequestFrame** — Trigger frame (no payload). Used to wake up components like AgentState.
+
+## Chat Messages
+
+**MessageFrame** — OpenAI-compatible chat message:
+- `role: Literal["system", "user", "assistant", "tool"]`
+- `content: str | None`
+- `tool_calls: list[ChatCompletionMessageToolCall] | None` — for assistant messages that invoke tools
+- `tool_call_id: str | None` — for tool result messages
+
+## Tools
+
+**ToolDef** — Tool definition (matches OpenAI FunctionDefinition):
+- `name: str`, `description: str`, `parameters: dict[str, Any]`, `strict: bool | None`
+
+**ToolCall** — LLM invoked a tool:
+- `call_id: str`, `name: str`, `arguments: str` (JSON string)
+
+**ToolResult** — Tool execution result:
+- `call_id: str`, `content: str`
+
+## Motion
+
+**BodyPoseFrame** — Full-body skeletal tracking:
+- `_poses: dict[str, BonePose | None]` — 13 body parts
+- `.get()` returns the poses dict
+- Any body part can be `None` (partial update — "don't change this bone")
+- Coordinate system: Y-up (see [Coordinate System](./coordinate-system))
+
+**BonePose** (NamedTuple):
+```
+pos_x: float = 0.0    # X position (figure's right)
+pos_y: float = 0.0    # Y position (up)
+pos_z: float = 0.0    # Z position (backward)
+rot_w: float = 1.0    # quaternion scalar (identity)
+rot_x: float = 0.0
+rot_y: float = 0.0
+rot_z: float = 0.0
+```
+
+Quaternion order is (w, x, y, z) — scalar first. `BonePose()` creates identity at origin.
+
+**13 body parts** (matching OpenVR full-body tracking):
+head, left_hand, right_hand, waist, chest, left_foot, right_foot, left_knee, right_knee, left_elbow, right_elbow, left_shoulder, right_shoulder
+
+**GoalFrame** — Navigation target:
+- `x, y, z: float | None` — 3D position (Y-up)
+- `heading: float | None` — target facing direction (degrees from +Z clockwise)
+
+## Video
+
+**VideoFrame** — `data: np.ndarray`, `width`, `height`, `format: BGR | RGB`
+- `.get(format)` — convert between BGR/RGB
+
+**StereoVideoFrame** — `left: np.ndarray`, `right: np.ndarray` (stereo pair)
+
+## Vision
+
+**ObjectDetectionFrame** — `boxes: [N, M, 4]`, `scores: [N, M]`, `prompts: tuple[str, ...]`
+
+**ObjectSegmentationFrame** — `masks: [K, H, W] bool`, `boxes`, `scores`, `object_ids`, `labels`
+
+**ObjectLocationFrame** — 3D world positions:
+- `labels: tuple[str, ...]`, `positions: [K, 3]`, `depths: [K,]`, `scores`, `boxes`, `object_ids`
+
+## Depth
+
+**DepthFrame** — `data: [H, W] float32`, `is_metric: bool`
+
+## Camera
+
+**CameraParamsFrame** — `intrinsics: [3, 3]`, `extrinsics: [4, 4]`, `width`, `height`
+
+**StereoCameraParamsFrame** — adds `baseline: float` to CameraParamsFrame

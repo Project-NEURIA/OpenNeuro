@@ -1,0 +1,261 @@
+# API Reference
+
+Backend serves on `http://localhost:8000`. FastAPI with CORS enabled for all origins.
+
+## Startup
+
+On lifespan startup:
+1. Creates projects directory (`~/Documents/OpenNeuro/projects/`)
+2. Copies bundled presets to user projects if not already present
+3. Installs global stdout/stderr capture for per-component logging
+4. Loads `AppConfig` from `~/Documents/OpenNeuro/config.json`
+5. Initializes `GraphManager` with empty graph
+
+A parent process watchdog exits the server if the parent dies (for Tauri/bun integration).
+
+## Component (`/component`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/component` | List all registered components |
+| GET | `/component/is-type?name=X` | Check if name resolves to a Python type |
+| GET | `/component/is-subtype?sub=X&sup=Y` | Subtype check via `issubclass()` |
+| POST | `/component/{name}/options` | Dynamic dropdown options |
+
+### GET /component
+
+Returns `list[ComponentInfo]`:
+
+```json
+{
+  "type_": "LLM",
+  "description": "Generates text responses...",
+  "tags": {"io": ["conduit"], "functionality": ["llm"]},
+  "init": {
+    "config": {
+      "type": "object",
+      "properties": {
+        "model": {"type": "string", "default": "groq/llama-3.3-70b-versatile"},
+        "temperature": {"type": "number", "default": 1.08}
+      }
+    }
+  },
+  "inputs": {"messages": "Receiver[list[MessageFrame]]"},
+  "outputs": {"token": "Sender[TextFrame | EOS]", "text": "Sender[TextFrame] | None"},
+  "ui_inputs": {},
+  "ui_outputs": {}
+}
+```
+
+The `init` field contains JSON Schema for each `__init__` parameter (via Pydantic's `TypeAdapter`). The frontend uses this to render config forms with appropriate widgets (text, number, dropdown, file picker).
+
+### POST /component/{name}/options
+
+Request: `dict[str, Any]` (current form values)
+
+Response: `dict[str, Any]` (field → option list)
+
+Used for dependent dropdowns — e.g. CharacterCard's preset list. The `values` dict lets options depend on other fields.
+
+## Graph (`/graph`)
+
+### Nodes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/graph/nodes` | List all nodes |
+| GET | `/graph/nodes/{id}` | Get single node |
+| POST | `/graph/nodes` | Create node |
+| PATCH | `/graph/nodes/{id}` | Update position |
+| PATCH | `/graph/nodes/{id}/init-args` | Update config (restarts if running) |
+| DELETE | `/graph/nodes/{id}` | Delete node + connected edges |
+
+**NodeResponse:**
+```json
+{
+  "id": "abc-123",
+  "type": "LLM",
+  "is_composite": false,
+  "status": "running",
+  "x": 100.0,
+  "y": 200.0,
+  "init_args": {"config": {"model": "groq/llama-3.3-70b-versatile"}},
+  "inputs": null,
+  "outputs": null,
+  "sub_graph": null
+}
+```
+
+For composite nodes, `inputs`/`outputs` contain the boundary port types and `sub_graph` contains the inner graph.
+
+**POST /graph/nodes** — If the component type isn't found in the registry, it tries to load it as a project (for nested composite components).
+
+**PATCH /graph/nodes/{id}/init-args** — Re-instantiates the component with new args. If the graph is running, stops all components, applies changes, and restarts.
+
+### Edges
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/graph/edges` | List all edges |
+| POST | `/graph/edges` | Create edge (validates slots exist and aren't duplicate) |
+| DELETE | `/graph/edges` | Delete edge |
+
+Edge validation checks:
+- Both nodes exist
+- Source slot exists in source node's outputs
+- Target slot exists in target node's inputs
+- Edge doesn't already exist
+
+### Execution
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/graph/start` | Start all components (`manager.run()`) |
+| POST | `/graph/stop` | Stop all components (`manager.stop()`) |
+| POST | `/graph/save` | Save graph to active project's `graph.json` |
+
+### Subgraphs
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/graph/subgraph` | Group nodes into composite |
+| POST | `/graph/ungroup/{id}` | Expand composite back |
+
+**POST /graph/subgraph** takes `{"node_ids": [...], "name": "Subgraph"}`. It:
+1. Extracts selected nodes + internal edges into a sub-graph
+2. Creates a `CompositeComponent` at the average position
+3. Rewires boundary edges (port format: `"{inner_node_id}.{slot}"`)
+4. Removes original nodes from outer graph
+
+**POST /graph/ungroup/{id}** reverses the process, restoring inner nodes and rewiring edges.
+
+## Projects (`/projects`, `/project`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/projects` | List projects (name + has_thumbnail) |
+| POST | `/projects` | Create project (empty graph + placeholder thumbnail) |
+| DELETE | `/projects/{name}` | Delete project directory |
+| POST | `/projects/{name}/start` | Load graph.json, reset manager |
+| POST | `/project/close` | Reset to empty graph |
+| GET | `/project/current` | Current project name or null |
+| GET | `/projects/{name}/thumbnail` | PNG thumbnail image |
+
+Projects live in `~/Documents/OpenNeuro/projects/{name}/` with:
+- `graph.json` — serialized graph
+- `thumbnail.png` — preview image
+
+## Metrics (`/metrics`)
+
+**SSE stream** — `GET /metrics`
+
+Streams JSON every 100ms:
+
+```json
+{
+  "nodes": {
+    "abc-123": {
+      "name": "LLM",
+      "status": "running",
+      "senders": {
+        "token": {
+          "name": "token",
+          "msg_count_delta": 5,
+          "byte_count_delta": 240,
+          "last_send_time": 1711234567.89,
+          "buffer_depth": 0
+        }
+      },
+      "receivers": {
+        "messages": {
+          "name": "messages",
+          "msg_count_delta": 1,
+          "byte_count_delta": 512,
+          "lag": 0
+        }
+      }
+    }
+  },
+  "timestamp": 1711234567.89
+}
+```
+
+Deltas are computed per collection cycle (msg/byte counts since last report).
+
+## Logs (`/logs`)
+
+**GET /logs/{node_id}**
+
+Query params: `after: int = 0`, `limit: int = 400` (max 2000)
+
+```json
+{
+  "node_id": "abc-123",
+  "entries": [
+    {"seq": 1, "timestamp": 1711234567.89, "stream": "stdout", "text": "[LLM] Starting"},
+    {"seq": 2, "timestamp": 1711234568.01, "stream": "stderr", "text": "Warning: ..."}
+  ]
+}
+```
+
+Uses a global stream capture installed at startup. Each component's stdout/stderr is tagged with its node ID and stored in a `LogStore` with sequential numbering for pagination.
+
+## UI WebSocket (`/ui/ws`)
+
+Bidirectional bridge between frontend and component UI channels.
+
+### Frontend → Component
+
+```json
+{"type": "ui_input", "node_id": "abc", "channel": "text_input", "payload": "hello"}
+```
+
+The server resolves the expected type from the component's `get_ui_input_types()`:
+- If `BaseModel` subclass and payload is dict: validates via `model_validate()`
+- If type has `.new()` and payload is string: calls `type.new(text=payload)`
+- Otherwise: sends payload as-is
+
+### Component → Frontend (text/JSON)
+
+```json
+{"type": "ui_output", "node_id": "abc", "channel": "display", "payload": "result text"}
+```
+
+Payload encoding:
+- `BaseModel`: `.model_dump()` (JSON dict)
+- Object with `.get()`: `.get()` (legacy TextFrame)
+- Other: direct serialization
+
+### Component → Frontend (binary)
+
+For `bytes` channels (video frames):
+
+```
+[2-byte BE header length][JSON header][raw bytes]
+```
+
+Header: `{"type": "ui_output", "node_id": "abc", "channel": "video"}`
+
+### Channel Watcher
+
+The WebSocket spawns an async watcher that monitors `GraphManager._ui_version`. When the graph restarts, it cancels stale reader tasks and spawns new ones for the updated UI channel set.
+
+## Environment (`/env`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/env` | Read `.env` from `~/Documents/OpenNeuro/.env` |
+| PUT | `/env` | Write `.env` file |
+
+## Dependency Injection
+
+All graph endpoints use `Depends(get_manager)` which returns `request.app.state.manager` — the singleton `GraphManager` instance.
+
+## Error Handling
+
+| Status | Trigger |
+|--------|---------|
+| 201 | POST creating resources |
+| 204 | DELETE, state-changing POST (start/stop/save) |
+| 400 | `ValueError` (validation, duplicates) |
+| 404 | `KeyError` (missing node/edge), missing files |
