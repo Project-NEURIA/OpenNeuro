@@ -1,0 +1,95 @@
+# Coordinate System
+
+OpenNeuro uses a **Y-up** coordinate system throughout the public API:
+
+```
+    +Y (up)
+     |
+     |
+     +------ +X (figure's right)
+    /
+   /
+  -Z (toward viewer)
+```
+
+- **+X** — figure's right
+- **+Y** — up
+- **+Z** — forward (into the screen, away from the viewer)
+
+The figure starts facing +Z (into the screen). The 2D pose renderer shows a rear view (camera behind the figure, also looking along +Z).
+
+## Heading
+
+Heading is measured in **degrees clockwise from +Z**:
+- 0° = facing +Z (initial forward)
+- 90° = facing +X (turned right)
+- -90° = facing -X (turned left)
+- 180° = facing -Z
+
+## GoalFrame
+
+Goals use Y-up coordinates:
+```python
+GoalFrame.new(x=5.0, y=0.0, z=10.0)  # 5m right, ground level, 10m forward
+GoalFrame.new(heading=90.0)            # face right
+```
+
+The LLM sends goals via MovementTool as `(x, z)` ground coordinates. MovementTool sets `y=0` (ground level).
+
+## DartControl (Internal)
+
+DartControl uses DART/SMPL's **Z-up** coordinate system internally. The conversion happens at DartControl's boundary:
+
+**Inbound (GoalFrame → DART):** Y-up `(x, y, z)` → Z-up `(-x, -z, y)`
+- X negated because DART +X = figure's left
+
+**Outbound (DART → BodyPoseFrame):** Z-up → Y-up
+- `pos_x = -DART_x` (negate so +X = figure's right)
+- `pos_y = DART_z` (height)
+- `pos_z = -DART_y`
+
+No other component knows about Z-up.
+
+### Z-up to Y-up Quaternion
+
+The conversion uses a **-90° rotation around X** as a quaternion:
+
+```python
+_Q_ZUP_TO_YUP = (sqrt(2)/2, -sqrt(2)/2, 0, 0)  # (w, x, y, z)
+```
+
+Applied to each bone: `q_yup = Q_ZUP_TO_YUP * q_zup`
+
+### Forward Kinematics
+
+DartControl's `_features_to_body_pose()` converts SMPL's 276-dim features to BonePoses:
+1. Extract 6D rotations (22 joints) → convert to 3x3 matrices via Gram-Schmidt
+2. Walk the kinematic chain: `world_rot[j] = world_rot[parent] @ local_rot[j]`
+3. Map 22 SMPL joints → 13 OpenVR body parts
+4. Convert each joint: negate X, swap Y/Z, apply quaternion conversion
+
+## OpenVR
+
+SteamVR/OpenVR also uses Y-up but with **-Z forward** (right-handed). The OpenVRMovement sink passes poses directly — no conversion needed since our BodyPoseFrame is already Y-up. The Z-sign difference is handled by SteamVR's internal rendering.
+
+## Position Reporting
+
+AgentState reports the figure's position to the LLM as:
+```
+[Position (y-up): x=3.14, y=0.92, z=-1.50]
+[Heading (from +Z clockwise): 135°]
+```
+
+This matches the coordinate system used by GoalFrame, so the LLM can reason about position and issue goal coordinates directly.
+
+### Heading Computation
+
+Heading is extracted from the waist quaternion:
+
+```python
+fwd_x = 2 * (qx * qz + w * qy)
+fwd_z = 1 - 2 * (qx * qx + qy * qy)
+heading = -degrees(atan2(fwd_x, fwd_z))
+```
+
+This rotates the +Z vector by the quaternion, projects to the XZ ground plane, computes the angle, and negates for clockwise convention.
