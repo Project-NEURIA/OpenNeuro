@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -7,7 +8,10 @@ from pydantic import TypeAdapter
 
 from src.api.component.dto import ComponentInfo
 from src.api.component import service
+from src.core.component import CompositeComponent, Tag
+from src.core.config import PROJECTS_DIR
 from src.core.frames import *  # noqa: F403, F401
+from src.core.graph import Graph
 
 router = APIRouter(prefix="/component")
 
@@ -40,10 +44,10 @@ def list_components() -> list[ComponentInfo]:
     result = []
     for type_, cls in classes.items():
         init = cls.get_init_types()
-        inputs = cls.get_input_types()
-        outputs = cls.get_output_types()
-        ui_inputs = cls.get_ui_input_types()
-        ui_outputs = cls.get_ui_output_types()
+        inputs = cls._class_input_types()
+        outputs = cls._class_output_types()
+        ui_inputs = cls._class_ui_input_types()
+        ui_outputs = cls._class_ui_output_types()
 
         result.append(
             ComponentInfo(
@@ -57,6 +61,36 @@ def list_components() -> list[ComponentInfo]:
                 ui_outputs={k: _type_name(v) for k, v in ui_outputs.items()},
             )
         )
+
+    # Include saved projects as composite components
+    if PROJECTS_DIR.exists():
+        for d in sorted(PROJECTS_DIR.iterdir()):
+            graph_path = d / "graph.json"
+            if not d.is_dir() or not graph_path.exists():
+                continue
+            try:
+                graph = Graph.model_validate(json.loads(graph_path.read_text()))
+                comp = CompositeComponent(d.name, graph)
+                result.append(
+                    ComponentInfo(
+                        type_=d.name,
+                        description="",
+                        tags=Tag(io={"conduit"}, functionality={"misc"}),
+                        init={},
+                        inputs={
+                            k: _type_name(v) for k, v in comp.get_input_types().items()
+                        },
+                        outputs={
+                            k: _type_name(v) for k, v in comp.get_output_types().items()
+                        },
+                        ui_inputs={},
+                        ui_outputs={},
+                        is_composite=True,
+                        has_thumbnail=(d / "thumbnail.png").exists(),
+                    )
+                )
+            except Exception:
+                continue
 
     return result
 

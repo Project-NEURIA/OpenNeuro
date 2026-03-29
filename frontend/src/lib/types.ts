@@ -23,6 +23,8 @@ export interface ComponentInfo {
   outputs: Record<string, string>;
   ui_inputs: Record<string, string>;
   ui_outputs: Record<string, string>;
+  is_composite?: boolean;
+  has_thumbnail?: boolean;
 }
 
 export interface GraphNode {

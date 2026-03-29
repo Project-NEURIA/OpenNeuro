@@ -794,8 +794,10 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         policy = self._load_policy(engine)
         print("[DartControl] Streaming motion")
 
-        instruction: str | None = None
-        text_embedding: torch.Tensor | None = None
+        instruction: str = "stand"
+        text_embedding: torch.Tensor = engine.encode_text(["stand"]).expand(
+            self.config.batch_size, -1
+        )
         current_goal: torch.Tensor | None = None
         current_goal_heading: float | None = None
 
@@ -882,11 +884,6 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                             if pending_future is not None:
                                 pending_future.cancel()
                                 pending_future = None
-
-                # Stay idle until an instruction is received
-                if text_embedding is None:
-                    self.stop_event.wait(0.1)
-                    continue
 
                 # Poll goal channel (non-blocking)
                 if inputs.goal is not None:

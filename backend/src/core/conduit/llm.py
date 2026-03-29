@@ -38,6 +38,7 @@ class LLMOutputs(NamedTuple):
     token: Sender[TextFrame | EOS]
     text: Sender[TextFrame] | None = None
     tool_calls: Sender[ToolCall] | None = None
+    eos: Sender[EOS] | None = None
 
 
 class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
@@ -143,6 +144,8 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                         if full_text and outputs.text is not None:
                             outputs.text.send(TextFrame.new(text=full_text))
                         outputs.token.send(EOS.END)
+                        if outputs.eos is not None:
+                            outputs.eos.send(EOS.END)
                         break
 
                 choice = chunk.choices[0] if chunk.choices else None
@@ -176,6 +179,8 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                     if full_text and outputs.text is not None:
                         outputs.text.send(TextFrame.new(text=full_text))
                     outputs.token.send(EOS.END)
+                    if outputs.eos is not None:
+                        outputs.eos.send(EOS.END)
                     break
 
                 text = (delta.content or "") if delta else ""

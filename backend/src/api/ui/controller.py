@@ -33,7 +33,7 @@ def _resolve_ui_output_type(
     comp = manager.components().get(node_id)
     if comp is None:
         return None
-    slot_type = type(comp).get_ui_output_types().get(slot)
+    slot_type = comp.get_ui_output_types().get(slot)
     if slot_type is None:
         return None
     # slot_type is e.g. UISender[bytes], UIVideoSender (which is UISender[bytes]), etc.
@@ -60,7 +60,7 @@ def _resolve_ui_input_type(
     comp = manager.components().get(node_id)
     if comp is None:
         return None
-    slot_type = type(comp).get_ui_input_types().get(slot)
+    slot_type = comp.get_ui_input_types().get(slot)
     if slot_type is None:
         return None
     args = get_args(slot_type)

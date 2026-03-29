@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import base64
-import collections
 import io
-import time
-from concurrent.futures import Future, ThreadPoolExecutor
 from typing import NamedTuple
 
-import numpy as np
 from openai import OpenAI
 from openai.types.chat import ChatCompletionContentPartParam
 from PIL import Image
@@ -18,24 +14,28 @@ from src.core.component import ThreadedComponent, Tag
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat
 
 
+class VLMResponse(BaseModel):
+    caption: str
+    objects: str
+
+
 class StreamingVLMConfig(BaseModel):
-    base_url: str
-    api_key: str = ""
-    model_id: str = "Qwen/Qwen3.5-0.8B"
-    vlm_fps: int = 3
-    window_duration: float = 3.0
+    base_url: str = "https://api.openai.com/v1"
+    model_id: str = "gpt-5.4"
     memory_size: int = 4
     key_window_interval: int | None = 4
     prompt_window1: str = (
         "You are an advanced real-time vision module for blind people. "
         "Given the current observation, use short phrases to caption what you see, include movement and composition if needed. "
-        'Keep it short, efficient, real-time, relavant. Think "What would the blind person like to know?"'
+        'Keep it short, efficient, real-time, relavant. Think "What would the blind person like to know?" '
+        "Also list the distinct objects/items visible as a unique comma-separated list in the objects field. No duplicates."
     )
     prompt_window2_template: str = (
         "You are an advanced real-time vision module for blind people. "
         "Given the current observation history, generate an efficient delta caption "
         "only introducing new observations that were not mentioned in the history context. "
         'Keep it efficient, no redundant information, Think "What would the blind person like to know?"\nDO NOT REPEAT anything that is already mentioned.\n\n'
+        "Also list the distinct objects/items visible as a unique comma-separated list in the objects field. No duplicates.\n\n"
         "History context:\n{context}"
     )
 
@@ -46,6 +46,7 @@ class StreamingVLMInputs(NamedTuple):
 
 class StreamingVLMOutputs(NamedTuple):
     observation: Sender[TextFrame]
+    objects: Sender[TextFrame]
 
 
 class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
@@ -64,12 +65,7 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
     def __init__(self, config: StreamingVLMConfig) -> None:
         super().__init__()
         self.config = config
-        self._client = OpenAI(
-            base_url=config.base_url, api_key=config.api_key or "unused"
-        )
-        self._frame_buffer: collections.deque[tuple[float, VideoFrame]] = (
-            collections.deque(maxlen=max(1, int(config.window_duration * 60)))
-        )
+        self._client = OpenAI(base_url=config.base_url)
         self._captions_history: list[str] = []
 
     def _encode_pil_to_base64_uri(self, img: Image.Image) -> str:
@@ -82,7 +78,8 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         interval = self.config.key_window_interval
         return interval is not None and interval > 0 and window_index % interval == 0
 
-    def _call_vllm(self, frames: list[Image.Image], prompt: str) -> str:
+    def _call_vllm(self, frames: list[Image.Image], prompt: str) -> tuple[str, str]:
+        """Call VLM and return (caption, objects_csv)."""
         content: list[ChatCompletionContentPartParam] = [
             {
                 "type": "image_url",
@@ -93,34 +90,22 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         content.append({"type": "text", "text": prompt})
 
         try:
-            response = self._client.chat.completions.create(
+            response = self._client.beta.chat.completions.parse(
                 model=self.config.model_id,
                 messages=[{"role": "user", "content": content}],
+                response_format=VLMResponse,
                 max_completion_tokens=512,
                 temperature=0.7,
             )
-            text = response.choices[0].message.content
-            return text.strip() if text else ""
+            parsed = response.choices[0].message.parsed
+            if parsed is not None:
+                return parsed.caption, parsed.objects
+            # Fallback if parsing failed but content exists
+            text = (response.choices[0].message.content or "").strip()
+            return text, ""
         except Exception as e:
             print(f"[StreamingVLM] VLLM call failed: {e}")
-            return ""
-
-    def _sample_window(self) -> list[Image.Image] | None:
-        now = time.time()
-        window_start = now - self.config.window_duration
-        window_frames = [f for ts, f in self._frame_buffer if ts >= window_start]
-        if not window_frames:
-            return None
-
-        frames_per_window = max(
-            1, int(self.config.window_duration * self.config.vlm_fps)
-        )
-        sample_count = min(frames_per_window, len(window_frames))
-        indices = np.linspace(0, len(window_frames) - 1, sample_count, dtype=int)
-
-        return [
-            Image.fromarray(window_frames[i].get(VideoDataFormat.RGB)) for i in indices
-        ]
+            return "", ""
 
     def _build_prompt(self, window_count: int) -> str:
         if not self._captions_history or self._should_use_key_window_prompt(
@@ -130,49 +115,34 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         history_str = " ".join(self._captions_history)
         return self.config.prompt_window2_template.format(context=history_str)
 
-    def _handle_caption(self, caption: str, outputs: StreamingVLMOutputs) -> None:
-        if not caption:
-            return
-        print(f"[StreamingVLM] Caption: {caption}")
-        self._captions_history.append(caption)
-        if len(self._captions_history) > self.config.memory_size:
-            self._captions_history.pop(0)
-        outputs.observation.send(TextFrame.new(text=caption))
+    def _handle_result(
+        self, caption: str, objects: str, outputs: StreamingVLMOutputs
+    ) -> None:
+        if caption:
+            print(f"[StreamingVLM] Caption: {caption}")
+            self._captions_history.append(caption)
+            if len(self._captions_history) > self.config.memory_size:
+                self._captions_history.pop(0)
+            outputs.observation.send(TextFrame.new(text=caption))
+        if objects:
+            print(f"[StreamingVLM] Objects: {objects}")
+            outputs.objects.send(TextFrame.new(text=objects))
 
     def run(self, inputs: StreamingVLMInputs, outputs: StreamingVLMOutputs) -> None:
         print("[StreamingVLM] Starting Streaming VLM component")
 
-        executor = ThreadPoolExecutor(max_workers=1)
-        pending: Future[str] | None = None
+        inputs.video.newest = True
+
         window_count = 0
-        last_submit_time = 0.0
 
         for frame in inputs.video:
             if frame is None:
                 break
 
-            self._frame_buffer.append((time.time(), frame))
+            pil_img = Image.fromarray(frame.get(VideoDataFormat.RGB))
+            window_count += 1
+            prompt = self._build_prompt(window_count)
+            caption, objects = self._call_vllm([pil_img], prompt)
+            self._handle_result(caption, objects, outputs)
 
-            # Check if pending VLM call is done
-            if pending is not None and pending.done():
-                self._handle_caption(pending.result(), outputs)
-                pending = None
-
-            # Submit new VLM call if none in flight and enough time has passed
-            if (
-                pending is None
-                and time.time() - last_submit_time >= self.config.window_duration
-            ):
-                pil_frames = self._sample_window()
-                if pil_frames:
-                    window_count += 1
-                    prompt = self._build_prompt(window_count)
-                    pending = executor.submit(self._call_vllm, pil_frames, prompt)
-                    last_submit_time = time.time()
-
-        # Drain pending result
-        if pending is not None:
-            self._handle_caption(pending.result(), outputs)
-
-        executor.shutdown(wait=False)
         print("[StreamingVLM] Streaming VLM component stopped")

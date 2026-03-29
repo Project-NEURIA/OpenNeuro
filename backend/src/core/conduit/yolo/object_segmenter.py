@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-import threading
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
@@ -77,7 +76,6 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
         self._model: Any = None
         self._tracker_yaml: str | None = None
         self._prompts: list[str] = []
-        self._lock = threading.Lock()
         self._device = auto_device(config.device)
 
     def _build_tracker_yaml(self) -> str:
@@ -139,7 +137,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
             conf=self.config.conf,
             iou=0.7,
             rect=False,
-            half=True,
+            half=False,
             max_det=16,
             retina_masks=False,
             agnostic_nms=False,
@@ -208,31 +206,26 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
             tuple(keep_labels),
         )
 
-    def _prompt_listener(self, inputs: ObjectSegmenterInputs) -> None:
-        for frame in inputs.prompts:
-            if frame is None:
-                break
-            new_prompts = [p.strip() for p in frame.text.split(",") if p.strip()]
-            with self._lock:
-                self._set_phrases(new_prompts)
-            if new_prompts:
-                print(f"[ObjectSegmenter] Prompts updated: {new_prompts}")
-
     def run(
         self, inputs: ObjectSegmenterInputs, outputs: ObjectSegmenterOutputs
     ) -> None:
         print("[ObjectSegmenter] Starting...")
 
-        prompt_thread = threading.Thread(
-            target=self._prompt_listener, args=(inputs,), daemon=True
-        )
-        prompt_thread.start()
+        inputs.video.newest = True
+        inputs.prompts.newest = True
 
         print("[ObjectSegmenter] Running inference loop")
-        inputs.video.newest = True
-        for frame in inputs.video:
+        while not self.stop_event.is_set():
+            frame = next(inputs.video, None)
             if frame is None:
                 break
+
+            prompt_frame = next(inputs.prompts, None)
+            if prompt_frame is None:
+                break
+
+            new_prompts = [p.strip() for p in prompt_frame.text.split(",") if p.strip()]
+            self._set_phrases(new_prompts)
 
             rgb = frame.get(VideoDataFormat.RGB)
             rgb = resize_and_crop(rgb, 640, 640)
@@ -240,8 +233,7 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
             if not self._prompts:
                 continue
 
-            with self._lock:
-                result = self._infer(rgb)
+            result = self._infer(rgb)
 
             if result is not None:
                 masks, boxes, scores, object_ids, labels = result
@@ -254,7 +246,16 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
                         labels=labels,
                     )
                 )
+            else:
+                outputs.segmentations.send(
+                    ObjectSegmentationFrame.new(
+                        masks=np.zeros((0, 0, 0), dtype=bool),
+                        boxes=np.zeros((0, 4), dtype=np.float32),
+                        scores=np.zeros((0,), dtype=np.float32),
+                        object_ids=np.zeros((0,), dtype=np.int64),
+                        labels=(),
+                    )
+                )
             outputs.video.send(VideoFrame.new(data=rgb, format=VideoDataFormat.RGB))
 
-        prompt_thread.join(timeout=2.0)
         print("[ObjectSegmenter] Stopped")
