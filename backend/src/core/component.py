@@ -318,6 +318,8 @@ class ThreadedComponent[
         try:
             self._status = Status.SETUP
             self.setup()
+            if self._stop_event.is_set():
+                return
             self._status = Status.RUNNING
             self.run(inputs, outputs)
         except Exception:
@@ -329,8 +331,10 @@ class ThreadedComponent[
             self._status = Status.STOPPED
 
     def start(self, inputs: I, outputs: O) -> None:
-        if self.status == Status.RUNNING:
+        if self.status in (Status.RUNNING, Status.SETUP):
             return
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
         self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._safe_run, args=(inputs, outputs), daemon=True
