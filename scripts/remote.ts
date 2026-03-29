@@ -34,6 +34,22 @@ async function getTailscalePeerIP(): Promise<string | null> {
   return null;
 }
 
+async function waitForBackend(
+  url: string,
+  timeoutMs: number = 120_000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await fetch(url);
+      return;
+    } catch {
+      await Bun.sleep(500);
+    }
+  }
+  console.warn("[remote] Backend did not become ready in time, starting frontend anyway.");
+}
+
 const explicitIP = Bun.argv[2];
 const vrchatIP =
   explicitIP ??
@@ -63,7 +79,13 @@ const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
   env,
 });
 
-const frontend = Bun.spawn(["bun", "run", "dev"], {
+console.log("[remote] Waiting for backend to be ready...");
+await waitForBackend("http://localhost:8000/component");
+console.log("[remote] Backend is ready, starting frontend.\n");
+
+// Use npx vite (Node runtime) instead of bunx --bun vite to avoid
+// Bun's broken node:http proxy (oven-sh/bun#28396).
+const frontend = Bun.spawn(["npx", "vite"], {
   cwd: "./frontend",
   stdout: "inherit",
   stderr: "inherit",
