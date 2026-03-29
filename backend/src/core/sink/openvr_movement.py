@@ -134,7 +134,7 @@ class OpenVRMovementSink(
                 _send_poses(client, _TPOSE)
                 self.stop_event.wait()
             else:
-                for frame in poses(self):
+                for frame in poses:
                     if frame is None:
                         break
 

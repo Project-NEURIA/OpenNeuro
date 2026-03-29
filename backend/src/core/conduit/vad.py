@@ -264,13 +264,16 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
         )
         monitor_thread.start()
 
-        for frame in inputs.audio(self):
-            if frame is None:
-                break
-            self._process_audio_frame(frame, outputs)
+        try:
+            for frame in inputs.audio:
+                if frame is None:
+                    break
+                self._process_audio_frame(frame, outputs)
 
-        if self._current_segment:
-            with self._lock:
-                self._finalize_segment(outputs)
+            if self._current_segment:
+                with self._lock:
+                    self._finalize_segment(outputs)
+        finally:
+            monitor_thread.join(timeout=2.0)
 
         print("[VAD] Voice Activity Detection stopped")

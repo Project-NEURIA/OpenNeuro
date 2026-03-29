@@ -235,6 +235,12 @@ class DartControlConfig(BaseModel):
     obs_goal_dist_clip: float = 5.0
     """Maximum goal distance value in observation (clamped)."""
 
+    goal_reach_threshold: float = 0.3
+    """Distance (meters) below which the goal is considered reached and cleared."""
+
+    heading_reach_threshold: float = 20.0
+    """Angle (degrees) below which the heading goal is considered reached and cleared."""
+
 
 class DartControlInputs(NamedTuple):
     goal: Receiver[GoalFrame] | None = None
@@ -404,6 +410,8 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         self._transf_rotmat = primitive_dict["transf_rotmat"]
         self._transf_transl = primitive_dict["transf_transl"]
         self._betas = betas.unsqueeze(0).expand(B, -1).to(device)
+        self._last_goal_dist: float = float("inf")
+        self._last_heading_diff: float = float("inf")
 
         print(
             f"[DartControl] History initialized from stand.pkl (shape={self._history.shape})"
@@ -518,8 +526,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
     def _compute_observation(
         self,
         putil: PrimitiveUtility,
-        goal: torch.Tensor,
+        goal: torch.Tensor | None,
         text_embedding: torch.Tensor,
+        goal_heading: float | None = None,
     ) -> torch.Tensor:
         """Compute the RL policy observation vector.
 
@@ -527,8 +536,9 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
 
         Args:
             putil: PrimitiveUtility instance
-            goal: [B, 3] goal location in world coordinates
+            goal: [B, 3] goal location in world coordinates, or None for heading-only
             text_embedding: [B, 512] CLIP text embedding
+            goal_heading: target heading in radians (from +Z clockwise), or None
 
         Returns:
             observation: [B, obs_dim] observation vector
@@ -541,13 +551,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         global_joints = self._get_global_joints(putil)  # [B, H, 22, 3]
         global_pelvis = global_joints[:, -1, 0]  # [B, 3]
 
-        # Goal direction (XY plane)
-        global_goal_dir = goal - global_pelvis  # [B, 3]
-        global_goal_dir[:, 2] = 0
-        goal_dist = torch.norm(global_goal_dir, dim=-1, keepdim=True)  # [B, 1]
-        global_goal_dir = global_goal_dir / goal_dist.clip(min=1e-12)
-
-        # Body forward direction
+        # Body forward direction (needed for both position and heading goals)
         body_orient, _ = get_new_coordinate(
             global_joints[:, -1]
         )  # [B, 3, 3], [B, 1, 3]
@@ -556,6 +560,42 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         moving_dir = forward_dir / torch.norm(forward_dir, dim=-1, keepdim=True).clip(
             min=1e-12
         )
+
+        if goal is not None:
+            # Position goal: direction from pelvis to goal (XY plane)
+            global_goal_dir = goal - global_pelvis  # [B, 3]
+            global_goal_dir[:, 2] = 0
+            goal_dist = torch.norm(global_goal_dir, dim=-1, keepdim=True)  # [B, 1]
+            self._last_goal_dist = goal_dist[0, 0].item()
+            global_goal_dir = global_goal_dir / goal_dist.clip(min=1e-12)
+        else:
+            # Heading-only goal: construct direction from target heading
+            # Heading is from +Z clockwise in world (y-up), but sim is z-up
+            # sim_x = -world_x, sim_y = -world_z
+            # world forward = (sin(heading), 0, cos(heading))
+            # sim forward = (-sin(heading), -cos(heading), 0)
+            assert goal_heading is not None
+            global_goal_dir = torch.tensor(
+                [[-math.sin(goal_heading), -math.cos(goal_heading), 0.0]],
+                device=device,
+                dtype=torch.float32,
+            ).expand(B, -1)
+            goal_dist = torch.zeros(B, 1, device=device)
+            self._last_goal_dist = 0.0
+
+        # Compute heading difference if a heading goal is active
+        if goal_heading is not None:
+            heading_dir = torch.tensor(
+                [[-math.sin(goal_heading), -math.cos(goal_heading), 0.0]],
+                device=device,
+                dtype=torch.float32,
+            )
+            cos_hdiff = torch.einsum("bi,bi->b", moving_dir, heading_dir)
+            self._last_heading_diff = math.degrees(
+                math.acos(float(cos_hdiff[0].clip(-1, 1)))
+            )
+        else:
+            self._last_heading_diff = float("inf")
 
         # Clip goal angle
         cos_theta = torch.einsum("bi,bi->b", global_goal_dir, moving_dir)  # [B]
@@ -585,11 +625,18 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         # Floor height relative to first-frame pelvis
         floor_height = -global_joints[:, 0, 0, 2]  # [B]
 
-        print(
-            f"[OBS] pelvis=({global_pelvis[0, 0]:.2f}, {global_pelvis[0, 1]:.2f}, {global_pelvis[0, 2]:.2f}), "
-            f"goal=({goal[0, 0]:.2f}, {goal[0, 1]:.2f}, {goal[0, 2]:.2f}), "
-            f"dist={goal_dist[0, 0]:.2f}, local_dir=({local_goal_dir[0, 0]:.2f}, {local_goal_dir[0, 1]:.2f}, {local_goal_dir[0, 2]:.2f})"
-        )
+        if goal is not None:
+            print(
+                f"[OBS] pelvis=({-global_pelvis[0, 0]:.2f}, {global_pelvis[0, 2]:.2f}, {-global_pelvis[0, 1]:.2f}), "
+                f"goal=({-goal[0, 0]:.2f}, {goal[0, 2]:.2f}, {-goal[0, 1]:.2f}), "
+                f"dist={goal_dist[0, 0]:.2f}, local_dir=({local_goal_dir[0, 0]:.2f}, {local_goal_dir[0, 1]:.2f}, {local_goal_dir[0, 2]:.2f})"
+            )
+        else:
+            print(
+                f"[OBS] pelvis=({-global_pelvis[0, 0]:.2f}, {global_pelvis[0, 2]:.2f}, {-global_pelvis[0, 1]:.2f}), "
+                f"heading_goal={math.degrees(goal_heading) if goal_heading is not None else 'N/A'}°, "
+                f"local_dir=({local_goal_dir[0, 0]:.2f}, {local_goal_dir[0, 1]:.2f}, {local_goal_dir[0, 2]:.2f})"
+            )
 
         # Concatenate: goal_dir(3), goal_dist(1), text(512), motion(H*276), scene(1)
         observation = torch.cat(
@@ -646,17 +693,26 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         text_embedding: torch.Tensor,
         policy: PolicyReachLocationMLP | None,
         current_goal: torch.Tensor | None,
-    ) -> torch.Tensor:
+        current_goal_heading: float | None = None,
+    ) -> tuple[torch.Tensor, float | None, float | None]:
         """Generate one motion primitive and update autoregressive state.
 
-        Returns: [B, F, 276] world-space features (on CPU).
+        Returns: ([B, F, 276] world-space features on CPU, goal_dist or None, heading_diff or None).
         """
         # Compute noise from policy if available
         noise: torch.Tensor | None = None
-        if policy is not None and current_goal is not None:
-            obs = self._compute_observation(putil, current_goal, text_embedding)
+        goal_dist_scalar: float | None = None
+        heading_diff_scalar: float | None = None
+        if policy is not None and (
+            current_goal is not None or current_goal_heading is not None
+        ):
+            obs = self._compute_observation(
+                putil, current_goal, text_embedding, current_goal_heading
+            )
             action = policy.get_action_mean(obs)
             noise = action.view(self.config.batch_size, *engine.noise_shape)
+            goal_dist_scalar = self._last_goal_dist
+            heading_diff_scalar = self._last_heading_diff
 
         # Generate one primitive
         future_normalized = engine.generate_step(
@@ -675,7 +731,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         # Update history (must complete before next generation)
         self._update_history(engine, putil, world_features.to(self.config.device))
 
-        return world_features
+        return world_features, goal_dist_scalar, heading_diff_scalar
 
     @staticmethod
     def _prepare_frames(
@@ -738,39 +794,87 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
         policy = self._load_policy(engine)
         print("[DartControl] Streaming motion")
 
-        instruction: str | None = None
-        text_embedding: torch.Tensor | None = None
+        instruction: str = "stand"
+        text_embedding: torch.Tensor = engine.encode_text(["stand"]).expand(
+            self.config.batch_size, -1
+        )
         current_goal: torch.Tensor | None = None
+        current_goal_heading: float | None = None
 
         # Set up non-blocking generators for input channels
-        goal_gen = (
-            inputs.goal(self, newest=True, no_block=True)
-            if inputs.goal is not None
-            else None
-        )
-        instruction_gen = (
-            inputs.instruction(self, newest=True, no_block=True)
-            if inputs.instruction is not None
-            else None
-        )
+        if inputs.goal is not None:
+            inputs.goal.newest = True
+            inputs.goal.blocking = False
+        if inputs.instruction is not None:
+            inputs.instruction.newest = True
+            inputs.instruction.blocking = False
 
         print("[DartControl] Idle, waiting for instruction...")
         frame_interval = 1.0 / self.config.fps
 
         # Pipeline: generate next batch while emitting current batch
         gen_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dart-gen")
-        pending_future: Future[torch.Tensor] | None = None
+        pending_future: (
+            Future[tuple[torch.Tensor, float | None, float | None]] | None
+        ) = None
 
         while not self.stop_event.is_set():
             try:
+                world_features: torch.Tensor | None = None
+
+                # Resolve previous generation and check goal reach BEFORE polling new inputs
+                if pending_future is not None:
+                    world_features, goal_dist, heading_diff = pending_future.result()
+                    pending_future = None
+
+                    # Position goal reached
+                    if (
+                        current_goal is not None
+                        and goal_dist is not None
+                        and goal_dist < self.config.goal_reach_threshold
+                    ):
+                        if current_goal_heading is not None:
+                            # Position reached but heading goal remains — transition to heading phase
+                            print(
+                                f"[DartControl] Position reached (dist={goal_dist:.2f}), turning to heading"
+                            )
+                            current_goal = None
+                        else:
+                            # Position only — done, switch to stand
+                            print(
+                                f"[DartControl] Goal reached (dist={goal_dist:.2f}), switching to stand"
+                            )
+                            current_goal = None
+                            instruction = "stand"
+                            text_embedding = engine.encode_text(["stand"]).expand(
+                                self.config.batch_size, -1
+                            )
+
+                    # Heading goal reached (heading-only or after position phase)
+                    elif (
+                        current_goal is None
+                        and current_goal_heading is not None
+                        and heading_diff is not None
+                        and heading_diff < self.config.heading_reach_threshold
+                    ):
+                        print(
+                            f"[DartControl] Heading reached (diff={heading_diff:.1f}°), switching to stand"
+                        )
+                        current_goal_heading = None
+                        instruction = "stand"
+                        text_embedding = engine.encode_text(["stand"]).expand(
+                            self.config.batch_size, -1
+                        )
+
                 # Poll instruction channel (non-blocking)
-                if instruction_gen is not None:
-                    instr_frame = next(instruction_gen)
+                if inputs.instruction is not None:
+                    instr_frame = next(inputs.instruction)
                     if instr_frame is not None and isinstance(instr_frame, TextFrame):
                         new_instruction = instr_frame.get()
                         if new_instruction and new_instruction != instruction:
                             instruction = new_instruction
                             current_goal = None
+                            current_goal_heading = None
                             print(f"[DartControl] Instruction updated: '{instruction}'")
                             text_embedding = engine.encode_text([instruction])
                             text_embedding = text_embedding.expand(
@@ -781,28 +885,33 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                                 pending_future.cancel()
                                 pending_future = None
 
-                # Stay idle until an instruction is received
-                if text_embedding is None:
-                    self.stop_event.wait(0.1)
-                    continue
-
                 # Poll goal channel (non-blocking)
-                if goal_gen is not None:
-                    goal_frame = next(goal_gen)
+                if inputs.goal is not None:
+                    goal_frame = next(inputs.goal)
                     if goal_frame is not None and isinstance(goal_frame, GoalFrame):
-                        current_goal = torch.tensor(
-                            [[-goal_frame.x, -goal_frame.z, goal_frame.y]],
-                            device=self.config.device,
-                            dtype=torch.float32,
-                        ).expand(self.config.batch_size, -1)
+                        if goal_frame.x is not None and goal_frame.z is not None:
+                            current_goal = torch.tensor(
+                                [[-goal_frame.x, -goal_frame.z, goal_frame.y or 0.0]],
+                                device=self.config.device,
+                                dtype=torch.float32,
+                            ).expand(self.config.batch_size, -1)
+                        else:
+                            current_goal = None
+                        current_goal_heading = (
+                            math.radians(goal_frame.heading)
+                            if goal_frame.heading is not None
+                            else None
+                        )
 
-                # Get world features — either from a pre-submitted future or generate now
-                if pending_future is not None:
-                    world_features = pending_future.result()
-                    pending_future = None
-                else:
-                    world_features = self._generate_primitive(
-                        engine, putil, text_embedding, policy, current_goal
+                # Generate if no pending result from above
+                if world_features is None:
+                    world_features, goal_dist, heading_diff = self._generate_primitive(
+                        engine,
+                        putil,
+                        text_embedding,
+                        policy,
+                        current_goal,
+                        current_goal_heading,
                     )
 
                 # Pre-compute pose dicts (cheap CPU work) before submitting next generation
@@ -817,6 +926,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                     text_embedding,
                     policy,
                     current_goal,
+                    current_goal_heading,
                 )
 
                 # Emit frames while next batch generates in parallel

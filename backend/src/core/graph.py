@@ -9,7 +9,12 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel, Field
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Component, EmitOnStart, ThreadedComponent
+from src.core.component import (
+    Component,
+    EmitOnStart,
+    PrimitiveComponent,
+    ThreadedComponent,
+)
 from src.core.log_capture import get_log_store
 
 
@@ -60,7 +65,7 @@ class GraphManager:
     # --- node CRUD ---
 
     def add_node(self, node_type: str, init_args: dict[str, Any]) -> tuple[str, Node]:
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(node_type)
         if cls is None:
             raise ValueError(f"Unknown node type: {node_type}")
@@ -110,7 +115,7 @@ class GraphManager:
         if node is None:
             return None
 
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(node.type)
         if cls is None:
             return None
@@ -197,10 +202,10 @@ class GraphManager:
         return self._ui_receivers
 
     def get_node_output(self, node_id: str) -> dict[str, type]:
-        return type(self._components[node_id]).get_output_types()
+        return self._components[node_id].get_output_types()
 
     def get_node_input(self, node_id: str) -> dict[str, type]:
-        return type(self._components[node_id]).get_input_types()
+        return self._components[node_id].get_input_types()
 
     def reset(self, graph: Graph) -> None:
         """Stop everything and replace with a new graph + components."""
@@ -214,7 +219,7 @@ class GraphManager:
         self._ui_senders.clear()
         self._ui_receivers.clear()
 
-        classes = Component.registered_subclasses()
+        classes = PrimitiveComponent.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
             if node.sub_graph is not None:
                 from src.core.component import CompositeComponent
@@ -308,6 +313,8 @@ class GraphManager:
     def run(self) -> None:
         """Stop all running components, then start each with wired handles."""
         self.stop()
+        for sender in self._sender_handles.values():
+            sender._stopped = False
         self._ui_channels.clear()
         self._ui_senders.clear()
         self._ui_receivers.clear()
@@ -324,6 +331,10 @@ class GraphManager:
             output_slots = comp.get_output_types()
             ui_input_slots = comp.get_ui_input_types()
             ui_output_slots = comp.get_ui_output_types()
+
+            from src.core.component import CompositeComponent
+
+            is_composite = isinstance(comp, CompositeComponent)
 
             input_handles: dict[str, Receiver[Any] | None] = {}
             for slot, slot_type in input_slots.items():
@@ -364,12 +375,26 @@ class GraphManager:
                 # Server keeps a Receiver to read from
                 self._ui_receivers[(node_id, slot)] = Receiver(ch)
 
-            inputs = self._build_tuple(input_type, input_handles)
-            outputs = self._build_tuple(output_type, output_handles)
+            # Wire all receivers (registers cursors before EmitOnStart)
+            if isinstance(comp, ThreadedComponent):
+                for handle in input_handles.values():
+                    if isinstance(handle, Receiver):
+                        handle._wire(comp.stop_event)
 
+            if is_composite:
+                built_inputs: Any = input_handles
+                built_outputs: Any = output_handles
+            else:
+                built_inputs = self._build_tuple(input_type, input_handles)
+                built_outputs = self._build_tuple(output_type, output_handles)
+
+            start_queue.append((node_id, comp, built_inputs, built_outputs))
+
+        # Emit AFTER all receivers are wired, so EmitOnStart data lands
+        # behind every cursor regardless of node processing order.
+        for _, comp, _, built_outputs in start_queue:
             if isinstance(comp, EmitOnStart):
-                comp.emit(outputs)
-            start_queue.append((node_id, comp, inputs, outputs))
+                comp.emit(built_outputs)
 
         # Start all components after all emits are done
         for node_id, comp, inputs, outputs in start_queue:
@@ -386,10 +411,14 @@ class GraphManager:
                 if ident is not None:
                     get_log_store().register_thread(node_id=node_id, ident=ident)
 
-        # Notify WS listeners that UI channels are ready
+        # Notify WS listeners that UI channels are ready.
+        # Save old event, replace with fresh one, *then* wake waiters.
+        # This avoids a race where a coroutine calling wait() between
+        # set() and reassignment would block on the now-orphaned event.
         self._ui_version += 1
-        self._ui_changed.set()
+        old_event = self._ui_changed
         self._ui_changed = asyncio.Event()
+        old_event.set()
 
     @staticmethod
     def _build_tuple(tp: type | None, handles: dict[str, Any]) -> tuple[Any, ...]:
@@ -401,6 +430,10 @@ class GraphManager:
         return tuple(handles[k] for k in sorted(handles.keys()))
 
     def stop(self) -> None:
-        """Stop all components."""
+        """Stop all components and senders."""
+        for sender in self._sender_handles.values():
+            sender._stopped = True
+        for sender in self._ui_senders.values():
+            sender._stopped = True
         for comp in self._components.values():
             comp.stop()

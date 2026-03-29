@@ -199,9 +199,9 @@ def ungroup(manager: GraphManager, node_id: str) -> None:
     manager.components().pop(node_id, None)
 
     # Re-instantiate the inner components
-    from src.core.component import Component
+    from src.core.component import PrimitiveComponent
 
-    classes = Component.registered_subclasses()
+    classes = PrimitiveComponent.registered_subclasses()
     for inner_id, inner_node in sub.nodes.items():
         cls = classes.get(inner_node.type)
         if cls is not None:

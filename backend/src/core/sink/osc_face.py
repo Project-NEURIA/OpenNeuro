@@ -652,7 +652,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
             self._enqueue_text(text)
 
     def _text_loop(self, text_recv: Receiver[TextFrame]) -> None:
-        for frame in text_recv(self):
+        for frame in text_recv:
             if frame is None:
                 break
 
@@ -688,7 +688,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
                 self._enqueue_text(text)
 
     def _interrupt_loop(self, interrupt_recv: Receiver[InterruptFrame]) -> None:
-        for frame in interrupt_recv(self):
+        for frame in interrupt_recv:
             if frame is None:
                 break
 

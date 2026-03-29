@@ -491,15 +491,7 @@ export function AppInner({
                 setNodes(
                     backendNodes.map((n) => {
                         const pos = posMap.get(n.id) ?? {x: 0, y: 0};
-
-                        return {
-                            id: n.id,
-                            type: "graph",
-                            position: {x: pos.x, y: pos.y},
-                            data: {
-                                ...makeGraphNodeData(n.id, n.type, n.status, n.init_args ?? {}),
-                            } satisfies GraphNodeData,
-                        };
+                        return toReactFlowNode(n, pos, componentMap, componentTypeInfo);
                     }),
                 );
 
@@ -636,21 +628,14 @@ export function AppInner({
         ) => {
             apiCreateNode(item.type_, initArgs)
                 .then((res) => {
-                    const newNode: Node<GraphNodeData> = {
-                        id: res.id,
-                        type: "graph",
-                        position,
-                        data: {
-                            ...makeGraphNodeData(res.id, item.type_, "startup", initArgs ?? {}),
-                        },
-                    };
+                    const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
                     setNodes((nds) => [...nds, newNode]);
                     runTypeCheck();
                     triggerSave();
                 })
                 .catch(console.error);
         },
-        [setNodes, triggerSave, runTypeCheck, makeGraphNodeData],
+        [setNodes, triggerSave, runTypeCheck, componentMap, componentTypeInfo],
     );
 
     const onDrop = useCallback(
@@ -820,7 +805,7 @@ export function AppInner({
                 onNodeContextMenu={onNodeContextMenu}
                 onPaneClick={() => setContextMenu(null)}
             />
-            <NodeSidebar components={components} projects={projects} currentProject={projectName}/>
+            <NodeSidebar components={components} currentProject={projectName}/>
 
             {/* Context menu */}
             {contextMenu && (

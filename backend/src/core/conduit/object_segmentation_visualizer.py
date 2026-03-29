@@ -117,12 +117,13 @@ class ObjectSegmentationVisualizer(
     ) -> None:
         print("[ObjectSegmentationVisualizer] Starting")
 
-        video_iter = inputs.video(self, newest=True)
-        for seg_frame in inputs.segmentations(self, newest=True):
+        inputs.video.newest = True
+        inputs.segmentations.newest = True
+        for seg_frame in inputs.segmentations:
             if seg_frame is None:
                 break
 
-            video = next(video_iter, None)
+            video = next(inputs.video, None)
             if video is None:
                 break
 

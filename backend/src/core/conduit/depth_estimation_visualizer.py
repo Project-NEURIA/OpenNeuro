@@ -68,12 +68,11 @@ class DepthEstimationVisualizer(
     ) -> None:
         print("[DepthEstimationVisualizer] Starting")
 
-        video_iter = inputs.video(self)
-        for depth_frame in inputs.depth(self):
+        for depth_frame in inputs.depth:
             if depth_frame is None:
                 break
 
-            video = next(video_iter, None)
+            video = next(inputs.video, None)
             if video is None:
                 break
 

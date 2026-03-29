@@ -31,8 +31,9 @@ class MovementTool(
             ToolDef.new(
                 name="move",
                 description="You are an embodied agent with a physical body. Use this tool to perform motions. "
-                "YOU MUST Provide *BOTH* x and y when you want to move to a specific location. "
-                "Omit x and y for in-place motions like dancing or waving.",
+                "Provide *BOTH* x and z when you want to move to a specific location. "
+                "Use heading to face a specific direction. "
+                "Omit x, z, and heading for in-place motions like dancing or waving.",
                 parameters={
                     "type": "object",
                     "properties": {
@@ -43,6 +44,10 @@ class MovementTool(
                         "z": {
                             "type": "number",
                             "description": "Target z position in meters",
+                        },
+                        "heading": {
+                            "type": "number",
+                            "description": "Target heading in degrees (from +Z clockwise). Use for facing a direction.",
                         },
                         "instruction": {
                             "type": "string",
@@ -55,27 +60,34 @@ class MovementTool(
         )
 
     def run(self, inputs: MovementToolInputs, outputs: MovementToolOutputs) -> None:
-        for call in inputs.tool_call(self):
+        for call in inputs.tool_call:
             if call is None:
                 break
             if call.name != "move":
-                outputs.tool_result.send(
-                    ToolResult.new(call_id=call.call_id, content="unknown tool")
-                )
                 continue
 
             args = json.loads(call.arguments)
             instruction = args["instruction"]
             x = args.get("x")
             z = args.get("z")
+            heading = args.get("heading")
 
             outputs.instruction.send(TextFrame.new(text=instruction))
-            if x is not None and z is not None:
-                outputs.goal.send(GoalFrame.new(x=float(x), y=0.0, z=float(z)))
+            if x is not None and z is not None or heading is not None:
+                outputs.goal.send(
+                    GoalFrame.new(
+                        x=float(x) if x is not None else None,
+                        y=0.0 if x is not None else None,
+                        z=float(z) if z is not None else None,
+                        heading=float(heading) if heading is not None else None,
+                    )
+                )
 
             result = f"Executing '{instruction}'"
             if x is not None and z is not None:
                 result += f" toward ({x}, {z})"
+            if heading is not None:
+                result += f" facing {heading}°"
             outputs.tool_result.send(
                 ToolResult.new(call_id=call.call_id, content=result)
             )

@@ -139,7 +139,7 @@ class PoseRenderer(ThreadedComponent[PoseRendererInputs, PoseRendererOutputs]):
         return img
 
     def run(self, inputs: PoseRendererInputs, outputs: PoseRendererOutputs) -> None:
-        for frame in inputs.pose(self):
+        for frame in inputs.pose:
             if frame is None:
                 break
             poses = frame.get()

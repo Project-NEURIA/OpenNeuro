@@ -128,7 +128,7 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
             interrupt_recv = inputs.interrupt
 
             def handle_interrupts() -> None:
-                for frame in interrupt_recv(self):
+                for frame in interrupt_recv:
                     if frame is None:
                         break
 
@@ -146,7 +146,7 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
 
             threading.Thread(target=handle_interrupts, daemon=True).start()
 
-        for frame in inputs.text(self):
+        for frame in inputs.text:
             if frame is None:
                 break
             if frame is EOS.END:

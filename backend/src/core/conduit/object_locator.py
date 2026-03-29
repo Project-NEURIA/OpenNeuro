@@ -39,18 +39,18 @@ class ObjectLocator(ThreadedComponent[ObjectLocatorInputs, ObjectLocatorOutputs]
     """
 
     def run(self, inputs: ObjectLocatorInputs, outputs: ObjectLocatorOutputs) -> None:
-        depth_iter = inputs.depth(self, newest=True)
-        cam_iter = inputs.camera_params(self, newest=True)
+        inputs.depth.newest = True
+        inputs.camera_params.newest = True
 
-        for seg_frame in inputs.segmentations(self):
+        for seg_frame in inputs.segmentations:
             if seg_frame is None:
                 break
 
-            depth_frame = next(depth_iter, None)
+            depth_frame = next(inputs.depth, None)
             if depth_frame is None:
                 break
 
-            cam_frame = next(cam_iter, None)
+            cam_frame = next(inputs.camera_params, None)
             if cam_frame is None:
                 break
 

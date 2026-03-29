@@ -10,7 +10,8 @@ backend/src/core/conduit/mem0_demo.py
 node_modules/
 .DS_Store
 
-dev-ignore
+/dev-ignore/
+/lib/
 
 # YOLO model files
 backend/src/core/conduit/yolo/*.ts
@@ -20,3 +21,5 @@ backend/src/core/conduit/yolo/*.pt
 backend/uv.lock
 backend/.coverage
 backend/coverage.xml
+
+backend/uv.lockanalysis-report.html

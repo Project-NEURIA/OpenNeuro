@@ -14,7 +14,7 @@ dependencies = [
     "openai>=2.17.0",
     "cv2-enumerate-cameras>=1.1.10",
     "opencv-python-headless>=4.13.0.92",
-    "openvr-virtual-driver-client>=0.1.1",
+    "openvr-virtual-driver-client>=0.1.2",
     "pillow>=12.1.1",
     "python-dotenv>=1.2.1",
     "smplx",
@@ -22,9 +22,9 @@ dependencies = [
     "trimesh>=4.0.0",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
-    "torch>=2.6.0 ; sys_platform == 'darwin'",
-    "torchaudio>=2.6.0 ; sys_platform == 'darwin'",
-    "torchvision>=0.21.0 ; sys_platform == 'darwin'",
+    "torch>=2.7.0 ; sys_platform == 'darwin'",
+    "torchaudio>=2.7.0 ; sys_platform == 'darwin'",
+    "torchvision>=0.22.0 ; sys_platform == 'darwin'",
     "transformers>=5.1.0",
     "types-requests>=2.32.4.20260107",
     "httpx>=0.27.0",
@@ -76,8 +76,13 @@ ignore_errors = true
 extend-exclude = ["src/core/conduit/qwen_tts/tts_model"]
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [[tool.uv.index]]
@@ -89,21 +94,24 @@ explicit = true
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
 conflicts = [
-    [{ group = "cuda" }, { group = "rocm" }],
+    [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
-default-groups = ["cuda"]
+default-groups = ["cuda12"]
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchaudio = [
-    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchvision = [
-    { index = "pytorch-cu126", group = "cuda", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 pytorch-triton-rocm = [
@@ -116,8 +124,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.1",
 ]
-cuda = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0"]
-rocm = ["torch>=2.6.0", "torchaudio>=2.6.0", "torchvision>=0.21.0", "pytorch-triton-rocm"]
+cuda12 = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0"]
+cuda13 = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0"]
+rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
 
 [tool.pytest.ini_options]
 addopts = [

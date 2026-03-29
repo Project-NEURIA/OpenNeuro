@@ -30,7 +30,8 @@ class StereoCameraParamsAdapter(
         inputs: StereoCameraParamsAdapterInputs,
         outputs: StereoCameraParamsAdapterOutputs,
     ) -> None:
-        for frame in inputs.stereo_camera_params(self, newest=True):
+        inputs.stereo_camera_params.newest = True
+        for frame in inputs.stereo_camera_params:
             if frame is None:
                 break
             outputs.camera_params.send(
