@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 from pathlib import Path
-import sys
 from types import SimpleNamespace
 
 import numpy as np

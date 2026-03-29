@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 import sys
 import types
 
@@ -38,7 +37,6 @@ from src.core.frames import (
     EOS,
     MessageFrame,
     StereoCameraParamsFrame,
-    TextFrame,
     ToolCall,
 )
 

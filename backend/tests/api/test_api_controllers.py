@@ -22,7 +22,6 @@ from src.api.graph.edge.dto import EdgeCreateRequest
 from src.core.graph import Graph, Node
 from src.core.component import CompositeComponent
 from src.core.channel import Channel, Receiver, Sender
-from src.core.frames import TextFrame
 
 
 class _Manager:

@@ -18,7 +18,6 @@ from src.core.frames import (
     BonePose,
     CameraParamsFrame,
     InterruptFrame,
-    ObjectSegmentationFrame,
     StereoCameraParamsFrame,
     StereoVideoFrame,
     TextFrame,
@@ -50,7 +49,6 @@ class _SyncThread:
 
 
 def test_monocular_depth_estimator_paths(monkeypatch) -> None:
-    import torch
     import src.core.conduit.monocular_depth_estimator as mono_mod
 
     monkeypatch.setattr(

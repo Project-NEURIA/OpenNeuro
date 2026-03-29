@@ -14,7 +14,6 @@ from src.core.channel import (
     Sender,
     UIReceiver,
     UISender,
-    UITextReceiver,
 )
 from src.core.frames import TextFrame
 

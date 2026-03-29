@@ -9,11 +9,9 @@ from types import SimpleNamespace
 import numpy as np
 
 from src.core.frames import (
-    AudioDataFormat,
     AudioFrame,
     CameraParamsFrame,
     DepthFrame,
-    InterruptFrame,
     ObjectLocationFrame,
     ObjectSegmentationFrame,
     TextFrame,
@@ -649,7 +647,6 @@ def test_object_detector_paths(monkeypatch) -> None:
     run_detector._model = lambda **kwargs: {"obj_id_to_mask": {}, "obj_id_to_score": {}}
     monkeypatch.setattr(run_detector, "_purge_dead_tracklets", lambda outputs: None)
     monkeypatch.setattr(run_detector, "_prune_old_frames", lambda: None)
-    gather_calls = []
     monkeypatch.setattr(
         run_detector,
         "_gather_by_prompt",

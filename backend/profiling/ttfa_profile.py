@@ -32,9 +32,9 @@ from requests import Response
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.core.channel import Channel, Receiver, Sender
-from src.core.component import ThreadedComponent, Tag
-from src.core.frames import AudioFrame, TextFrame, EOS, MessageFrame
+from src.core.channel import Channel, Receiver, Sender  # noqa: E402
+from src.core.component import ThreadedComponent, Tag  # noqa: E402
+from src.core.frames import AudioFrame, TextFrame, EOS, MessageFrame  # noqa: E402
 
 RESULTS_DIR = Path(__file__).parent / "results"
 BACKEND = Path(__file__).resolve().parent.parent
@@ -147,8 +147,7 @@ def run_sequential(wav_path: str):
     vad_mod, asr_mod, llm_mod, tts_mod = _load_modules()
     VAD, VADConfig = vad_mod.VAD, vad_mod.VADConfig
     ASR, ASRConfig = asr_mod.ASR, asr_mod.ASRConfig
-    LLM, LLMConfig = llm_mod.LLM, llm_mod.LLMConfig
-    TTS, TTSConfig = tts_mod.TTS, tts_mod.TTSConfig
+    TTSConfig = tts_mod.TTSConfig
 
     audio_data, sr = _load_wav(wav_path)
     chunk_samples = int(sr * 0.02)
@@ -381,7 +380,7 @@ def run_sequential(wav_path: str):
             log(f"  {name:<30} {total * 1000:>10.0f}ms (cProfile)")
 
     log()
-    log(f"  Estimated TTFA = ASR + LLM TTFT + TTS TTFB")
+    log("  Estimated TTFA = ASR + LLM TTFT + TTS TTFB")
     asr_time = (
         sum(p.getstats()[0].totaltime for p in _profilers["ASR._transcribe_audio"])
         if _profilers["ASR._transcribe_audio"]
@@ -465,7 +464,7 @@ class NullSink(ThreadedComponent[NullSinkInputs, tuple[()]]):
             if self._count == 1:
                 with _lock:
                     _timestamps["pipeline:first_audio"].append(time.perf_counter())
-                print(f"[NullSink] First audio received!")
+                print("[NullSink] First audio received!")
         print(f"[NullSink] {self._count} frames total")
 
 

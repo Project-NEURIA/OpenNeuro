@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import threading
 import time
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import pytest
 from pydantic import BaseModel

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.frames import EOS, InterruptFrame, TextFrame
+from src.core.frames import InterruptFrame, TextFrame
 
 
 class _FakeRecv:

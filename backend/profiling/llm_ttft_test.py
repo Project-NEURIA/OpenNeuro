@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from litellm import completion
+from litellm import completion  # noqa: E402
 
 MODELS = [
     "groq/llama-3.3-70b-versatile",

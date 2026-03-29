@@ -40,16 +40,15 @@ Edge cases tested below:
 
 from __future__ import annotations
 
-import threading
 import time
 from typing import Any, NamedTuple
 from unittest.mock import patch
 
 import pytest
 
-from src.core.channel import Channel, Receiver, Sender
+from src.core.channel import Receiver, Sender
 from src.core.component import Component, ThreadedComponent, Status
-from src.core.graph import Edge, Graph, GraphManager, Node
+from src.core.graph import Edge, Graph, GraphManager
 
 
 # ---------------------------------------------------------------------------

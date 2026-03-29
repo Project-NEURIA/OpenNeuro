@@ -10,21 +10,22 @@ Measures each hop in the chain:
   → litellm.completion() TTFT
 """
 
-import time
 import sys
 import threading
+import time
+import wave
 from pathlib import Path
-from collections import defaultdict
 from typing import Any, NamedTuple
 
+import numpy as np
 from dotenv import load_dotenv
 
 load_dotenv()
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.core.channel import Channel, Receiver, Sender
-from src.core.component import ThreadedComponent, Tag
-from src.core.frames import AudioFrame, TextFrame, EOS, MessageFrame
+from src.core.channel import Channel, Receiver, Sender  # noqa: E402
+from src.core.component import ThreadedComponent, Tag  # noqa: E402
+from src.core.frames import AudioFrame, TextFrame, EOS, MessageFrame  # noqa: E402
 
 _lock = threading.Lock()
 _ts: dict[str, float] = {}
@@ -155,12 +156,6 @@ def patched_llm_run(self, inputs, outputs):
 LLM.run = patched_llm_run
 
 
-# -- FileSource: send pre-recorded audio --
-
-import wave
-import numpy as np
-
-
 class FileSourceOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
@@ -218,8 +213,6 @@ def run_test(model: str):
     s2 = Sender(ch2)
     r2 = Receiver(ch2)
     ch3: Channel[TextFrame] = Channel()
-    s3 = Sender(ch3)
-    r3 = Receiver(ch3)
     ch4: Channel[list[MessageFrame]] = Channel()
     s4 = Sender(ch4)
     r4 = Receiver(ch4)
@@ -300,7 +293,7 @@ def run_test(model: str):
     print(
         f"  LLM msg received → first token:  {delta('llm_msg_received', 'llm_first_token')}"
     )
-    print(f"  ─────────────────────────────────")
+    print("  ─────────────────────────────────")
     print(
         f"  VAD exit → LLM first token:      {delta('vad_finalize_exit', 'llm_first_token')}"
     )

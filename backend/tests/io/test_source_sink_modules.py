@@ -7,7 +7,6 @@ import types
 
 import numpy as np
 
-from src.core.channel import Sender, Channel
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat, AudioFrame
 from src.core.sink.do_nothing import DoNothing, DoNothingInputs
 from src.core.sink.text_display import (
