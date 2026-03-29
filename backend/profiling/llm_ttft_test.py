@@ -17,15 +17,18 @@ MODELS = [
 ]
 
 MESSAGES = [
-    {"role": "system", "content": "You are a helpful voice assistant. Keep responses brief."},
+    {
+        "role": "system",
+        "content": "You are a helpful voice assistant. Keep responses brief.",
+    },
     {"role": "user", "content": "Hello, how are you doing today?"},
 ]
 
 
 def test_ttft(model: str, runs: int = 3):
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Model: {model}  ({runs} runs)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     ttfts = []
     for i in range(runs):
@@ -46,12 +49,16 @@ def test_ttft(model: str, runs: int = 3):
             # Drain the rest
             for _ in stream:
                 pass
-            print(f"  Run {i+1}: TTFT = {ttft_ms:.0f}ms  (first token: {first_token_text!r})")
+            print(
+                f"  Run {i + 1}: TTFT = {ttft_ms:.0f}ms  (first token: {first_token_text!r})"
+            )
         else:
-            print(f"  Run {i+1}: No tokens received")
+            print(f"  Run {i + 1}: No tokens received")
 
     if ttfts:
-        print(f"  Avg TTFT: {sum(ttfts)/len(ttfts):.0f}ms  Min: {min(ttfts):.0f}ms  Max: {max(ttfts):.0f}ms")
+        print(
+            f"  Avg TTFT: {sum(ttfts) / len(ttfts):.0f}ms  Min: {min(ttfts):.0f}ms  Max: {max(ttfts):.0f}ms"
+        )
 
 
 if __name__ == "__main__":

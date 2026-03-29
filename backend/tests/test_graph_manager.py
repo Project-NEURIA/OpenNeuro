@@ -56,6 +56,7 @@ from src.core.graph import Edge, Graph, GraphManager, Node
 # Stub component — lightweight stand-in so we never import heavy deps
 # ---------------------------------------------------------------------------
 
+
 class StubInputs(NamedTuple):
     data: Receiver[str]
 
@@ -80,7 +81,9 @@ def _stub_registry() -> dict[str, type[Component[Any, Any]]]:
 # Patch the registry for all tests so we never trigger real component imports.
 @pytest.fixture(autouse=True)
 def _patch_registry():
-    with patch.object(Component, "registered_subclasses", return_value=_stub_registry()):
+    with patch.object(
+        Component, "registered_subclasses", return_value=_stub_registry()
+    ):
         yield
 
 
@@ -128,8 +131,10 @@ class TestAddAndDeleteEdge:
         id_b, _ = gm.add_node("StubComponent", {})
 
         edge = Edge(
-            source_node=id_a, source_slot="data",
-            target_node=id_b, target_slot="data",
+            source_node=id_a,
+            source_slot="data",
+            target_node=id_b,
+            target_slot="data",
         )
         gm.add_edge(edge)
 
@@ -161,14 +166,22 @@ class TestDeleteNodeRemovesEdges:
         id_b, _ = gm.add_node("StubComponent", {})
         id_c, _ = gm.add_node("StubComponent", {})
 
-        gm.add_edge(Edge(
-            source_node=id_a, source_slot="data",
-            target_node=id_b, target_slot="data",
-        ))
-        gm.add_edge(Edge(
-            source_node=id_b, source_slot="data",
-            target_node=id_c, target_slot="data",
-        ))
+        gm.add_edge(
+            Edge(
+                source_node=id_a,
+                source_slot="data",
+                target_node=id_b,
+                target_slot="data",
+            )
+        )
+        gm.add_edge(
+            Edge(
+                source_node=id_b,
+                source_slot="data",
+                target_node=id_c,
+                target_slot="data",
+            )
+        )
 
         assert len(gm.graph.edges) == 2
 
@@ -197,8 +210,10 @@ class TestReconcileReusesChannels:
         id_c, _ = gm.add_node("StubComponent", {})
 
         edge_ab = Edge(
-            source_node=id_a, source_slot="data",
-            target_node=id_b, target_slot="data",
+            source_node=id_a,
+            source_slot="data",
+            target_node=id_b,
+            target_slot="data",
         )
         gm.add_edge(edge_ab)
 
@@ -208,10 +223,14 @@ class TestReconcileReusesChannels:
         assert channel_before is not None
 
         # Add unrelated edge B→C — A→B channel should survive
-        gm.add_edge(Edge(
-            source_node=id_b, source_slot="data",
-            target_node=id_c, target_slot="data",
-        ))
+        gm.add_edge(
+            Edge(
+                source_node=id_b,
+                source_slot="data",
+                target_node=id_c,
+                target_slot="data",
+            )
+        )
 
         channel_after = gm._channel_map.get(channel_key)
         assert channel_after is channel_before  # same object, not recreated
@@ -319,10 +338,14 @@ class TestRunAndStopLifecycle:
         gm = GraphManager(_empty_graph())
         id_a, _ = gm.add_node("StubComponent", {})
         id_b, _ = gm.add_node("StubComponent", {})
-        gm.add_edge(Edge(
-            source_node=id_a, source_slot="data",
-            target_node=id_b, target_slot="data",
-        ))
+        gm.add_edge(
+            Edge(
+                source_node=id_a,
+                source_slot="data",
+                target_node=id_b,
+                target_slot="data",
+            )
+        )
 
         gm.run()
         # Give threads a moment to start

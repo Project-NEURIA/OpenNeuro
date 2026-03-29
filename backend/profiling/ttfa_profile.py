@@ -49,6 +49,7 @@ _lock = threading.Lock()
 
 def _import_mod(name: str, filepath: str):
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(name, filepath)
     mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     sys.modules[name] = mod
@@ -57,10 +58,18 @@ def _import_mod(name: str, filepath: str):
 
 
 def _load_modules():
-    vad_mod = _import_mod("src.core.conduit.vad", str(BACKEND / "src/core/conduit/vad.py"))
-    asr_mod = _import_mod("src.core.conduit.asr", str(BACKEND / "src/core/conduit/asr.py"))
-    llm_mod = _import_mod("src.core.conduit.llm", str(BACKEND / "src/core/conduit/llm.py"))
-    tts_mod = _import_mod("src.core.conduit.tts", str(BACKEND / "src/core/conduit/tts.py"))
+    vad_mod = _import_mod(
+        "src.core.conduit.vad", str(BACKEND / "src/core/conduit/vad.py")
+    )
+    asr_mod = _import_mod(
+        "src.core.conduit.asr", str(BACKEND / "src/core/conduit/asr.py")
+    )
+    llm_mod = _import_mod(
+        "src.core.conduit.llm", str(BACKEND / "src/core/conduit/llm.py")
+    )
+    tts_mod = _import_mod(
+        "src.core.conduit.tts", str(BACKEND / "src/core/conduit/tts.py")
+    )
     return vad_mod, asr_mod, llm_mod, tts_mod
 
 
@@ -77,7 +86,9 @@ def _load_wav(wav_path: str) -> tuple[np.ndarray, int]:
     return data.reshape(1, -1), sr
 
 
-def _print_cprofile(name: str, profiler_list: list[cProfile.Profile], report: list[str]):
+def _print_cprofile(
+    name: str, profiler_list: list[cProfile.Profile], report: list[str]
+):
     if not profiler_list:
         return
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -158,7 +169,7 @@ def run_sequential(wav_path: str):
     t0 = time.perf_counter()
     profiler.enable()
     for start in range(0, audio_data.shape[1], chunk_samples):
-        chunk = audio_data[:, start:start + chunk_samples]
+        chunk = audio_data[:, start : start + chunk_samples]
         frame = AudioFrame.new(data=chunk, sample_rate=sr, channels=1)
         vad._process_audio_frame(frame, vad_outputs)
     # Finalize any pending segment
@@ -180,7 +191,9 @@ def run_sequential(wav_path: str):
     vad_frames = list(vad_out_channel._items)
 
     n_chunks = audio_data.shape[1] // chunk_samples
-    log(f"  {n_chunks} chunks processed in {(t1-t0)*1000:.0f}ms ({(t1-t0)*1000/n_chunks:.1f}ms/chunk)")
+    log(
+        f"  {n_chunks} chunks processed in {(t1 - t0) * 1000:.0f}ms ({(t1 - t0) * 1000 / n_chunks:.1f}ms/chunk)"
+    )
     log(f"  VAD output: {len(vad_frames)} audio segment(s)")
     log()
 
@@ -204,7 +217,9 @@ def run_sequential(wav_path: str):
     t1 = time.perf_counter()
     _profilers["ASR._transcribe_audio"].append(profiler)
 
-    log(f"  {len(vad_frames)} segment(s) transcribed in {(t1-t0)*1000:.0f}ms ({(t1-t0)*1000/len(vad_frames):.0f}ms/segment)")
+    log(
+        f"  {len(vad_frames)} segment(s) transcribed in {(t1 - t0) * 1000:.0f}ms ({(t1 - t0) * 1000 / len(vad_frames):.0f}ms/segment)"
+    )
     for r in asr_results:
         log(f"  Transcription: '{r.text}'")
     log()
@@ -220,22 +235,30 @@ def run_sequential(wav_path: str):
     # Warmup: pre-load tokenizer so cProfile captures steady-state TTFT
     log("  Warming up litellm tokenizer...")
     try:
-        completion(model="groq/llama-3.3-70b-versatile",
-                   messages=[{"role": "user", "content": "hi"}],
-                   max_tokens=1, stream=False)
+        completion(
+            model="groq/llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+            stream=False,
+        )
     except Exception:
         pass
 
     text = asr_results[0].text
     messages = [
-        {"role": "system", "content": "You are a helpful voice assistant. Keep responses brief."},
+        {
+            "role": "system",
+            "content": "You are a helpful voice assistant. Keep responses brief.",
+        },
         {"role": "user", "content": text},
     ]
 
     profiler = cProfile.Profile()
     t0 = time.perf_counter()
     profiler.enable()
-    stream = completion(model="groq/llama-3.3-70b-versatile", messages=messages, stream=True)
+    stream = completion(
+        model="groq/llama-3.3-70b-versatile", messages=messages, stream=True
+    )
     first_token_text = None
     full_text = ""
     for chunk in stream:
@@ -251,7 +274,7 @@ def run_sequential(wav_path: str):
 
     ttft_ms = (t_ttft - t0) * 1000 if first_token_text else float("nan")
     log(f"  TTFT: {ttft_ms:.0f}ms")
-    log(f"  Total generation: {(t1-t0)*1000:.0f}ms, {len(full_text)} chars")
+    log(f"  Total generation: {(t1 - t0) * 1000:.0f}ms, {len(full_text)} chars")
     log(f"  Response: '{full_text[:80]}...'")
     log()
 
@@ -282,7 +305,10 @@ def run_sequential(wav_path: str):
         warmup_r = session.post(
             tts_config.url,
             json=warmup_payload,
-            headers={"Authorization": f"Basic {cred}", "Content-Type": "application/json"},
+            headers={
+                "Authorization": f"Basic {cred}",
+                "Content-Type": "application/json",
+            },
             timeout=10,
         )
         warmup_r.close()
@@ -324,14 +350,16 @@ def run_sequential(wav_path: str):
         if len(raw) > 44:
             if t_first_audio is None:
                 t_first_audio = time.perf_counter()
-            tts_frames.append(AudioFrame.new(data=raw[44:], sample_rate=48000, channels=1))
+            tts_frames.append(
+                AudioFrame.new(data=raw[44:], sample_rate=48000, channels=1)
+            )
     profiler.disable()
     t1 = time.perf_counter()
     _profilers["TTS.requests.post"].append(profiler)
 
     ttfb_ms = (t_first_audio - t0) * 1000 if t_first_audio else float("nan")
     log(f"  TTS TTFB: {ttfb_ms:.0f}ms")
-    log(f"  Total: {(t1-t0)*1000:.0f}ms, {len(tts_frames)} audio chunks")
+    log(f"  Total: {(t1 - t0) * 1000:.0f}ms, {len(tts_frames)} audio chunks")
     log(f"  Input text: '{tts_text}'")
     log()
 
@@ -342,26 +370,42 @@ def run_sequential(wav_path: str):
     log(sep)
     log()
     log(f"  {'Function':<30} {'Wall Time':>12}")
-    log(f"  {'-'*30} {'-'*12}")
-    log(f"  {'VAD._process_audio_frame':<30} {(t1-t0)*1000:>10.0f}ms")
+    log(f"  {'-' * 30} {'-' * 12}")
+    log(f"  {'VAD._process_audio_frame':<30} {(t1 - t0) * 1000:>10.0f}ms")
 
     # Recompute per-component times from profiler
-    for name in ["VAD._process_audio_frame", "ASR._transcribe_audio", "LLM.TTFT", "TTS.requests.post"]:
+    for name in [
+        "VAD._process_audio_frame",
+        "ASR._transcribe_audio",
+        "LLM.TTFT",
+        "TTS.requests.post",
+    ]:
         profs = _profilers.get(name, [])
         if profs:
             s = io.StringIO()
             st = pstats.Stats(profs[0], stream=s)
             total = st.total_tt
-            log(f"  {name:<30} {total*1000:>10.0f}ms (cProfile)")
+            log(f"  {name:<30} {total * 1000:>10.0f}ms (cProfile)")
 
     log()
     log(f"  Estimated TTFA = ASR + LLM TTFT + TTS TTFB")
-    asr_time = sum(p.getstats()[0].totaltime for p in _profilers["ASR._transcribe_audio"]) if _profilers["ASR._transcribe_audio"] else 0
-    log(f"                ≈ {asr_time*1000:.0f} + {ttft_ms:.0f} + {ttfb_ms:.0f} = {asr_time*1000 + ttft_ms + ttfb_ms:.0f}ms")
+    asr_time = (
+        sum(p.getstats()[0].totaltime for p in _profilers["ASR._transcribe_audio"])
+        if _profilers["ASR._transcribe_audio"]
+        else 0
+    )
+    log(
+        f"                ≈ {asr_time * 1000:.0f} + {ttft_ms:.0f} + {ttfb_ms:.0f} = {asr_time * 1000 + ttft_ms + ttfb_ms:.0f}ms"
+    )
     log()
 
     # ── cProfile details ──
-    for name in ["VAD._process_audio_frame", "ASR._transcribe_audio", "LLM.TTFT", "TTS.requests.post"]:
+    for name in [
+        "VAD._process_audio_frame",
+        "ASR._transcribe_audio",
+        "LLM.TTFT",
+        "TTS.requests.post",
+    ]:
         _print_cprofile(name, _profilers.get(name, []), report)
 
     report_path = RESULTS_DIR / "report_sequential.txt"
@@ -399,7 +443,7 @@ class FileSource(ThreadedComponent[tuple[()], FileSourceOutputs]):
         for start in range(0, data.shape[1], chunk_samples):
             if self.stop_event.is_set():
                 break
-            chunk = data[:, start:start + chunk_samples]
+            chunk = data[:, start : start + chunk_samples]
             outputs.audio.send(AudioFrame.new(data=chunk, sample_rate=sr, channels=1))
             time.sleep(chunk_samples / sr)
 
@@ -435,7 +479,9 @@ class NullSink(ThreadedComponent[NullSinkInputs, tuple[()]]):
 class _Stub(ThreadedComponent[Any, Any]):
     tags = Tag(io={"conduit"}, functionality={"misc"})
     _registerable = False
-    def run(self, inputs, outputs): pass
+
+    def run(self, inputs, outputs):
+        pass
 
 
 def run_pipeline(wav_path: str):
@@ -452,6 +498,7 @@ def run_pipeline(wav_path: str):
 
     # Timestamp patches (no cProfile)
     orig_vad = VAD._process_audio_frame
+
     def ts_vad(self, frame, outputs):
         t = time.perf_counter()
         with _lock:
@@ -460,17 +507,21 @@ def run_pipeline(wav_path: str):
         with _lock:
             _timestamps["VAD._process_audio_frame:exit"].append(time.perf_counter())
         return result
+
     VAD._process_audio_frame = ts_vad
 
     orig_finalize = VAD._finalize_segment
+
     def ts_finalize(self, outputs):
         result = orig_finalize(self, outputs)
         with _lock:
             _timestamps["VAD._finalize_segment:exit"].append(time.perf_counter())
         return result
+
     VAD._finalize_segment = ts_finalize
 
     orig_asr = ASR._transcribe_audio
+
     def ts_asr(self, frame):
         t = time.perf_counter()
         with _lock:
@@ -479,48 +530,65 @@ def run_pipeline(wav_path: str):
         with _lock:
             _timestamps["ASR._transcribe_audio:exit"].append(time.perf_counter())
         return result
+
     ASR._transcribe_audio = ts_asr
 
     orig_llm_run = LLM.run
+
     def ts_llm(self, inputs, outputs):
         with _lock:
             _timestamps["LLM.run:enter"].append(time.perf_counter())
         orig_send = outputs.token.send
         first = threading.Event()
+
         def wrap_send(item):
-            if not first.is_set() and isinstance(item, TextFrame) and not isinstance(item, EOS):
+            if (
+                not first.is_set()
+                and isinstance(item, TextFrame)
+                and not isinstance(item, EOS)
+            ):
                 first.set()
                 with _lock:
                     _timestamps["LLM.run:first_token"].append(time.perf_counter())
             return orig_send(item)
+
         outputs.token.send = wrap_send
         result = orig_llm_run(self, inputs, outputs)
         with _lock:
             _timestamps["LLM.run:exit"].append(time.perf_counter())
         return result
+
     LLM.run = ts_llm
 
     orig_tts = TTS._worker
+
     def ts_tts(self, outputs):
         with _lock:
             _timestamps["TTS._worker:enter"].append(time.perf_counter())
         orig_audio = outputs.audio.send
         first = threading.Event()
+
         def wrap_audio(item):
             if not first.is_set():
                 first.set()
                 with _lock:
                     _timestamps["TTS._worker:first_audio"].append(time.perf_counter())
             return orig_audio(item)
+
         outputs.audio.send = wrap_audio
         result = orig_tts(self, outputs)
         with _lock:
             _timestamps["TTS._worker:exit"].append(time.perf_counter())
         return result
+
     TTS._worker = ts_tts
 
     # Wire pipeline
-    ch1 = Channel(); ch2 = Channel(); ch3 = Channel(); ch4 = Channel(); ch5 = Channel()
+    ch1 = Channel()
+    ch2 = Channel()
+    ch3 = Channel()
+    ch4 = Channel()
+    ch5 = Channel()
 
     file_source = FileSource(wav_path=wav_path)
     vad = VAD(config=VADConfig())
@@ -531,23 +599,34 @@ def run_pipeline(wav_path: str):
 
     # Adapter thread
     def adapter():
-        comp = _Stub(); comp._stop_event = threading.Event()
+        comp = _Stub()
+        comp._stop_event = threading.Event()
         for tf in Receiver(ch3)(comp):
-            if tf is None: break
+            if tf is None:
+                break
             msgs = [
-                MessageFrame.new(role="system", content="You are a helpful voice assistant. Keep responses brief."),
+                MessageFrame.new(
+                    role="system",
+                    content="You are a helpful voice assistant. Keep responses brief.",
+                ),
                 MessageFrame.new(role="user", content=tf.text),
             ]
             Sender(ch4).send(msgs)
 
     # Need a persistent sender for ch4
     adapter_sender = Sender(ch4)
+
     def adapter2():
-        comp = _Stub(); comp._stop_event = threading.Event()
+        comp = _Stub()
+        comp._stop_event = threading.Event()
         for tf in Receiver(ch3)(comp):
-            if tf is None: break
+            if tf is None:
+                break
             msgs = [
-                MessageFrame.new(role="system", content="You are a helpful voice assistant. Keep responses brief."),
+                MessageFrame.new(
+                    role="system",
+                    content="You are a helpful voice assistant. Keep responses brief.",
+                ),
                 MessageFrame.new(role="user", content=tf.text),
             ]
             adapter_sender.send(msgs)
@@ -555,8 +634,13 @@ def run_pipeline(wav_path: str):
     threading.Thread(target=adapter2, daemon=True).start()
 
     null_sink.start(NullSinkInputs(audio=Receiver(ch5)), ())
-    tts.start(tts_mod.TTSInputs(text=Receiver(ch4)), tts_mod.TTSOutputs(audio=Sender(ch5), text=Sender()))
-    llm.start(llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch4)))
+    tts.start(
+        tts_mod.TTSInputs(text=Receiver(ch4)),
+        tts_mod.TTSOutputs(audio=Sender(ch5), text=Sender()),
+    )
+    llm.start(
+        llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch4))
+    )
 
     # Wait — LLM reads from ch4, but adapter also writes to ch4. That's wrong.
     # LLM reads messages, TTS reads tokens. They need separate channels.
@@ -570,16 +654,26 @@ def run_pipeline(wav_path: str):
     # ch6: TTS → NullSink (audio)
 
     # Restart with correct wiring
-    ch1 = Channel(); ch2 = Channel(); ch3 = Channel()
-    ch4 = Channel(); ch5 = Channel(); ch6 = Channel()
+    ch1 = Channel()
+    ch2 = Channel()
+    ch3 = Channel()
+    ch4 = Channel()
+    ch5 = Channel()
+    ch6 = Channel()
 
     adapter_sender_2 = Sender(ch4)
+
     def adapter3():
-        comp = _Stub(); comp._stop_event = threading.Event()
+        comp = _Stub()
+        comp._stop_event = threading.Event()
         for tf in Receiver(ch3)(comp):
-            if tf is None: break
+            if tf is None:
+                break
             msgs = [
-                MessageFrame.new(role="system", content="You are a helpful voice assistant. Keep responses brief."),
+                MessageFrame.new(
+                    role="system",
+                    content="You are a helpful voice assistant. Keep responses brief.",
+                ),
                 MessageFrame.new(role="user", content=tf.text),
             ]
             adapter_sender_2.send(msgs)
@@ -595,10 +689,19 @@ def run_pipeline(wav_path: str):
     file_source_2 = FileSource(wav_path=wav_path)
 
     null_sink_2.start(NullSinkInputs(audio=Receiver(ch6)), ())
-    tts_2.start(tts_mod.TTSInputs(text=Receiver(ch5)), tts_mod.TTSOutputs(audio=Sender(ch6), text=Sender()))
-    llm_2.start(llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch5)))
-    asr_2.start(asr_mod.ASRInputs(audio=Receiver(ch2)), asr_mod.ASROutputs(text=Sender(ch3)))
-    vad_2.start(vad_mod.VADInputs(audio=Receiver(ch1)), vad_mod.VADOutputs(audio=Sender(ch2)))
+    tts_2.start(
+        tts_mod.TTSInputs(text=Receiver(ch5)),
+        tts_mod.TTSOutputs(audio=Sender(ch6), text=Sender()),
+    )
+    llm_2.start(
+        llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch5))
+    )
+    asr_2.start(
+        asr_mod.ASRInputs(audio=Receiver(ch2)), asr_mod.ASROutputs(text=Sender(ch3))
+    )
+    vad_2.start(
+        vad_mod.VADInputs(audio=Receiver(ch1)), vad_mod.VADOutputs(audio=Sender(ch2))
+    )
     file_source_2.start((), FileSourceOutputs(audio=Sender(ch1)))
 
     print("[Pipeline] Running...")
@@ -609,11 +712,17 @@ def run_pipeline(wav_path: str):
             break
         time.sleep(0.5)
 
-    file_source_2.stop(); vad_2.stop(); asr_2.stop(); llm_2.stop(); tts_2.stop(); null_sink_2.stop()
+    file_source_2.stop()
+    vad_2.stop()
+    asr_2.stop()
+    llm_2.stop()
+    tts_2.stop()
+    null_sink_2.stop()
     time.sleep(1.0)
 
     # Report
     report: list[str] = []
+
     def log(msg=""):
         print(msg)
         report.append(msg)
@@ -630,7 +739,8 @@ def run_pipeline(wav_path: str):
     tts_fa = _timestamps.get("TTS._worker:first_audio", [None])[0]
 
     def ms(a, b):
-        if a and b: return f"{(b-a)*1000:.0f}ms"
+        if a and b:
+            return f"{(b - a) * 1000:.0f}ms"
         return "N/A"
 
     log(f"  ASR latency (VAD-end → ASR done):    {ms(vad_exit, asr_exit)}")
@@ -641,13 +751,13 @@ def run_pipeline(wav_path: str):
 
     # Per-component wall times
     log(f"  {'Component':<30} {'Calls':>6} {'Avg (ms)':>10}")
-    log(f"  {'-'*30} {'-'*6} {'-'*10}")
+    log(f"  {'-' * 30} {'-' * 6} {'-' * 10}")
     for name in ["VAD._process_audio_frame", "ASR._transcribe_audio"]:
         enters = _timestamps.get(f"{name}:enter", [])
         exits = _timestamps.get(f"{name}:exit", [])
         n = min(len(enters), len(exits))
         if n:
-            avg = sum((exits[i]-enters[i])*1000 for i in range(n)) / n
+            avg = sum((exits[i] - enters[i]) * 1000 for i in range(n)) / n
             log(f"  {name:<30} {n:>6} {avg:>8.1f}ms")
     log()
 
@@ -665,12 +775,15 @@ def run_pipeline(wav_path: str):
 
 def main():
     parser = argparse.ArgumentParser(description="TTFA Profiler")
-    parser.add_argument("--mode", choices=["sequential", "pipeline"], default="sequential")
+    parser.add_argument(
+        "--mode", choices=["sequential", "pipeline"], default="sequential"
+    )
     args = parser.parse_args()
 
     wav_path = str(Path(__file__).parent / "assets" / "test_audio.wav")
     if not Path(wav_path).exists():
         from profiling.generate_test_audio import generate
+
         generate()
 
     if args.mode == "sequential":

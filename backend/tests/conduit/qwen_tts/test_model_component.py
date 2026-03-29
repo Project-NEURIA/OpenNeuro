@@ -259,7 +259,9 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
         model_mod.torch, "set_float32_matmul_precision", lambda value: None
     )
     monkeypatch.setattr(
-        model_mod.torch.cuda, "Stream", lambda: SimpleNamespace(synchronize=lambda: None)
+        model_mod.torch.cuda,
+        "Stream",
+        lambda: SimpleNamespace(synchronize=lambda: None),
     )
     loaded_cuda = model_mod.SimpleStreamingTTS.load("demo", "cuda")
     assert loaded_cuda._decode_stream is not None

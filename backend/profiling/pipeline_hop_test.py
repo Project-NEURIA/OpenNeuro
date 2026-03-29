@@ -39,6 +39,7 @@ def ts(name: str):
 
 def _import_mod(name, filename):
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(name, filename)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -63,66 +64,94 @@ LLMInputs, LLMOutputs = llm_mod.LLMInputs, llm_mod.LLMOutputs
 
 # VAD._finalize_segment: record when audio is sent
 orig_finalize = VAD._finalize_segment
+
+
 def patched_finalize(self, outputs):
     ts("vad_finalize_enter")
     result = orig_finalize(self, outputs)
     ts("vad_finalize_exit")
     return result
+
+
 VAD._finalize_segment = patched_finalize
 
 # ASR._transcribe_audio: record API call time
 orig_transcribe = ASR._transcribe_audio
+
+
 def patched_transcribe(self, frame):
     ts("asr_transcribe_enter")
     result = orig_transcribe(self, frame)
     ts("asr_transcribe_exit")
     return result
+
+
 ASR._transcribe_audio = patched_transcribe
 
 # ASR._worker_loop: record when frame is dequeued
 orig_worker = ASR._worker_loop
+
+
 def patched_worker(self, outputs):
     orig_get = self._task_queue.get
     first_get = threading.Event()
+
     def timed_get(*a, **kw):
         item = orig_get(*a, **kw)
         if item is not None and not first_get.is_set():
             first_get.set()
             ts("asr_queue_get")
         return item
+
     self._task_queue.get = timed_get
     return orig_worker(self, outputs)
+
+
 ASR._worker_loop = patched_worker
 
 # LLM: record when messages arrive and when completion is called
 orig_llm_run = LLM.run
+
+
 def patched_llm_run(self, inputs, outputs):
     orig_send = outputs.token.send
     first_token = threading.Event()
+
     def token_send(item):
-        if not first_token.is_set() and isinstance(item, TextFrame) and not isinstance(item, EOS):
+        if (
+            not first_token.is_set()
+            and isinstance(item, TextFrame)
+            and not isinstance(item, EOS)
+        ):
             first_token.set()
             ts("llm_first_token")
         return orig_send(item)
+
     outputs.token.send = token_send
 
     # Patch the messages receiver to record when first message arrives
     orig_iter = inputs.messages.__call__
+
     def patched_iter(subscriber, **kw):
         it = orig_iter(subscriber, **kw)
         first_msg = threading.Event()
         orig_next = it.__next__
+
         def timed_next():
             item = orig_next()
             if item is not None and not first_msg.is_set():
                 first_msg.set()
                 ts("llm_msg_received")
             return item
+
         it.__next__ = timed_next
         return it
+
     inputs.messages.__call__ = patched_iter
 
     return orig_llm_run(self, inputs, outputs)
+
+
 LLM.run = patched_llm_run
 
 
@@ -131,14 +160,18 @@ LLM.run = patched_llm_run
 import wave
 import numpy as np
 
+
 class FileSourceOutputs(NamedTuple):
     audio: Sender[AudioFrame]
 
+
 class FileSource(ThreadedComponent[tuple[()], FileSourceOutputs]):
     tags = Tag(io={"source"}, functionality={"audio"})
+
     def __init__(self, wav_path: str):
         super().__init__()
         self._wav_path = wav_path
+
     def run(self, inputs, outputs):
         with wave.open(self._wav_path, "rb") as wf:
             sr = wf.getframerate()
@@ -149,7 +182,7 @@ class FileSource(ThreadedComponent[tuple[()], FileSourceOutputs]):
         for start in range(0, data.shape[1], chunk_samples):
             if self.stop_event.is_set():
                 break
-            chunk = data[:, start:start+chunk_samples]
+            chunk = data[:, start : start + chunk_samples]
             outputs.audio.send(AudioFrame.new(data=chunk, sample_rate=sr, channels=1))
             time.sleep(chunk_samples / sr)
         time.sleep(3.0)
@@ -159,14 +192,16 @@ class FileSource(ThreadedComponent[tuple[()], FileSourceOutputs]):
 class _Adapter(ThreadedComponent[Any, Any]):
     tags = Tag(io={"conduit"}, functionality={"misc"})
     _registerable = False
-    def run(self, inputs, outputs): pass
+
+    def run(self, inputs, outputs):
+        pass
 
 
 def run_test(model: str):
     _ts.clear()
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Model: {model}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     wav_path = str(Path(__file__).parent / "assets" / "test_audio.wav")
 
@@ -176,21 +211,34 @@ def run_test(model: str):
     llm = LLM(config=LLMConfig(model=model))
 
     # Wire: FileSource -> VAD -> ASR -> Adapter -> LLM -> NullSink
-    ch1 = Channel(); s1 = Sender(ch1); r1 = Receiver(ch1)
-    ch2 = Channel(); s2 = Sender(ch2); r2 = Receiver(ch2)
-    ch3 = Channel(); s3 = Sender(ch3); r3 = Receiver(ch3)
-    ch4 = Channel(); s4 = Sender(ch4); r4 = Receiver(ch4)
+    ch1 = Channel()
+    s1 = Sender(ch1)
+    r1 = Receiver(ch1)
+    ch2 = Channel()
+    s2 = Sender(ch2)
+    r2 = Receiver(ch2)
+    ch3 = Channel()
+    s3 = Sender(ch3)
+    r3 = Receiver(ch3)
+    ch4 = Channel()
+    s4 = Sender(ch4)
+    r4 = Receiver(ch4)
 
     # Adapter thread
     def adapter():
         comp = _Adapter()
         comp._stop_event = threading.Event()
         for text_frame in Receiver(ch3)(comp):
-            if text_frame is None: break
-            if comp.stop_event.is_set(): break
+            if text_frame is None:
+                break
+            if comp.stop_event.is_set():
+                break
             ts("adapter_received")
             msgs = [
-                MessageFrame.new(role="system", content="You are a helpful voice assistant. Keep responses brief."),
+                MessageFrame.new(
+                    role="system",
+                    content="You are a helpful voice assistant. Keep responses brief.",
+                ),
                 MessageFrame.new(role="user", content=text_frame.text),
             ]
             s4.send(msgs)
@@ -216,7 +264,10 @@ def run_test(model: str):
         time.sleep(0.1)
 
     time.sleep(1)
-    file_source.stop(); vad.stop(); asr.stop(); llm.stop()
+    file_source.stop()
+    vad.stop()
+    asr.stop()
+    llm.stop()
     time.sleep(0.5)
 
     # Print results
@@ -225,16 +276,34 @@ def run_test(model: str):
             return f"{(_ts[b] - _ts[a]) * 1000:.0f}ms"
         return "N/A"
 
-    print(f"  VAD finalize:                    {delta('vad_finalize_enter', 'vad_finalize_exit')}")
-    print(f"  VAD exit → ASR queue get:        {delta('vad_finalize_exit', 'asr_queue_get')}")
-    print(f"  ASR queue get → transcribe enter: {delta('asr_queue_get', 'asr_transcribe_enter')}")
-    print(f"  ASR transcribe (API call):       {delta('asr_transcribe_enter', 'asr_transcribe_exit')}")
-    print(f"  ASR exit → Adapter received:     {delta('asr_transcribe_exit', 'adapter_received')}")
-    print(f"  Adapter received → sent:         {delta('adapter_received', 'adapter_sent')}")
-    print(f"  Adapter sent → LLM msg received: {delta('adapter_sent', 'llm_msg_received')}")
-    print(f"  LLM msg received → first token:  {delta('llm_msg_received', 'llm_first_token')}")
+    print(
+        f"  VAD finalize:                    {delta('vad_finalize_enter', 'vad_finalize_exit')}"
+    )
+    print(
+        f"  VAD exit → ASR queue get:        {delta('vad_finalize_exit', 'asr_queue_get')}"
+    )
+    print(
+        f"  ASR queue get → transcribe enter: {delta('asr_queue_get', 'asr_transcribe_enter')}"
+    )
+    print(
+        f"  ASR transcribe (API call):       {delta('asr_transcribe_enter', 'asr_transcribe_exit')}"
+    )
+    print(
+        f"  ASR exit → Adapter received:     {delta('asr_transcribe_exit', 'adapter_received')}"
+    )
+    print(
+        f"  Adapter received → sent:         {delta('adapter_received', 'adapter_sent')}"
+    )
+    print(
+        f"  Adapter sent → LLM msg received: {delta('adapter_sent', 'llm_msg_received')}"
+    )
+    print(
+        f"  LLM msg received → first token:  {delta('llm_msg_received', 'llm_first_token')}"
+    )
     print(f"  ─────────────────────────────────")
-    print(f"  VAD exit → LLM first token:      {delta('vad_finalize_exit', 'llm_first_token')}")
+    print(
+        f"  VAD exit → LLM first token:      {delta('vad_finalize_exit', 'llm_first_token')}"
+    )
 
 
 if __name__ == "__main__":

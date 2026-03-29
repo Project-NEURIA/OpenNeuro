@@ -29,6 +29,7 @@ from src.core.channel import Channel, Sender
 
 try:
     from fast_channel import Channel as FastChannel, Sender as FastSender
+
     HAS_FAST_CHANNEL = True
 except ImportError:
     HAS_FAST_CHANNEL = False
@@ -36,8 +37,8 @@ except ImportError:
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
-N = 100_000      # messages per run
-RUNS = 7         # runs per test
+N = 100_000  # messages per run
+RUNS = 7  # runs per test
 LATENCY_N = 10_000
 LATENCY_RUNS = 5
 
@@ -127,11 +128,13 @@ class CountDownLatch:
         self._count = count
         self._event = threading.Event()
         self._lock = threading.Lock()
+
     def count_down(self):
         with self._lock:
             self._count -= 1
             if self._count <= 0:
                 self._event.set()
+
     def wait(self, timeout: float | None = None):
         self._event.wait(timeout)
 
@@ -308,13 +311,21 @@ def bench_3p1c_queue(n: int) -> tuple[float, bool]:
 
 
 def bench_pipeline_channel(n: int) -> tuple[float, bool]:
-    ch1 = Channel(); ch2 = Channel(); ch3 = Channel()
+    ch1 = Channel()
+    ch2 = Channel()
+    ch3 = Channel()
     sender = Sender(ch1)
     stop = threading.Event()
     latch = threading.Event()
     final_sum = [0]
 
-    def stage(in_ch: Channel, out_ch: Channel | None, sub_id: int, transform, acc: list[int] | None):
+    def stage(
+        in_ch: Channel,
+        out_ch: Channel | None,
+        sub_id: int,
+        transform,
+        acc: list[int] | None,
+    ):
         in_ch._register(sub_id, latest=False)
         out_sender = Sender(out_ch) if out_ch else None
         for _ in range(n):
@@ -329,10 +340,18 @@ def bench_pipeline_channel(n: int) -> tuple[float, bool]:
         if acc is not None:
             latch.set()
 
-    t1 = threading.Thread(target=stage, args=(ch1, ch2, 1, lambda x: x + 1, None), daemon=True)
-    t2 = threading.Thread(target=stage, args=(ch2, ch3, 1, lambda x: x * 2, None), daemon=True)
-    t3 = threading.Thread(target=stage, args=(ch3, None, 1, lambda x: x, final_sum), daemon=True)
-    t1.start(); t2.start(); t3.start()
+    t1 = threading.Thread(
+        target=stage, args=(ch1, ch2, 1, lambda x: x + 1, None), daemon=True
+    )
+    t2 = threading.Thread(
+        target=stage, args=(ch2, ch3, 1, lambda x: x * 2, None), daemon=True
+    )
+    t3 = threading.Thread(
+        target=stage, args=(ch3, None, 1, lambda x: x, final_sum), daemon=True
+    )
+    t1.start()
+    t2.start()
+    t3.start()
 
     expected_sum = sum((i + 1) * 2 for i in range(n))
     t0 = time.perf_counter()
@@ -342,12 +361,16 @@ def bench_pipeline_channel(n: int) -> tuple[float, bool]:
     elapsed = time.perf_counter() - t0
 
     stop.set()
-    t1.join(timeout=1); t2.join(timeout=1); t3.join(timeout=1)
+    t1.join(timeout=1)
+    t2.join(timeout=1)
+    t3.join(timeout=1)
     return elapsed, final_sum[0] == expected_sum
 
 
 def bench_pipeline_queue(n: int) -> tuple[float, bool]:
-    q1: Queue[int] = Queue(); q2: Queue[int] = Queue(); q3: Queue[int] = Queue()
+    q1: Queue[int] = Queue()
+    q2: Queue[int] = Queue()
+    q3: Queue[int] = Queue()
     latch = threading.Event()
     final_sum = [0]
 
@@ -362,10 +385,18 @@ def bench_pipeline_queue(n: int) -> tuple[float, bool]:
         if acc is not None:
             latch.set()
 
-    t1 = threading.Thread(target=stage, args=(q1, q2, lambda x: x + 1, None), daemon=True)
-    t2 = threading.Thread(target=stage, args=(q2, q3, lambda x: x * 2, None), daemon=True)
-    t3 = threading.Thread(target=stage, args=(q3, None, lambda x: x, final_sum), daemon=True)
-    t1.start(); t2.start(); t3.start()
+    t1 = threading.Thread(
+        target=stage, args=(q1, q2, lambda x: x + 1, None), daemon=True
+    )
+    t2 = threading.Thread(
+        target=stage, args=(q2, q3, lambda x: x * 2, None), daemon=True
+    )
+    t3 = threading.Thread(
+        target=stage, args=(q3, None, lambda x: x, final_sum), daemon=True
+    )
+    t1.start()
+    t2.start()
+    t3.start()
 
     expected_sum = sum((i + 1) * 2 for i in range(n))
     t0 = time.perf_counter()
@@ -374,7 +405,9 @@ def bench_pipeline_queue(n: int) -> tuple[float, bool]:
     latch.wait(timeout=30)
     elapsed = time.perf_counter() - t0
 
-    t1.join(timeout=1); t2.join(timeout=1); t3.join(timeout=1)
+    t1.join(timeout=1)
+    t2.join(timeout=1)
+    t3.join(timeout=1)
     return elapsed, final_sum[0] == expected_sum
 
 
@@ -393,21 +426,27 @@ def _make_fast_variants():
         stop = threading.Event()
         latch = threading.Event()
         consumer_sum = [0]
+
         def consumer():
             ch._register(1, latest=False)
             for _ in range(n):
                 item = ch._wait_and_get(1, stop)
-                if item is None: break
+                if item is None:
+                    break
                 consumer_sum[0] += item
             latch.set()
-        t = threading.Thread(target=consumer, daemon=True); t.start()
+
+        t = threading.Thread(target=consumer, daemon=True)
+        t.start()
         expected_sum = 0
         t0 = time.perf_counter()
         for i in range(n):
-            sender.send(i); expected_sum += i
+            sender.send(i)
+            expected_sum += i
         latch.wait(timeout=10)
         elapsed = time.perf_counter() - t0
-        stop.set(); t.join(timeout=1)
+        stop.set()
+        t.join(timeout=1)
         return elapsed, consumer_sum[0] == expected_sum
 
     def bench_1p3c_fast(n: int) -> tuple[float, bool]:
@@ -416,24 +455,31 @@ def _make_fast_variants():
         stop = threading.Event()
         latch = CountDownLatch(3)
         sums = [[0], [0], [0]]
+
         def consumer(sub_id, acc):
             ch._register(sub_id, latest=False)
             for _ in range(n):
                 item = ch._wait_and_get(sub_id, stop)
-                if item is None: break
+                if item is None:
+                    break
                 acc[0] += item
             latch.count_down()
+
         threads = []
         for i in range(3):
-            t = threading.Thread(target=consumer, args=(i+1, sums[i]), daemon=True); t.start(); threads.append(t)
+            t = threading.Thread(target=consumer, args=(i + 1, sums[i]), daemon=True)
+            t.start()
+            threads.append(t)
         expected_sum = 0
         t0 = time.perf_counter()
         for i in range(n):
-            sender.send(i); expected_sum += i
+            sender.send(i)
+            expected_sum += i
         latch.wait(timeout=30)
         elapsed = time.perf_counter() - t0
         stop.set()
-        for t in threads: t.join(timeout=1)
+        for t in threads:
+            t.join(timeout=1)
         return elapsed, all(s[0] == expected_sum for s in sums)
 
     def bench_3p1c_fast(n: int) -> tuple[float, bool]:
@@ -443,76 +489,120 @@ def _make_fast_variants():
         latch = threading.Event()
         consumer_sum = [0]
         per_producer = n // 3
+
         def consumer():
             ch._register(1, latest=False)
             for _ in range(per_producer * 3):
                 item = ch._wait_and_get(1, stop)
-                if item is None: break
+                if item is None:
+                    break
                 consumer_sum[0] += item
             latch.set()
-        ct = threading.Thread(target=consumer, daemon=True); ct.start()
+
+        ct = threading.Thread(target=consumer, daemon=True)
+        ct.start()
         go = threading.Event()
         expected_sums = [0, 0, 0]
+
         def producer(pid, sender):
             go.wait()
             for i in range(per_producer):
-                val = pid * per_producer + i; sender.send(val); expected_sums[pid] += val
+                val = pid * per_producer + i
+                sender.send(val)
+                expected_sums[pid] += val
+
         pts = []
         for pid in range(3):
-            t = threading.Thread(target=producer, args=(pid, senders[pid]), daemon=True); t.start(); pts.append(t)
-        t0 = time.perf_counter(); go.set()
-        for t in pts: t.join(timeout=30)
+            t = threading.Thread(target=producer, args=(pid, senders[pid]), daemon=True)
+            t.start()
+            pts.append(t)
+        t0 = time.perf_counter()
+        go.set()
+        for t in pts:
+            t.join(timeout=30)
         latch.wait(timeout=30)
         elapsed = time.perf_counter() - t0
-        stop.set(); ct.join(timeout=1)
+        stop.set()
+        ct.join(timeout=1)
         return elapsed, consumer_sum[0] == sum(expected_sums)
 
     def bench_pipeline_fast(n: int) -> tuple[float, bool]:
-        ch1 = FastChannel(); ch2 = FastChannel(); ch3 = FastChannel()
+        ch1 = FastChannel()
+        ch2 = FastChannel()
+        ch3 = FastChannel()
         sender = FastSender(ch1)
         stop = threading.Event()
         latch = threading.Event()
         final_sum = [0]
+
         def stage(in_ch, out_ch, sub_id, transform, acc):
             in_ch._register(sub_id, latest=False)
             out_sender = FastSender(out_ch) if out_ch else None
             for _ in range(n):
                 item = in_ch._wait_and_get(sub_id, stop)
-                if item is None: break
+                if item is None:
+                    break
                 val = transform(item)
-                if out_sender: out_sender.send(val)
-                if acc is not None: acc[0] += val
-            if acc is not None: latch.set()
-        t1 = threading.Thread(target=stage, args=(ch1, ch2, 1, lambda x: x+1, None), daemon=True)
-        t2 = threading.Thread(target=stage, args=(ch2, ch3, 1, lambda x: x*2, None), daemon=True)
-        t3 = threading.Thread(target=stage, args=(ch3, None, 1, lambda x: x, final_sum), daemon=True)
-        t1.start(); t2.start(); t3.start()
-        expected_sum = sum((i+1)*2 for i in range(n))
+                if out_sender:
+                    out_sender.send(val)
+                if acc is not None:
+                    acc[0] += val
+            if acc is not None:
+                latch.set()
+
+        t1 = threading.Thread(
+            target=stage, args=(ch1, ch2, 1, lambda x: x + 1, None), daemon=True
+        )
+        t2 = threading.Thread(
+            target=stage, args=(ch2, ch3, 1, lambda x: x * 2, None), daemon=True
+        )
+        t3 = threading.Thread(
+            target=stage, args=(ch3, None, 1, lambda x: x, final_sum), daemon=True
+        )
+        t1.start()
+        t2.start()
+        t3.start()
+        expected_sum = sum((i + 1) * 2 for i in range(n))
         t0 = time.perf_counter()
-        for i in range(n): sender.send(i)
+        for i in range(n):
+            sender.send(i)
         latch.wait(timeout=30)
         elapsed = time.perf_counter() - t0
-        stop.set(); t1.join(timeout=1); t2.join(timeout=1); t3.join(timeout=1)
+        stop.set()
+        t1.join(timeout=1)
+        t2.join(timeout=1)
+        t3.join(timeout=1)
         return elapsed, final_sum[0] == expected_sum
 
     def bench_latency_fast(n: int) -> list[float]:
-        ch_ping = FastChannel(); ch_pong = FastChannel()
-        stop = threading.Event(); ready = threading.Event()
+        ch_ping = FastChannel()
+        ch_pong = FastChannel()
+        stop = threading.Event()
+        ready = threading.Event()
+
         def ponger():
             ch_ping._register(1, latest=False)
-            s = FastSender(ch_pong); ready.set()
+            s = FastSender(ch_pong)
+            ready.set()
             for _ in range(n):
                 item = ch_ping._wait_and_get(1, stop)
-                if item is None: break
+                if item is None:
+                    break
                 s.send(item)
-        t = threading.Thread(target=ponger, daemon=True); t.start(); ready.wait()
+
+        t = threading.Thread(target=ponger, daemon=True)
+        t.start()
+        ready.wait()
         ch_pong._register(2, latest=False)
         pinger = FastSender(ch_ping)
         latencies = []
         for _ in range(n):
-            t0 = time.perf_counter(); pinger.send(0); ch_pong._wait_and_get(2, stop)
+            t0 = time.perf_counter()
+            pinger.send(0)
+            ch_pong._wait_and_get(2, stop)
             latencies.append(time.perf_counter() - t0)
-        stop.set(); t.join(timeout=1)
+        stop.set()
+        t.join(timeout=1)
         return latencies
 
     return {
@@ -523,6 +613,7 @@ def _make_fast_variants():
         "latency": bench_latency_fast,
     }
 
+
 FAST_VARIANTS = _make_fast_variants()
 
 
@@ -532,7 +623,8 @@ FAST_VARIANTS = _make_fast_variants()
 
 
 def bench_latency_channel(n: int) -> list[float]:
-    ch_ping = Channel(); ch_pong = Channel()
+    ch_ping = Channel()
+    ch_pong = Channel()
     stop = threading.Event()
     ready = threading.Event()
 
@@ -609,7 +701,7 @@ def run_throughput(name: str, channel_fn, queue_fn, n: int, runs: int, fast_fn=N
         checksums_ok = True
         for r in range(runs):
             gc.collect()
-            print(f"  {label} run {r+1}/{runs}...", end=" ", flush=True)
+            print(f"  {label} run {r + 1}/{runs}...", end=" ", flush=True)
             elapsed, ok = fn(n)
             if not ok:
                 checksums_ok = False
@@ -621,7 +713,9 @@ def run_throughput(name: str, channel_fn, queue_fn, n: int, runs: int, fast_fn=N
         best = results[-1]
         worst = results[0]
         check = "✓" if checksums_ok else "✗ CHECKSUM FAIL"
-        print(f"  {label:<10} median={median:>12,.0f} ops/s  best={best:>12,.0f}  worst={worst:>12,.0f}  {check}")
+        print(
+            f"  {label:<10} median={median:>12,.0f} ops/s  best={best:>12,.0f}  worst={worst:>12,.0f}  {check}"
+        )
 
     print()
 
@@ -639,18 +733,20 @@ def run_latency(name: str, channel_fn, queue_fn, n: int, runs: int, fast_fn=None
         best_run = []
         for r in range(runs):
             gc.collect()
-            print(f"  {label} run {r+1}/{runs}...", end=" ", flush=True)
+            print(f"  {label} run {r + 1}/{runs}...", end=" ", flush=True)
             lats = fn(n)
             p = percentiles(lats)
-            print(f"p50={p['p50']*1e6:.0f}µs", flush=True)
+            print(f"p50={p['p50'] * 1e6:.0f}µs", flush=True)
             if p["p50"] < best_p50:
                 best_p50 = p["p50"]
                 best_run = lats
         if best_run:
             p = percentiles(best_run)
             us = {k: v * 1e6 for k, v in p.items()}
-            print(f"  {label:<10} p50={us['p50']:>8.1f}µs  p90={us['p90']:>8.1f}µs  "
-                  f"p99={us['p99']:>8.1f}µs  p99.9={us['p99.9']:>8.1f}µs  max={us['max']:>8.1f}µs")
+            print(
+                f"  {label:<10} p50={us['p50']:>8.1f}µs  p90={us['p90']:>8.1f}µs  "
+                f"p99={us['p99']:>8.1f}µs  p99.9={us['p99.9']:>8.1f}µs  max={us['max']:>8.1f}µs"
+            )
 
     print()
 
@@ -658,7 +754,11 @@ def run_latency(name: str, channel_fn, queue_fn, n: int, runs: int, fast_fn=None
 def main():
     sep = "=" * 70
 
-    title = "Channel vs Queue vs FastChannel Benchmark" if HAS_FAST_CHANNEL else "Channel vs Queue Benchmark"
+    title = (
+        "Channel vs Queue vs FastChannel Benchmark"
+        if HAS_FAST_CHANNEL
+        else "Channel vs Queue Benchmark"
+    )
     print(sep)
     print(title)
     print(f"  {N:,} messages/run, {RUNS} runs/test, gc.collect() between runs")
@@ -667,11 +767,36 @@ def main():
     print()
 
     fv = FAST_VARIANTS
-    run_throughput("1P1C (unicast)", bench_1p1c_channel, bench_1p1c_queue, N, RUNS, fv.get("1p1c"))
-    run_throughput("1P3C (multicast)", bench_1p3c_channel, bench_1p3c_queue, N, RUNS, fv.get("1p3c"))
-    run_throughput("3P1C (fan-in)", bench_3p1c_channel, bench_3p1c_queue, N, RUNS, fv.get("3p1c"))
-    run_throughput("Pipeline (P→S1→S2→S3)", bench_pipeline_channel, bench_pipeline_queue, N, RUNS, fv.get("pipeline"))
-    run_latency("Ping-Pong Latency", bench_latency_channel, bench_latency_queue, LATENCY_N, LATENCY_RUNS, fv.get("latency"))
+    run_throughput(
+        "1P1C (unicast)", bench_1p1c_channel, bench_1p1c_queue, N, RUNS, fv.get("1p1c")
+    )
+    run_throughput(
+        "1P3C (multicast)",
+        bench_1p3c_channel,
+        bench_1p3c_queue,
+        N,
+        RUNS,
+        fv.get("1p3c"),
+    )
+    run_throughput(
+        "3P1C (fan-in)", bench_3p1c_channel, bench_3p1c_queue, N, RUNS, fv.get("3p1c")
+    )
+    run_throughput(
+        "Pipeline (P→S1→S2→S3)",
+        bench_pipeline_channel,
+        bench_pipeline_queue,
+        N,
+        RUNS,
+        fv.get("pipeline"),
+    )
+    run_latency(
+        "Ping-Pong Latency",
+        bench_latency_channel,
+        bench_latency_queue,
+        LATENCY_N,
+        LATENCY_RUNS,
+        fv.get("latency"),
+    )
 
     print(sep)
     print("Notes:")
