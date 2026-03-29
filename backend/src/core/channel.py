@@ -87,6 +87,11 @@ class Channel[T]:
             else:
                 if index >= self._offset + len(self._items):
                     return None
+            # Guard against stale index: if the subscriber was unwired and
+            # re-wired (or GC advanced past us) while we were waiting, the
+            # offset may have moved beyond our captured index.
+            if index < self._offset:
+                return None
             item = self._items[index - self._offset]
             self._cursors[sub_id] = index + 1
             self._gc()
