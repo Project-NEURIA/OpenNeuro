@@ -52,7 +52,6 @@ class Component[
 
     def __init__(self) -> None:
         self._status = Status.STARTUP
-        self._inputs: I | None = None
 
     @property
     @abstractmethod
@@ -76,16 +75,10 @@ class Component[
 
     def start(self, inputs: I, outputs: O) -> None:
         """Start the component. Subclasses override with their execution model."""
-        self._inputs = inputs
         self._status = Status.RUNNING
 
     def stop(self) -> None:
         """Idempotent. Signals the component to stop."""
-        if self._status == Status.STOPPED:
-            return
-        self._status = Status.STOPPING
-        if self._inputs is not None:
-            self.destruct(self._inputs)
         self._status = Status.STOPPED
 
     # --- Reflection / introspection ---
@@ -373,7 +366,6 @@ class ThreadedComponent[
             return
         if self._thread is not None:
             self._thread.join(timeout=5.0)
-        self._inputs = inputs
         self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._safe_run, args=(inputs, outputs), daemon=True
@@ -477,7 +469,6 @@ class CompositeComponent(Component[Any, Any]):
     def start(self, inputs: Any, outputs: Any) -> None:
         if self.status == Status.RUNNING:
             return
-        self._inputs = inputs
         self._status = Status.SETUP
 
         from src.core.graph import GraphManager
