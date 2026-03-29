@@ -20,7 +20,7 @@ A parent process watchdog exits the server if the parent dies (for Tauri/bun int
 | GET | `/component` | List all registered components |
 | GET | `/component/is-type?name=X` | Check if name resolves to a Python type |
 | GET | `/component/is-subtype?sub=X&sup=Y` | Subtype check via `issubclass()` |
-| POST | `/component/{name}/options` | Dynamic dropdown options |
+| POST | `/component/{'{name}'}/options` | Dynamic dropdown options |
 
 ### GET /component
 
@@ -49,7 +49,7 @@ Returns `list[ComponentInfo]`:
 
 The `init` field contains JSON Schema for each `__init__` parameter (via Pydantic's `TypeAdapter`). The frontend uses this to render config forms with appropriate widgets (text, number, dropdown, file picker).
 
-### POST /component/{name}/options
+### POST /component/{'{name}'}/options
 
 Request: `dict[str, Any]` (current form values)
 
@@ -64,11 +64,11 @@ Used for dependent dropdowns — e.g. CharacterCard's preset list. The `values` 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/graph/nodes` | List all nodes |
-| GET | `/graph/nodes/{id}` | Get single node |
+| GET | `/graph/nodes/{'{id}'}` | Get single node |
 | POST | `/graph/nodes` | Create node |
-| PATCH | `/graph/nodes/{id}` | Update position |
-| PATCH | `/graph/nodes/{id}/init-args` | Update config (restarts if running) |
-| DELETE | `/graph/nodes/{id}` | Delete node + connected edges |
+| PATCH | `/graph/nodes/{'{id}'}` | Update position |
+| PATCH | `/graph/nodes/{'{id}'}/init-args` | Update config (restarts if running) |
+| DELETE | `/graph/nodes/{'{id}'}` | Delete node + connected edges |
 
 **NodeResponse:**
 ```json
@@ -90,7 +90,7 @@ For composite nodes, `inputs`/`outputs` contain the boundary port types and `sub
 
 **POST /graph/nodes** — If the component type isn't found in the registry, it tries to load it as a project (for nested composite components).
 
-**PATCH /graph/nodes/{id}/init-args** — Re-instantiates the component with new args. If the graph is running, stops all components, applies changes, and restarts.
+**PATCH /graph/nodes/{'{id}'}/init-args** — Re-instantiates the component with new args. If the graph is running, stops all components, applies changes, and restarts.
 
 ### Edges
 
@@ -119,7 +119,7 @@ Edge validation checks:
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/graph/subgraph` | Group nodes into composite |
-| POST | `/graph/ungroup/{id}` | Expand composite back |
+| POST | `/graph/ungroup/{'{id}'}` | Expand composite back |
 
 **POST /graph/subgraph** takes `{"node_ids": [...], "name": "Subgraph"}`. It:
 1. Extracts selected nodes + internal edges into a sub-graph
@@ -127,7 +127,7 @@ Edge validation checks:
 3. Rewires boundary edges (port format: `"{inner_node_id}.{slot}"`)
 4. Removes original nodes from outer graph
 
-**POST /graph/ungroup/{id}** reverses the process, restoring inner nodes and rewiring edges.
+**POST /graph/ungroup/{'{id}'}** reverses the process, restoring inner nodes and rewiring edges.
 
 ## Projects (`/projects`, `/project`)
 
@@ -135,13 +135,13 @@ Edge validation checks:
 |--------|------|-------------|
 | GET | `/projects` | List projects (name + has_thumbnail) |
 | POST | `/projects` | Create project (empty graph + placeholder thumbnail) |
-| DELETE | `/projects/{name}` | Delete project directory |
-| POST | `/projects/{name}/start` | Load graph.json, reset manager |
+| DELETE | `/projects/{'{name}'}` | Delete project directory |
+| POST | `/projects/{'{name}'}/start` | Load graph.json, reset manager |
 | POST | `/project/close` | Reset to empty graph |
 | GET | `/project/current` | Current project name or null |
-| GET | `/projects/{name}/thumbnail` | PNG thumbnail image |
+| GET | `/projects/{'{name}'}/thumbnail` | PNG thumbnail image |
 
-Projects live in `~/Documents/OpenNeuro/projects/{name}/` with:
+Projects live in `~/Documents/OpenNeuro/projects/{'{name}'}/` with:
 - `graph.json` — serialized graph
 - `thumbnail.png` — preview image
 
@@ -184,7 +184,7 @@ Deltas are computed per collection cycle (msg/byte counts since last report).
 
 ## Logs (`/logs`)
 
-**GET /logs/{node_id}**
+**GET /logs/{'{node_id}'}**
 
 Query params: `after: int = 0`, `limit: int = 400` (max 2000)
 
