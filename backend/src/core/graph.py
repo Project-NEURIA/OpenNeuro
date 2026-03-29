@@ -12,7 +12,6 @@ from src.core.channel import Channel, Receiver, Sender
 from src.core.component import (
     Component,
     PrimitiveComponent,
-    Status,
     ThreadedComponent,
 )
 from src.core.log_capture import get_log_store
@@ -58,7 +57,6 @@ class GraphManager:
         self._ui_channels: dict[tuple[str, str], Channel[Any]] = {}
         self._ui_senders: dict[tuple[str, str], Sender[Any]] = {}
         self._ui_receivers: dict[tuple[str, str], Receiver[Any]] = {}
-        self._built_inputs: dict[str, Any] = {}  # node_id → built inputs tuple
         self._ui_version = 0
         self._ui_changed = asyncio.Event()
         self.reset(graph)
@@ -389,7 +387,6 @@ class GraphManager:
                 built_inputs = self._build_tuple(input_type, input_handles)
                 built_outputs = self._build_tuple(output_type, output_handles)
 
-            self._built_inputs[node_id] = built_inputs
             start_queue.append((node_id, comp, built_inputs, built_outputs))
 
         # Call setup() on all components AFTER all receivers are wired,
@@ -438,12 +435,3 @@ class GraphManager:
             sender._stopped = True
         for comp in self._components.values():
             comp.stop()
-        # Call destruct() AFTER all threads have exited,
-        # symmetric with setup() being called before threads start.
-        for node_id, comp in self._components.items():
-            built_inputs = self._built_inputs.get(node_id)
-            if built_inputs is not None:
-                comp._status = Status.STOPPING
-                comp.destruct(built_inputs)
-                comp._status = Status.STOPPED
-        self._built_inputs.clear()
