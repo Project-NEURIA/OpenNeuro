@@ -85,7 +85,7 @@ console.log("[remote] Backend is ready, starting frontend.\n");
 
 // Run Vite on Node to avoid Bun's broken node:http proxy (oven-sh/bun#28396).
 const frontend = Bun.spawn(
-  ["node", "./node_modules/vite/bin/vite.js"],
+  ["node", "-e", "require('vite/bin/vite.js')"],
   {
     cwd: "./frontend",
     stdout: "inherit",
