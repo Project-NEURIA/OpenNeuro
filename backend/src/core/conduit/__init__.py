@@ -45,4 +45,5 @@ from src.core.conduit.object_locator_visualizer import (
 )
 from src.core.conduit.do_nothing_tool import DoNothingTool as DoNothingTool
 from src.core.conduit.movement_tool import MovementTool as MovementTool
+from src.core.conduit.think_tool import ThinkTool as ThinkTool
 from src.core.conduit.throttle import Throttle as Throttle

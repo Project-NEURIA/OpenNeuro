@@ -69,12 +69,12 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         for oid, (label, pos) in self._visible.items():
             if oid not in new_visible:
                 x, y, z = pos
-                self._history.append(
-                    MessageFrame.new(
-                        role="system",
-                        content=f'[Object "{label}" (id={oid}) last seen at ({x:.2f}, {y:.2f}, {z:.2f})]',
-                    )
+                msg = MessageFrame.new(
+                    role="system",
+                    content=f'[Object "{label}" (id={oid}) last seen at ({x:.2f}, {y:.2f}, {z:.2f})]',
                 )
+                self._history.append(msg)
+                self._print_message(msg)
 
         self._visible = new_visible
 
@@ -99,16 +99,16 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         return -math.degrees(math.atan2(fwd_x, fwd_z))
 
     @staticmethod
-    def _print_messages(msgs: list[MessageFrame]) -> None:
-        print("-------------------------------------------")
-        for m in msgs:
-            preview = m.content[:80] if m.content else "(no content)"
-            extra = ""
-            if m.tool_calls:
-                extra += f" tool_calls={[tc.name for tc in m.tool_calls]}"
-            if m.tool_call_id:
-                extra += f" tool_call_id={m.tool_call_id}"
-            print(f"  [{m.role}] {preview}{extra}")
+    def _print_message(m: MessageFrame) -> None:
+        preview = m.content[:120] if m.content else "(no content)"
+        extra = ""
+        if m.tool_calls:
+            for tc in m.tool_calls:
+                args = tc.arguments[:80] if tc.arguments else ""
+                extra += f" {tc.name}({args})"
+        if m.tool_call_id:
+            extra += f" tool_call_id={m.tool_call_id}"
+        print(f"  [{m.role}] {preview}{extra}")
 
     def run(self, inputs: AgentStateInputs, outputs: AgentStateOutputs) -> None:
         print("[AgentState] Starting Agent State management")
@@ -148,64 +148,70 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             if req is None:
                 break
 
-            # If request itself carries text (e.g. TextInput wired directly),
-            # treat it as the user message so it doesn't need a separate speech wire.
-            if hasattr(req, "text") and req.text:
-                ts = datetime.fromtimestamp(req.pts / 1e9).strftime("%H:%M:%S")
-                self._history.append(
-                    MessageFrame.new(role="user", content=f"[{ts}] {req.text}")
-                )
-
-            for speech, feedback, vision, memory, tc, tr in drain(
+            # Drain everything except tool results
+            for speech, feedback, vision, memory, tc in drain(
                 inputs.speech,
                 inputs.feedback,
                 inputs.vision,
                 inputs.memory,
                 inputs.tool_call,
-                inputs.tool_result,
             ):
                 if speech is not None:
                     ts = datetime.fromtimestamp(speech.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(role="user", content=f"[{ts}] {speech.text}")
-                    )
+                    msg = MessageFrame.new(role="user", content=f"[{ts}] {speech.text}")
+                    self._history.append(msg)
+                    self._print_message(msg)
                 if feedback is not None:
                     ts = datetime.fromtimestamp(feedback.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(
-                            role="assistant", content=f"[{ts}] {feedback.text}"
-                        )
+                    msg = MessageFrame.new(
+                        role="assistant", content=f"[{ts}] {feedback.text}"
                     )
+                    self._history.append(msg)
+                    self._print_message(msg)
                 if vision is not None:
                     ts = datetime.fromtimestamp(vision.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(role="system", content=f"[{ts}] {vision.text}")
-                    )
+                    msg = MessageFrame.new(role="system", content=f"[{ts}] {vision.text}")
+                    self._history.append(msg)
+                    self._print_message(msg)
                 if memory is not None:
                     ts = datetime.fromtimestamp(memory.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(role="system", content=f"[{ts}] {memory.text}")
-                    )
+                    msg = MessageFrame.new(role="system", content=f"[{ts}] {memory.text}")
+                    self._history.append(msg)
+                    self._print_message(msg)
                 if tc is not None:
+                    # Tool call in chronological position + placeholder result
+                    ts = datetime.fromtimestamp(tc.pts / 1e9).strftime("%H:%M:%S")
+                    msg_tc = MessageFrame.new(
+                        role="assistant",
+                        content=f"[{ts}]",
+                        tool_calls=[tc],
+                    )
+                    self._history.append(msg_tc)
+                    self._print_message(msg_tc)
+                    msg_tr = MessageFrame.new(
+                        role="tool",
+                        content="(pending)",
+                        tool_call_id=tc.call_id,
+                    )
+                    self._history.append(msg_tr)
                     pending_tool_calls[tc.call_id] = tc
-                if tr is not None and tr.call_id in pending_tool_calls:
-                    ptc = pending_tool_calls.pop(tr.call_id)
-                    ts = datetime.fromtimestamp(ptc.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(
-                            role="assistant",
-                            content=f"[{ts}]",
-                            tool_calls=[ptc],
-                        )
-                    )
+
+            # Drain tool results and replace placeholders
+            if inputs.tool_result is not None:
+                for tr in inputs.tool_result:
+                    if tr is None:
+                        break
                     ts = datetime.fromtimestamp(tr.pts / 1e9).strftime("%H:%M:%S")
-                    self._history.append(
-                        MessageFrame.new(
-                            role="tool",
-                            content=f"[{ts}] {tr.content}",
-                            tool_call_id=tr.call_id,
-                        )
-                    )
+                    for i, m in enumerate(self._history):
+                        if m.tool_call_id == tr.call_id and m.content == "(pending)":
+                            self._history[i] = MessageFrame.new(
+                                role="tool",
+                                content=f"[{ts}] {tr.content}",
+                                tool_call_id=tr.call_id,
+                            )
+                            self._print_message(self._history[i])
+                            pending_tool_calls.pop(tr.call_id, None)
+                            break
 
             # Diff objects against previous state
             if inputs.objects is not None:
@@ -240,7 +246,6 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                             )
                         )
 
-            self._print_messages(msgs)
             outputs.messages.send(msgs)
 
         print("[AgentState] Agent State management stopped")

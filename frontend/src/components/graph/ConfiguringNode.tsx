@@ -301,32 +301,27 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
             );
           }
 
+          const isNumber = propType === "number" || propType === "integer";
+
           return (
             <label key={key} className="flex flex-col gap-1">
               <span className="text-[12px] font-mono text-white/60">{key}</span>
+              {isNumber ? (
               <input
-                type={propType === "number" || propType === "integer" ? "text" : "text"}
-                inputMode={propType === "number" || propType === "integer" ? "decimal" : undefined}
-                step={propType === "number" ? "any" : undefined}
+                type="text"
+                inputMode="decimal"
                 value={String(values[key] ?? "")}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  if (propType === "number" || propType === "integer") {
-                    // Allow intermediate states like "0.", "-", "1.0" while typing
-                    if (raw === "" || raw === "-" || raw === "." || /^-?\d*\.?\d*$/.test(raw)) {
-                      setValues((v) => ({ ...v, [key]: raw }));
-                    }
-                  } else {
+                  if (raw === "" || raw === "-" || raw === "." || /^-?\d*\.?\d*$/.test(raw)) {
                     setValues((v) => ({ ...v, [key]: raw }));
                   }
                 }}
                 onBlur={() => {
-                  if (propType === "number" || propType === "integer") {
-                    const raw = String(values[key] ?? "");
-                    const num = Number(raw);
-                    if (raw !== "" && !isNaN(num)) {
-                      setValues((v) => ({ ...v, [key]: num }));
-                    }
+                  const raw = String(values[key] ?? "");
+                  const num = Number(raw);
+                  if (raw !== "" && !isNaN(num)) {
+                    setValues((v) => ({ ...v, [key]: num }));
                   }
                 }}
                 className={cn(
@@ -335,6 +330,28 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
                   "focus:outline-none focus:border-conduit/60",
                 )}
               />
+              ) : (
+              <textarea
+                rows={1}
+                value={String(values[key] ?? "")}
+                onChange={(e) => {
+                  setValues((v) => ({ ...v, [key]: e.target.value }));
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = el.scrollHeight + "px";
+                  }
+                }}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-[13px] font-mono resize-none overflow-hidden",
+                  "bg-white/[0.06] border border-white/[0.08] text-white/90",
+                  "focus:outline-none focus:border-conduit/60",
+                )}
+              />
+              )}
             </label>
           );
         })}

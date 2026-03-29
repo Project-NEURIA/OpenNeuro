@@ -64,9 +64,6 @@ class MovementTool(
             if call is None:
                 break
             if call.name != "move":
-                outputs.tool_result.send(
-                    ToolResult.new(call_id=call.call_id, content="unknown tool")
-                )
                 continue
 
             args = json.loads(call.arguments)
