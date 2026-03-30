@@ -60,11 +60,15 @@ pub fn run() {
             // Detect GPU and sync dependencies
             let extra = detect_gpu_extra();
             let mut sync_args: Vec<&str> = vec!["sync"];
-            match extra {
-                Some("rocm") => {
-                    sync_args.extend(["--no-group", "cuda12", "--group", "rocm"]);
+            if cfg!(target_os = "macos") {
+                sync_args.extend(["--no-group", "cuda12"]);
+            } else {
+                match extra {
+                    Some("rocm") => {
+                        sync_args.extend(["--no-group", "cuda12", "--group", "rocm"]);
+                    }
+                    _ => {} // NVIDIA: cuda12 is default-group, no extra flags needed
                 }
-                _ => {} // cuda12 is default-group, Mac has no group needed
             }
 
             println!("[tauri] Running: uv {}", sync_args.join(" "));
