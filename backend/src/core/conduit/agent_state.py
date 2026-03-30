@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import numpy as np
 import math
 from datetime import datetime
 from typing import Any, NamedTuple
@@ -23,6 +22,10 @@ from src.core.utils import drain
 
 class AgentStateConfig(BaseModel):
     system_prompt: str
+    post_prompt: str = (
+        "Do nothing unless the user has talked and you haven't replied, "
+        "or if you are executing a task."
+    )
 
 
 class AgentStateInputs[T](NamedTuple):
@@ -36,6 +39,7 @@ class AgentStateInputs[T](NamedTuple):
     pose: Receiver[BodyPoseFrame] | None = None
     objects: Receiver[ObjectLocationFrame] | None = None
     memory: Receiver[TextFrame] | None = None
+    pause: Receiver[TextFrame] | None = None
 
 
 class AgentStateOutputs(NamedTuple):
@@ -55,42 +59,6 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         self._history: list[MessageFrame] = [
             MessageFrame.new(role="system", content=config.system_prompt)
         ]
-        # Object tracking: object_id -> (label, position)
-        self._visible: dict[int, tuple[str, np.ndarray]] = {}
-
-    def _diff_objects(self, frame: ObjectLocationFrame) -> None:
-        """Diff incoming objects against currently visible. Disappeared objects
-        get frozen into history, visible objects update in-place."""
-        new_visible: dict[int, tuple[str, np.ndarray]] = {}
-        for i, obj_id in enumerate(frame.object_ids):
-            oid = int(obj_id)
-            new_visible[oid] = (frame.labels[i], frame.positions[i])
-
-        # Disappeared objects -> freeze into history
-        for oid, (label, pos) in self._visible.items():
-            if oid not in new_visible:
-                x, y, z = pos
-                msg = MessageFrame.new(
-                    role="system",
-                    content=f'[Object "{label}" (id={oid}) last seen at ({x:.2f}, {y:.2f}, {z:.2f})]',
-                )
-                self._history.append(msg)
-                self._print_message(msg)
-
-        self._visible = new_visible
-
-    def _build_visible_message(self) -> MessageFrame | None:
-        """Build a live message describing currently visible objects."""
-        if not self._visible:
-            return None
-        lines = []
-        for oid, (label, pos) in self._visible.items():
-            x, y, z = pos
-            lines.append(f'  "{label}" (id={oid}) at ({x:.2f}, {y:.2f}, {z:.2f})')
-        return MessageFrame.new(
-            role="system",
-            content="[Currently visible objects]\n" + "\n".join(lines),
-        )
 
     @staticmethod
     def _heading_from_quat(w: float, x: float, y: float, z: float) -> float:
@@ -127,6 +95,7 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         if inputs.feedback:
             inputs.feedback.blocking = False
         if inputs.vision:
+            inputs.vision.newest = True
             inputs.vision.blocking = False
         if inputs.memory:
             inputs.memory.blocking = False
@@ -140,6 +109,10 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
         if inputs.pose is not None:
             inputs.pose.newest = True
             inputs.pose.blocking = False
+        # Pause support
+        if inputs.pause is not None:
+            inputs.pause.newest = True
+            inputs.pause.blocking = False
 
         # Buffer tool_calls until their matching tool_result arrives
         pending_tool_calls: dict[str, ToolCall] = {}
@@ -149,11 +122,17 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             if req is None:
                 break
 
-            # Drain everything except tool results
-            for speech, feedback, vision, memory, tc in drain(
+            # Check for pause signal — drain all queued requests and wait for next
+            if inputs.pause is not None:
+                p = next(inputs.pause, None)
+                if p is not None:
+                    print("[AgentState] Paused — draining requests")
+                    continue
+
+            # Drain everything except tool results and vision
+            for speech, feedback, memory, tc in drain(
                 inputs.speech,
                 inputs.feedback,
-                inputs.vision,
                 inputs.memory,
                 inputs.tool_call,
             ):
@@ -166,13 +145,6 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     ts = datetime.fromtimestamp(feedback.pts / 1e9).strftime("%H:%M:%S")
                     msg = MessageFrame.new(
                         role="assistant", content=f"[{ts}] {feedback.text}"
-                    )
-                    self._history.append(msg)
-                    self._print_message(msg)
-                if vision is not None:
-                    ts = datetime.fromtimestamp(vision.pts / 1e9).strftime("%H:%M:%S")
-                    msg = MessageFrame.new(
-                        role="system", content=f"[{ts}] {vision.text}"
                     )
                     self._history.append(msg)
                     self._print_message(msg)
@@ -218,19 +190,35 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                             pending_tool_calls.pop(tr.call_id, None)
                             break
 
-            # Diff objects against previous state
-            if inputs.objects is not None:
-                obj_frame = next(inputs.objects)
-                if obj_frame is not None:
-                    self._diff_objects(obj_frame)
-
             # Build final messages: history
             msgs = self._history.copy()
 
-            # visible objects
-            visible_msg = self._build_visible_message()
-            if visible_msg is not None:
-                msgs.append(visible_msg)
+            # Latest vision caption (transient, not in history)
+            if inputs.vision is not None:
+                vision_frame = next(inputs.vision, None)
+                if vision_frame is not None:
+                    ts = datetime.fromtimestamp(vision_frame.pts / 1e9).strftime("%H:%M:%S")
+                    msgs.append(
+                        MessageFrame.new(
+                            role="system",
+                            content=f"[{ts}] {vision_frame.text}",
+                        )
+                    )
+
+            # Latest object locations (transient, not in history)
+            if inputs.objects is not None:
+                obj_frame = next(inputs.objects, None)
+                if obj_frame is not None and len(obj_frame.labels) > 0:
+                    lines = []
+                    for i in range(len(obj_frame.labels)):
+                        x, y, z = obj_frame.positions[i]
+                        lines.append(f'  "{obj_frame.labels[i]}" at ({x:.2f}, {y:.2f}, {z:.2f})')
+                    msgs.append(
+                        MessageFrame.new(
+                            role="system",
+                            content="[Currently visible objects]\n" + "\n".join(lines),
+                        )
+                    )
 
             # Read agent spatial state (position + direction)
             if inputs.pose is not None:
@@ -250,6 +238,14 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                                 f"[Heading (from +Z clockwise): {heading:.0f}°]",
                             )
                         )
+
+            # Post-prompt (always last)
+            if self.config.post_prompt:
+                msgs.append(
+                    MessageFrame.new(
+                        role="system", content=self.config.post_prompt
+                    )
+                )
 
             self._dump_messages(msgs)
             outputs.messages.send(msgs)

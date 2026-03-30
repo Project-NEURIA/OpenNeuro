@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from pydantic import BaseModel
+
 from src.core.channel import Receiver, Sender
 from src.core.component import ThreadedComponent, Tag
 from src.core.frames import ToolCall, ToolDef, ToolResult
+
+
+class DoNothingToolConfig(BaseModel):
+    tool_description: str = "Do nothing. Call this when no action is needed."
 
 
 class DoNothingToolInputs(NamedTuple):
@@ -22,11 +28,15 @@ class DoNothingTool(
     description = "A do-nothing tool: emits its definition and returns empty results"
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
+    def __init__(self, config: DoNothingToolConfig = DoNothingToolConfig()) -> None:
+        super().__init__()
+        self.config = config
+
     def setup(self, outputs: DoNothingToolOutputs) -> None:
         outputs.tool_def.send(
             ToolDef.new(
                 name="do_nothing",
-                description="Do nothing. Call this when no action is needed.",
+                description=self.config.tool_description,
                 parameters={"type": "object", "properties": {}, "required": []},
             )
         )
