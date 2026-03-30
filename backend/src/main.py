@@ -99,7 +99,7 @@ def main() -> None:
 
     import uvicorn
 
-    print("[backend] API server starting on http://localhost:8000")
+    print("[backend] API server starting on http://0.0.0.0:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
 
 

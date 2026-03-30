@@ -205,7 +205,7 @@ describe("GraphNode", () => {
 
     expect(screen.getByText("awaiting data")).toBeInTheDocument();
 
-    const textInput = screen.getByPlaceholderText("textIn...");
+    const textInput = screen.getByPlaceholderText("textIn (JSON)...");
     fireEvent.change(textInput, { target: { value: "   " } });
     fireEvent.click(screen.getAllByRole("button", { name: "Send" })[0]!);
 

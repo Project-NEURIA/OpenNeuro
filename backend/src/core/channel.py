@@ -209,6 +209,18 @@ class UIVideoSender(UISender[bytes]):
     """Component sends JPEG bytes for display in the node UI."""
 
 
+class UIVideoReceiver(UIReceiver[bytes]):
+    """Component receives JPEG bytes from the frontend."""
+
+
+class UIAudioSender(UISender[bytes]):
+    """Component sends raw PCM bytes to the frontend."""
+
+
+class UIAudioReceiver(UIReceiver[bytes]):
+    """Component receives raw PCM bytes from the frontend."""
+
+
 class UITextReceiver(UIReceiver[TextFrame]):
     """Component receives text typed by the user in the node UI."""
 
