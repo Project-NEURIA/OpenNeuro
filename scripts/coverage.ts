@@ -16,12 +16,12 @@ async function run(command: string[], cwd = ".") {
 }
 
 async function updateBadges(target: "all" | "backend" | "frontend") {
-  const command = ["uv", "run", "python", "scripts/generate_coverage_badges.py"];
+  const command = ["python", "scripts/generate_coverage_badges.py"];
 
   if (target === "all" || target === "backend") {
     command.push(
       "--backend-xml",
-      "backend/coverage.xml",
+      "backend/tests_runtime/coverage/coverage.xml",
       "--backend-svg",
       "docs/backend-coverage.svg",
     );
@@ -61,4 +61,7 @@ async function main() {
   await updateBadges(mode === "all" ? "all" : mode);
 }
 
-await main();
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});

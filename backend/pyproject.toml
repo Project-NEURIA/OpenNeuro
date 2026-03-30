@@ -52,7 +52,7 @@ dependencies = [
 ]
 
 [tool.mypy]
-exclude = '(^tests/)|(^tests_runtime/)|(^pytest[^/\\]*(?:$|[\\/]))'
+exclude = '(^tests/)|(^tests_runtime/)|(^cache/)|(^pytest[^/\\]*(?:$|[\\/]))|(^\.venv(?:$|[\\/]))'
 
 [[tool.mypy.overrides]]
 module = [
