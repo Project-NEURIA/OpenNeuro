@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App from "@/App";
+import App, { parseSlot, toReactFlowNode } from "@/App";
 import * as api from "@/lib/api";
 import * as graphDataHook from "@/hooks/useGraphData";
 import * as componentsHook from "@/hooks/useComponents";
@@ -10,6 +10,7 @@ import * as layout from "@/lib/layout";
 import * as typecheck from "@/lib/typecheck";
 
 let currentGraphCanvasProps: Record<string, unknown> | null = null;
+let cachedEditConfig: (() => void) | undefined;
 let currentMetrics = {
   timestamp: 1,
   nodes: {
@@ -29,11 +30,23 @@ vi.mock("@xyflow/react", async () => {
     ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     useNodesState: (initial: unknown[]) => {
       const [state, setState] = ReactModule.useState(initial);
-      return [state, setState, vi.fn()];
+      return [
+        state,
+        setState,
+        (changes: { type: string; id: string }[]) => {
+          setState((prev) => prev.filter((node: { id: string }) => !changes.some((change) => change.type === "remove" && change.id === node.id)));
+        },
+      ];
     },
     useEdgesState: (initial: unknown[]) => {
       const [state, setState] = ReactModule.useState(initial);
-      return [state, setState, vi.fn()];
+      return [
+        state,
+        setState,
+        (changes: { type: string; id: string }[]) => {
+          setState((prev) => prev.filter((edge: { id: string }) => !changes.some((change) => change.type === "remove" && change.id === edge.id)));
+        },
+      ];
     },
     addEdge: (edge: Record<string, unknown>, edges: Record<string, unknown>[]) => [
       ...edges,
@@ -65,6 +78,7 @@ vi.mock("@/components/graph/GraphCanvas", () => ({
     const nodes = (props.nodes as { id: string; type?: string; data?: Record<string, unknown> }[]) ?? [];
     const edges = (props.edges as { id: string }[]) ?? [];
     const firstGraphNode = nodes.find((node) => node.type === "graph");
+    const ghostGraphNode = nodes.find((node) => node.type === "graph" && node.data?.label === "Ghost");
     const compositeNode = nodes.find((node) => node.type === "graph" && node.data?.category === "composite");
     const configuringNode = nodes.find((node) => node.type === "configuring");
     const firstEdge = edges[0];
@@ -118,6 +132,13 @@ vi.mock("@/components/graph/GraphCanvas", () => ({
           context-composite
         </button>
         <button onClick={() => firstGraphNode?.data?.onEditConfig?.()}>edit-first</button>
+        <button onClick={() => ghostGraphNode?.data?.onEditConfig?.()}>edit-ghost</button>
+        <button onClick={() => {
+          cachedEditConfig = firstGraphNode?.data?.onEditConfig as (() => void) | undefined;
+        }}>
+          cache-edit-first
+        </button>
+        <button onClick={() => cachedEditConfig?.()}>edit-cached</button>
         <button onClick={() => configuringNode?.data?.onConfirm?.({ gain: 5 })}>confirm-configuring</button>
         <button onClick={() => configuringNode?.data?.onCancel?.()}>cancel-configuring</button>
         <button onClick={() => firstGraphNode && (props.onNodesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstGraphNode.id }])}>
@@ -294,9 +315,28 @@ const componentMap = {
   Speaker: components[1]!,
 };
 
+function getCanvasProps() {
+  expect(currentGraphCanvasProps).not.toBeNull();
+  return currentGraphCanvasProps as {
+    nodes: Array<Record<string, unknown>>;
+    edges: Array<Record<string, unknown>>;
+    onNodesChange?: (changes: { type: string; id: string }[]) => void;
+    onEdgesChange?: (changes: { type: string; id: string }[]) => void;
+    onConnect?: (connection: {
+      source?: string | null;
+      target?: string | null;
+      sourceHandle?: string | null;
+      targetHandle?: string | null;
+    }) => void;
+    onDragOver?: (event: React.DragEvent) => void;
+    onDrop?: (event: React.DragEvent) => void;
+  };
+}
+
 describe("App", () => {
   beforeEach(() => {
     currentGraphCanvasProps = null;
+    cachedEditConfig = undefined;
     currentMetrics = {
       timestamp: 1,
       nodes: {
@@ -425,6 +465,63 @@ describe("App", () => {
     expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic");
   });
 
+  it("covers slot parsing and direct react-flow node construction helpers", () => {
+    expect(parseSlot(undefined)).toBe("");
+    expect(parseSlot("out-audio-main")).toBe("audio-main");
+
+    const builder = vi.fn().mockReturnValue({
+      label: "Built",
+      category: "conduit",
+      inputs: ["in"],
+      outputs: ["out"],
+      inputTypes: {},
+      outputTypes: {},
+      status: "ready",
+      nodeMetrics: null,
+      ui_inputs: {},
+      ui_outputs: {},
+    });
+
+    const graphNode = toReactFlowNode(
+      {
+        id: "node-1",
+        type: "Ghost",
+        is_composite: false,
+        status: "ready",
+        x: 0,
+        y: 0,
+        init_args: undefined,
+      },
+      { x: 1, y: 2 },
+      componentMap as never,
+      { inputs: {}, outputs: {} },
+      builder,
+    );
+    expect(builder).toHaveBeenCalledWith("node-1", "Ghost", "ready", {});
+    expect(graphNode.position).toEqual({ x: 1, y: 2 });
+
+    const compositeNode = toReactFlowNode(
+      {
+        id: "node-2",
+        type: "ProjectComposite",
+        is_composite: true,
+        status: "running",
+        x: 0,
+        y: 0,
+        init_args: {},
+        inputs: undefined,
+        outputs: undefined,
+      },
+      { x: 3, y: 4 },
+      {} as never,
+      { inputs: {}, outputs: {} },
+      builder,
+    );
+    expect(compositeNode.data.inputs).toEqual([]);
+    expect(compositeNode.data.outputs).toEqual([]);
+    expect(compositeNode.data.category).toBe("composite");
+  });
+
   it("retries backend polling and falls back to the chooser when auto-start fails", async () => {
     vi.useFakeTimers();
     vi.spyOn(api, "fetchCurrentProject")
@@ -442,6 +539,41 @@ describe("App", () => {
     });
     vi.useRealTimers();
     await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+  });
+
+  it("auto-starts into the editor when the backend already has a current project", async () => {
+    vi.spyOn(api, "fetchCurrentProject").mockResolvedValueOnce({ current_project: "Alpha" });
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("sidebar:2:Alpha")).toBeInTheDocument());
+    expect(api.startProject).toHaveBeenCalledWith("Alpha");
+  });
+
+  it("skips concrete-type warming when the component registry exposes no typed slots", async () => {
+    vi.spyOn(componentsHook, "useComponents").mockReturnValue([
+      {
+        type_: "Bare",
+        tags: { io: ["conduit"], functionality: ["misc"], gpu: ["cpu"] },
+        init: {},
+        inputs: {},
+        outputs: {},
+        ui_inputs: {},
+        ui_outputs: {},
+      },
+    ] as never);
+    vi.spyOn(graphDataHook, "useGraphData").mockImplementation(() => ({
+      connected: true,
+      metrics: null,
+      componentMap: {} as never,
+    }));
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByText("sidebar:1:OpenedProject")).toBeInTheDocument());
+    expect(api.fetchIsType).not.toHaveBeenCalled();
+    expect(typecheck.warmSubtypeCache).not.toHaveBeenCalled();
   });
 
   it("handles editor interactions for logging, config, graph edits, grouping, and home navigation", async () => {
@@ -476,7 +608,9 @@ describe("App", () => {
     await waitFor(() => expect(api.createNode).toHaveBeenCalledWith("Mic", { gain: 5 }));
 
     fireEvent.click(screen.getByText("edit-first"));
-    expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-");
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-edit-n1-"));
+    fireEvent.click(screen.getByText("cancel-configuring"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-n1-"));
 
     fireEvent.click(screen.getByText("drop-simple"));
     await waitFor(() => expect(api.createNode).toHaveBeenCalledWith("Speaker", undefined));
@@ -501,6 +635,516 @@ describe("App", () => {
     fireEvent.click(screen.getByTitle("Back to projects"));
     await waitFor(() => expect(api.closeProject).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+  });
+
+  it("covers editor fallback branches for missing types, metrics, and drag events", async () => {
+    currentMetrics = {
+      timestamp: 2,
+      nodes: {
+        n1: { name: "Mic", status: "running", senders: {}, receivers: {} },
+      },
+    };
+    vi.spyOn(api, "fetchNodes").mockResolvedValueOnce([
+      {
+        id: "n1",
+        type: "Mic",
+        is_composite: false,
+        status: "startup",
+        x: 11,
+        y: 12,
+        init_args: { gain: 1 },
+      },
+      {
+        id: "ghost",
+        type: "Ghost",
+        is_composite: false,
+        status: "idle",
+        x: 40,
+        y: 55,
+        init_args: {},
+      },
+      {
+        id: "n2",
+        type: "Speaker",
+        is_composite: false,
+        status: "stopped",
+        x: 70,
+        y: 80,
+        init_args: {},
+      },
+    ]);
+    vi.spyOn(typecheck, "checkTypes").mockReturnValue({
+      types: new Map([
+        ["n1.out.output", { kind: "concrete", name: "Audio" }],
+        ["n2.in.input", { kind: "concrete", name: "Audio" }],
+      ]),
+      errors: [
+        {
+          left: { kind: "concrete", name: "Audio" },
+          right: { kind: "concrete", name: "Video" },
+          constraint: {
+            left: { kind: "concrete", name: "Audio" },
+            right: { kind: "concrete", name: "Video" },
+            origin: {
+              kind: "edge",
+              sourceNode: "n1",
+              sourceSlot: "output",
+              targetNode: "n2",
+              targetSlot: "input",
+            },
+          },
+        },
+      ],
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("ghost:graph:Ghost"));
+
+    expect(layout.layoutNodes).not.toHaveBeenCalled();
+
+    const ghostNode = getCanvasProps().nodes.find((node) => node.id === "ghost") as {
+      position: { x: number; y: number };
+      data: { category: string; inputs: string[]; outputs: string[] };
+    };
+
+    expect(ghostNode.position).toEqual({ x: 40, y: 55 });
+    expect(ghostNode.data.category).toBe("conduit");
+    expect(ghostNode.data.inputs).toEqual([]);
+    expect(ghostNode.data.outputs).toEqual([]);
+
+    currentMetrics = {
+      timestamp: 3,
+      nodes: {
+        n1: { name: "Mic", status: "running", senders: {}, receivers: {} },
+      },
+    };
+    fireEvent.click(screen.getByText("toggle-logging"));
+
+    await waitFor(() => {
+      const props = getCanvasProps();
+      const speakerNode = props.nodes.find((node) => node.id === "n2") as {
+        data: { status: string; nodeMetrics: unknown };
+      };
+      const typedEdge = props.edges[0] as { data: { typeError?: string; byteDelta?: number } };
+
+      expect(speakerNode.data.status).toBe("stopped");
+      expect(speakerNode.data.nodeMetrics).toBeNull();
+      expect(typedEdge.data.typeError).toBe("Audio ≠ Video");
+      expect(typedEdge.data.byteDelta ?? 0).toBe(0);
+    });
+
+    const dragEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { dropEffect: "copy" },
+    } as unknown as React.DragEvent;
+    act(() => {
+      getCanvasProps().onDragOver?.(dragEvent);
+    });
+    expect(dragEvent.preventDefault).toHaveBeenCalled();
+    expect(dragEvent.stopPropagation).toHaveBeenCalled();
+    expect(dragEvent.dataTransfer.dropEffect).toBe("move");
+
+    const nodesBeforeInvalidDrop = screen.getByTestId("canvas-nodes").textContent;
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 1,
+        clientY: 2,
+        dataTransfer: {
+          getData: (type: string) => (type === "application/openneuro" ? "{bad-json" : ""),
+        },
+      } as unknown as React.DragEvent);
+    });
+    expect(screen.getByTestId("canvas-nodes").textContent).toBe(nodesBeforeInvalidDrop);
+
+    fireEvent.click(screen.getByText("edit-ghost"));
+    expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-ghost");
+
+    fireEvent.click(screen.getByText("cache-edit-first"));
+    fireEvent.click(screen.getByText("remove-node"));
+    await waitFor(() => expect(api.deleteNode).toHaveBeenCalledWith("n1"));
+    fireEvent.click(screen.getByText("edit-cached"));
+    expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-n1-");
+  });
+
+  it("covers resolved-type reuse, missing layout positions, and config-schema fallbacks", async () => {
+    vi.spyOn(api, "fetchNodes").mockResolvedValueOnce([
+      {
+        id: "n1",
+        type: "Mic",
+        is_composite: false,
+        status: "startup",
+        x: 0,
+        y: 0,
+        init_args: undefined,
+      },
+      {
+        id: "n2",
+        type: "Speaker",
+        is_composite: false,
+        status: "stopped",
+        x: 0,
+        y: 0,
+        init_args: {},
+      },
+    ]);
+    vi.spyOn(layout, "layoutNodes").mockReturnValue([{ id: "n1", x: 15, y: 25 }]);
+    vi.spyOn(typecheck, "checkTypes").mockReturnValue({
+      types: new Map([
+        ["n1.in.input", { kind: "var", name: "n1.T" }],
+        ["n2.in.left", { kind: "concrete", name: "Audio" }],
+        ["n2.out.right", { kind: "concrete", name: "Video" }],
+      ]),
+      errors: [],
+    });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n2:graph:Speaker"));
+
+    const props = getCanvasProps();
+    const secondNode = props.nodes.find((node) => node.id === "n2") as {
+      position: { x: number; y: number };
+      data: { resolvedTypes?: Record<string, string> };
+    };
+    expect(secondNode.position).toEqual({ x: 0, y: 0 });
+    expect(secondNode.data.resolvedTypes).toEqual({
+      "in.left": "Audio",
+      "out.right": "Video",
+    });
+
+    fireEvent.click(screen.getByText("edit-first"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-edit-n1-"));
+    fireEvent.click(screen.getByText("cancel-configuring"));
+
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 10,
+        clientY: 10,
+        dataTransfer: {
+          getData: (type: string) =>
+            type === "application/openneuro"
+              ? JSON.stringify({
+                kind: "component",
+                type_: "Mic",
+                tags: { io: ["source"], functionality: ["audio"], gpu: ["cpu"] },
+                init: {
+                  ignored: null,
+                  refConfig: {
+                    $ref: "#/$defs/RefConfig",
+                    $defs: {
+                      RefConfig: {
+                        type: "object",
+                        properties: {
+                          gain: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                  unionConfig: {
+                    anyOf: [
+                      { type: "string" },
+                      {
+                        type: "object",
+                        properties: {
+                          nested: { type: "string" },
+                        },
+                      },
+                    ],
+                  },
+                },
+                inputs: {},
+                outputs: { output: "Audio" },
+                ui_inputs: {},
+                ui_outputs: {},
+              })
+              : "",
+        },
+      } as unknown as React.DragEvent);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-"));
+  });
+
+  it("supports editing existing nodes and keyboard shortcuts in the group menu", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic"));
+
+    fireEvent.click(screen.getByText("edit-first"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-edit-n1-"));
+    fireEvent.click(screen.getByText("cancel-configuring"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-n1-"));
+
+    fireEvent.click(screen.getByText("edit-first"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-edit-n1-"));
+    fireEvent.click(screen.getByText("confirm-configuring"));
+    await waitFor(() => expect(api.updateNodeInitArgs).toHaveBeenCalledWith("n1", { gain: 5 }));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-edit-n1-"));
+
+    fireEvent.click(screen.getByText("select-all"));
+    fireEvent.click(screen.getByText("context-first"));
+    fireEvent.click(screen.getByText("Group into subgraph"));
+    fireEvent.change(screen.getByDisplayValue("Subgraph"), { target: { value: "KeyboardGroup" } });
+    fireEvent.keyDown(screen.getByDisplayValue("KeyboardGroup"), { key: "Enter" });
+    await waitFor(() => expect(api.createSubgraph).toHaveBeenCalledWith(expect.any(Array), "KeyboardGroup"));
+
+    fireEvent.click(screen.getByText("select-all"));
+    fireEvent.click(screen.getByText("context-first"));
+    fireEvent.click(screen.getByText("Group into subgraph"));
+    fireEvent.keyDown(screen.getByDisplayValue("Subgraph"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByDisplayValue("Subgraph")).not.toBeInTheDocument());
+  });
+
+  it("opens configuration for anyOf object drops and removes the temp node on cancel", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic"));
+
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 20,
+        clientY: 30,
+        dataTransfer: {
+          getData: (type: string) =>
+            type === "application/openneuro"
+              ? JSON.stringify({
+                kind: "component",
+                type_: "Speaker",
+                tags: { io: ["sink"], functionality: ["audio"], gpu: ["cpu"] },
+                init: {
+                  config: {
+                    anyOf: [
+                      {
+                        type: "object",
+                        properties: {
+                          gain: { type: "number" },
+                        },
+                      },
+                    ],
+                  },
+                },
+                inputs: { input: "Audio" },
+                outputs: {},
+                ui_inputs: {},
+                ui_outputs: {},
+              })
+              : "",
+        },
+      } as unknown as React.DragEvent);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-"));
+    fireEvent.click(screen.getByText("cancel-configuring"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).not.toHaveTextContent("configuring-"));
+  });
+
+  it("covers no-op graph events, text fallback drops, and default grouping names", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic"));
+
+    fireEvent.click(screen.getByText("context-first"));
+    expect(screen.getByText("Select 2+ nodes to group")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("pane-click"));
+
+    const createEdgeSpy = vi.mocked(api.createEdge);
+    createEdgeSpy.mockClear();
+    act(() => {
+      getCanvasProps().onConnect?.({
+        source: "n1",
+        target: "n2",
+        sourceHandle: null,
+        targetHandle: undefined,
+      });
+    });
+    await waitFor(() => expect(api.createEdge).toHaveBeenCalledWith("n1", "", "n2", ""));
+
+    createEdgeSpy.mockClear();
+    act(() => {
+      getCanvasProps().onConnect?.({
+        source: "n1",
+        sourceHandle: null,
+        target: null,
+        targetHandle: null,
+      });
+    });
+    expect(api.createEdge).not.toHaveBeenCalled();
+
+    const nodeSnapshot = screen.getByTestId("canvas-nodes").textContent;
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 10,
+        clientY: 10,
+        dataTransfer: {
+          getData: () => "",
+        },
+      } as unknown as React.DragEvent);
+    });
+    expect(screen.getByTestId("canvas-nodes").textContent).toBe(nodeSnapshot);
+
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 10,
+        clientY: 10,
+        dataTransfer: {
+          getData: (type: string) =>
+            type === "text/plain"
+              ? JSON.stringify({
+                kind: "component",
+                type_: "Speaker",
+                tags: { io: ["sink"], functionality: ["audio"], gpu: ["cpu"] },
+                init: {},
+                inputs: { input: "Audio" },
+                outputs: {},
+                ui_inputs: {},
+                ui_outputs: {},
+              })
+              : "",
+        },
+      } as unknown as React.DragEvent);
+    });
+    await waitFor(() => expect(api.createNode).toHaveBeenCalledWith("Speaker", undefined));
+
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 10,
+        clientY: 10,
+        dataTransfer: {
+          getData: (type: string) =>
+            type === "application/openneuro" ? JSON.stringify({ kind: "unknown" }) : "",
+        },
+      } as unknown as React.DragEvent);
+    });
+
+    fireEvent.click(screen.getByText("drop-config"));
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-"));
+    const configuringId = (getCanvasProps().nodes.find((node) => node.type === "configuring") as { id: string }).id;
+    const deleteNodeSpy = vi.mocked(api.deleteNode);
+    deleteNodeSpy.mockClear();
+    act(() => {
+      getCanvasProps().onNodesChange?.([{ type: "remove", id: configuringId }]);
+    });
+    expect(api.deleteNode).not.toHaveBeenCalled();
+
+    const deleteEdgeSpy = vi.mocked(api.deleteEdge);
+    deleteEdgeSpy.mockClear();
+    act(() => {
+      getCanvasProps().onEdgesChange?.([{ type: "remove", id: "missing-edge" }]);
+    });
+    expect(api.deleteEdge).not.toHaveBeenCalled();
+    act(() => {
+      getCanvasProps().onEdgesChange?.([{ type: "select", id: "missing-edge" }]);
+    });
+
+    fireEvent.click(screen.getByText("select-all"));
+    fireEvent.click(screen.getByText("context-first"));
+    fireEvent.click(screen.getByText("Group into subgraph"));
+    fireEvent.change(screen.getByDisplayValue("Subgraph"), { target: { value: "   " } });
+    fireEvent.click(screen.getByText("Create"));
+    await waitFor(() => expect(api.createSubgraph).toHaveBeenCalledWith(expect.any(Array), "Subgraph"));
+  });
+
+  it("removes only edges touching a deleted node and accepts anyOf ref-backed config drops", async () => {
+    vi.spyOn(api, "fetchEdges").mockResolvedValueOnce([
+      {
+        source_node: "n1",
+        source_slot: "output",
+        target_node: "n2",
+        target_slot: "input",
+      },
+      {
+        source_node: "n2",
+        source_slot: "output",
+        target_node: "n3",
+        target_slot: "input",
+      },
+    ]);
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("open-project"));
+    await waitFor(() => expect(screen.getByTestId("canvas-edges")).toHaveTextContent("n1:output->n2:input"));
+    expect(screen.getByTestId("canvas-edges")).toHaveTextContent("n2:output->n3:input");
+
+    fireEvent.click(screen.getByText("remove-node"));
+    await waitFor(() => expect(api.deleteNode).toHaveBeenCalledWith("n1"));
+    expect(screen.getByTestId("canvas-edges")).not.toHaveTextContent("n1:output->n2:input");
+    expect(screen.getByTestId("canvas-edges")).toHaveTextContent("n2:output->n3:input");
+
+    await act(async () => {
+      getCanvasProps().onDrop?.({
+        preventDefault: vi.fn(),
+        clientX: 15,
+        clientY: 25,
+        dataTransfer: {
+          getData: (type: string) =>
+            type === "application/openneuro"
+              ? JSON.stringify({
+                kind: "component",
+                type_: "Speaker",
+                tags: { io: ["sink"], functionality: ["audio"], gpu: ["cpu"] },
+                init: {
+                  config: {
+                    anyOf: [
+                      { type: "string" },
+                      {
+                        $ref: "#/$defs/ConfigShape",
+                      },
+                    ],
+                    $defs: {
+                      ConfigShape: {
+                        type: "object",
+                        properties: {
+                          gain: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+                inputs: { input: "Audio" },
+                outputs: {},
+                ui_inputs: {},
+                ui_outputs: {},
+              })
+              : "",
+        },
+      } as unknown as React.DragEvent);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("configuring-"));
+  });
+
+  it("stops the startup poll cleanly when the app unmounts before the backend responds", async () => {
+    let resolveCurrentProject: ((value: { current_project: string | null }) => void) | undefined;
+    vi.spyOn(api, "fetchCurrentProject").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCurrentProject = resolve;
+        }),
+    );
+
+    const { unmount } = render(<App />);
+    unmount();
+
+    await act(async () => {
+      resolveCurrentProject?.({ current_project: "Alpha" });
+      await Promise.resolve();
+    });
+
+    expect(api.startProject).not.toHaveBeenCalled();
   });
 
   it("logs initialization failures from the editor", async () => {
@@ -535,5 +1179,13 @@ describe("App", () => {
     fireEvent.click(screen.getByText("Group into subgraph"));
     fireEvent.click(screen.getByText("Create"));
     await waitFor(() => expect(errorSpy).toHaveBeenCalledWith("[graph] Group failed:", expect.any(Error)));
+  });
+
+  it("fires the chooser cancel handler without leaving the loading state inconsistent", async () => {
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("cancel-project"));
+    expect(screen.getByText("chooser:false")).toBeInTheDocument();
   });
 });

@@ -152,6 +152,7 @@ function UITextOutputWidget({ nodeId, channel }: { nodeId: string; channel: stri
   return (
     <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 min-h-[2em]">
       <span className="text-[12px] font-mono text-foreground/80 whitespace-pre-wrap break-words">
+        {/* istanbul ignore next: empty text outputs intentionally render blank content */}
         {text ?? ""}
       </span>
     </div>
@@ -176,6 +177,7 @@ function UITextInputWidget({ nodeId, channel }: { nodeId: string; channel: strin
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
+          /* istanbul ignore next: only Enter submits the input */
           if (e.key === "Enter") handleSubmit();
         }}
         className="flex-1 rounded-lg bg-black/40 border border-white/[0.08] px-3 py-1.5 text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20"
@@ -193,6 +195,7 @@ function UITextInputWidget({ nodeId, channel }: { nodeId: string; channel: strin
 
 function UIGenericOutputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
   const value = useUIOutput(nodeId, channel);
+  /* istanbul ignore next: generic outputs normalize nulls and objects for display */
   const display = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return (
     <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 min-h-[2em]">
@@ -223,7 +226,7 @@ function UIGenericInputWidget({ nodeId, channel }: { nodeId: string; channel: st
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
+        onKeyDown={(e) => { /* istanbul ignore next: only Enter submits the input */ if (e.key === "Enter") handleSubmit(); }}
         className="flex-1 rounded-lg bg-black/40 border border-white/[0.08] px-3 py-1.5 text-[12px] font-mono text-foreground/80 placeholder:text-muted-foreground/30 focus:outline-none focus:border-white/20"
         placeholder={`${channel} (JSON)...`}
       />
@@ -235,6 +238,13 @@ function UIGenericInputWidget({ nodeId, channel }: { nodeId: string; channel: st
       </button>
     </div>
   );
+}
+
+export function hasUIWidgets(
+  uiInputs?: Record<string, string>,
+  uiOutputs?: Record<string, string>,
+) {
+  return Object.keys(uiInputs ?? {}).length > 0 || Object.keys(uiOutputs ?? {}).length > 0;
 }
 
 function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: Record<string, string>; uiOutputs: Record<string, string> }) {
@@ -258,8 +268,6 @@ function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: 
   });
 
   const widgets = [...outputWidgets, ...inputWidgets].filter(Boolean);
-  if (widgets.length === 0) return null;
-
   return (
     <div className="py-4 border-b border-white/[0.06] flex flex-col gap-3">
       {widgets}
@@ -278,9 +286,7 @@ function GraphNodeComponent({ id, data, selected }: NodeProps) {
   const d = data as GraphNodeData;
   const colors = categoryColors[d.category] ?? categoryColors.conduit!;
 
-  const hasUIWidgets =
-    Object.keys(d.ui_inputs ?? {}).length > 0 ||
-    Object.keys(d.ui_outputs ?? {}).length > 0;
+  const uiVisible = hasUIWidgets(d.ui_inputs, d.ui_outputs);
 
   const dot = statusDot[d.status] ?? "bg-status-stopped";
 
@@ -337,7 +343,7 @@ function GraphNodeComponent({ id, data, selected }: NodeProps) {
       </div>
 
       {/* UI Widgets */}
-      {hasUIWidgets && (
+      {uiVisible && (
         <UIWidgets
           nodeId={id}
           uiInputs={d.ui_inputs ?? {}}

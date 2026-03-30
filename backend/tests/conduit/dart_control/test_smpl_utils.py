@@ -53,16 +53,24 @@ def _patch_transforms(monkeypatch) -> None:
         prefix = values.shape[:-2]
         return torch.zeros((*prefix, 6), dtype=torch.float32)
 
-    monkeypatch.setattr(smpl_utils.transforms, "axis_angle_to_matrix", axis_angle_to_matrix)
-    monkeypatch.setattr(smpl_utils.transforms, "rotation_6d_to_matrix", rotation_6d_to_matrix)
-    monkeypatch.setattr(smpl_utils.transforms, "matrix_to_rotation_6d", matrix_to_rotation_6d)
+    monkeypatch.setattr(
+        smpl_utils.transforms, "axis_angle_to_matrix", axis_angle_to_matrix
+    )
+    monkeypatch.setattr(
+        smpl_utils.transforms, "rotation_6d_to_matrix", rotation_6d_to_matrix
+    )
+    monkeypatch.setattr(
+        smpl_utils.transforms, "matrix_to_rotation_6d", matrix_to_rotation_6d
+    )
 
 
 def _feature_dict(batch: int = 1, frames: int = 2) -> dict[str, torch.Tensor | str]:
     return {
         "gender": "male",
         "betas": torch.ones((batch, frames, 10), dtype=torch.float32),
-        "transf_rotmat": torch.eye(3, dtype=torch.float32).unsqueeze(0).repeat(batch, 1, 1),
+        "transf_rotmat": torch.eye(3, dtype=torch.float32)
+        .unsqueeze(0)
+        .repeat(batch, 1, 1),
         "transf_transl": torch.zeros((batch, 1, 3), dtype=torch.float32),
         "pelvis_delta": torch.zeros((batch, 3), dtype=torch.float32),
         "transl": torch.zeros((batch, frames, 3), dtype=torch.float32),
@@ -76,7 +84,9 @@ def _feature_dict(batch: int = 1, frames: int = 2) -> dict[str, torch.Tensor | s
 
 def test_smpl_utils_top_level_and_basic_primitive_utility(monkeypatch) -> None:
     _patch_transforms(monkeypatch)
-    monkeypatch.setattr(smpl_utils.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel())
+    monkeypatch.setattr(
+        smpl_utils.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel()
+    )
 
     tensor_dict = {"a": torch.ones(1), "b": "x"}
     converted = smpl_utils.tensor_dict_to_device(dict(tensor_dict), "cpu")
@@ -133,7 +143,10 @@ def test_smpl_utils_top_level_and_basic_primitive_utility(monkeypatch) -> None:
     ).shape == (1, 2, 3)
 
     subset = smpl_utils.get_dict_subset_by_batch(
-        {"gender": "male", "transl": torch.arange(6, dtype=torch.float32).reshape(2, 3)},
+        {
+            "gender": "male",
+            "transl": torch.arange(6, dtype=torch.float32).reshape(2, 3),
+        },
         0,
     )
     assert subset["gender"] == "male"
@@ -190,7 +203,9 @@ def test_smpl_utils_top_level_and_basic_primitive_utility(monkeypatch) -> None:
 
 def test_smpl_utils_advanced_primitive_paths(monkeypatch) -> None:
     _patch_transforms(monkeypatch)
-    monkeypatch.setattr(smpl_utils.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel())
+    monkeypatch.setattr(
+        smpl_utils.smplx, "build_layer", lambda *args, **kwargs: _FakeBodyModel()
+    )
 
     utility = smpl_utils.PrimitiveUtility(device="cpu")
     body_param = {
@@ -201,7 +216,9 @@ def test_smpl_utils_advanced_primitive_paths(monkeypatch) -> None:
         "global_orient": torch.eye(3).reshape(1, 3, 3),
     }
 
-    rotmat_a, transl_a = utility.get_new_coordinate(body_param, use_predicted_joints=False)
+    rotmat_a, transl_a = utility.get_new_coordinate(
+        body_param, use_predicted_joints=False
+    )
     rotmat_b, transl_b = utility.get_new_coordinate(
         body_param,
         use_predicted_joints=True,

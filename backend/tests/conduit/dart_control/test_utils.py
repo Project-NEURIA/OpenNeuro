@@ -89,6 +89,37 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
     out.sum().backward()
     assert torch.allclose(x_in.grad, torch.tensor([4.0]))
 
+    monkeypatch.setattr(nn_mod, "_AMP_DEVICE_TYPE", None)
+    monkeypatch.setattr(nn_mod, "_custom_fwd", lambda fn: fn)
+    monkeypatch.setattr(nn_mod, "_custom_bwd", lambda fn: fn)
+    x_amp = torch.tensor([3.0], requires_grad=True)
+    amp_out = nn_mod.checkpoint(lambda t: t * t, [x_amp], [], True)
+    assert torch.allclose(amp_out, torch.tensor([9.0]))
+    amp_out.sum().backward()
+    assert torch.allclose(x_amp.grad, torch.tensor([6.0]))
+
+    no_input_ctx = SimpleNamespace(saved_tensors=[torch.tensor([1.0])], input_length=1)
+    assert nn_mod.CheckpointFunction._backward_impl(
+        no_input_ctx, torch.tensor([1.0])
+    ) == (
+        None,
+        None,
+        None,
+    )
+
+    no_output_ctx = SimpleNamespace(
+        saved_tensors=[torch.tensor([1.0], requires_grad=True)],
+        input_length=1,
+        run_function=lambda tensor: torch.tensor([2.0]),
+    )
+    assert nn_mod.CheckpointFunction._backward_impl(
+        no_output_ctx, torch.tensor([1.0])
+    ) == (
+        None,
+        None,
+        None,
+    )
+
     assert respace_mod.space_timesteps(10, [1, 2]) == {0, 5, 9}
     assert len(respace_mod.space_timesteps(10, "ddim5")) == 5
     assert len(respace_mod.space_timesteps(9, "1,1,1")) == 3
@@ -160,6 +191,8 @@ def test_rotation_conversions() -> None:
     with pytest.raises(ValueError):
         rot_mod.euler_angles_to_matrix(torch.tensor(1.0), "XYZ")
     with pytest.raises(ValueError):
+        rot_mod.euler_angles_to_matrix(torch.zeros(1, 3), "XY")
+    with pytest.raises(ValueError):
         rot_mod.euler_angles_to_matrix(torch.zeros(1, 3), "XXZ")
     with pytest.raises(ValueError):
         rot_mod.euler_angles_to_matrix(torch.zeros(1, 3), "XQZ")
@@ -174,7 +207,11 @@ def test_rotation_conversions() -> None:
     )
 
     with pytest.raises(ValueError):
+        rot_mod.matrix_to_euler_angles(torch.eye(3), "XY")
+    with pytest.raises(ValueError):
         rot_mod.matrix_to_euler_angles(torch.eye(3), "XXZ")
+    with pytest.raises(ValueError):
+        rot_mod.matrix_to_euler_angles(torch.eye(3), "XQZ")
     with pytest.raises(ValueError):
         rot_mod.matrix_to_euler_angles(torch.eye(2), "XYZ")
 
@@ -279,6 +316,16 @@ def test_policy_and_inference_more(monkeypatch, tmp_path: Path) -> None:
         inf_mod._load_tyro_yaml(raw_path, inf_mod.DataArgs), inf_mod.DataArgs
     )
 
+    double_yaml = tmp_path / "double.yaml"
+    double_yaml.write_text(
+        '"denoiser_args:\\n  model_type: transformer\\n  model_args:\\n    h_dim: 8\\n    ff_size: 16\\n    num_layers: 1\\n    num_heads: 1\\n    dropout: 0.0\\n    activation: relu\\n    history_shape: [2, 10]\\n    noise_shape: [1, 5]\\n  diffusion_args:\\n    diffusion_steps: 4\\n    noise_schedule: linear\\n"',
+        encoding="utf-8",
+    )
+    transformed = inf_mod._load_tyro_yaml(double_yaml, inf_mod.MLDArgs)
+    assert isinstance(
+        transformed.denoiser_args.model_args, inf_mod.DenoiserTransformerArgs
+    )
+
     mlp_yaml = tmp_path / "mlp.yaml"
     mlp_yaml.write_text(
         """
@@ -366,10 +413,14 @@ model_args:
         lambda path, cls: (
             inf_mod.MLDArgs(
                 denoiser_args=inf_mod.DenoiserArgs(
-                    model_type="mlp",
-                    model_args=inf_mod.DenoiserMLPArgs(
+                    model_type="transformer",
+                    model_args=inf_mod.DenoiserTransformerArgs(
                         h_dim=8,
-                        n_blocks=2,
+                        ff_size=16,
+                        num_layers=1,
+                        num_heads=1,
+                        dropout=0.0,
+                        activation="relu",
                         history_shape=(2, 5),
                         noise_shape=(1, 3),
                     ),
@@ -382,10 +433,12 @@ model_args:
         ),
     )
     monkeypatch.setattr(inf_mod, "DenoiserMLP", _FakeDenoiser)
+    monkeypatch.setattr(inf_mod, "DenoiserTransformer", _FakeDenoiser)
     monkeypatch.setattr(inf_mod, "AutoMldVae", _FakeVAE)
     monkeypatch.setattr(
         inf_mod, "ClassifierFreeWrapper", lambda model: SimpleNamespace(model=model)
     )
+    original_torch_load = inf_mod.torch.load
     monkeypatch.setattr(
         inf_mod.torch,
         "load",
@@ -404,6 +457,110 @@ model_args:
     assert isinstance(mvae_args, inf_mod.MVAEArgs)
     assert torch.equal(vae_model.latent_mean, torch.tensor(0))
     assert torch.equal(vae_model.latent_std, torch.tensor(1))
+
+    monkeypatch.setattr(
+        inf_mod,
+        "_load_tyro_yaml",
+        lambda path, cls: (
+            inf_mod.MLDArgs(
+                denoiser_args=inf_mod.DenoiserArgs(
+                    model_type="mlp",
+                    model_args=inf_mod.DenoiserMLPArgs(
+                        h_dim=8,
+                        n_blocks=2,
+                        history_shape=(2, 5),
+                        noise_shape=(1, 3),
+                    ),
+                )
+            )
+            if cls is inf_mod.MLDArgs
+            else inf_mod.MVAEArgs(
+                model_args=inf_mod.VAEArgs(latent_dim=(1, 3), nfeats=5)
+            )
+        ),
+    )
+    mlp_dummy = object.__new__(inf_mod.DartControlInference)
+    mlp_dummy.device = "cpu"
+    _, mlp_denoiser, _, _ = mlp_dummy._load_models(
+        str(tmp_path / "denoiser-mlp.pt"),
+        str(tmp_path / "vae-mlp.pt"),
+    )
+    assert hasattr(mlp_denoiser, "model")
+    monkeypatch.setattr(inf_mod.torch, "load", original_torch_load)
+
+    init_infer = None
+
+    class _ClipModel:
+        def __init__(self):
+            self.eval_called = False
+            self._params = [torch.nn.Parameter(torch.ones(1))]
+
+        def eval(self):
+            self.eval_called = True
+            return self
+
+        def parameters(self):
+            return self._params
+
+    clip_model = _ClipModel()
+    monkeypatch.setattr(
+        inf_mod.clip,
+        "load",
+        lambda clip_version, device, jit=False: (clip_model, None),
+    )
+    monkeypatch.setattr(inf_mod.clip.model, "convert_weights", lambda model: None)
+    monkeypatch.setattr(
+        inf_mod,
+        "_create_diffusion",
+        lambda args, respacing_override="": SimpleNamespace(num_timesteps=2),
+    )
+    monkeypatch.setattr(
+        inf_mod.DartControlInference,
+        "_load_models",
+        lambda self, denoiser_checkpoint, vae_checkpoint: (
+            inf_mod.MLDArgs(
+                denoiser_args=inf_mod.DenoiserArgs(
+                    model_type="transformer",
+                    model_args=inf_mod.DenoiserTransformerArgs(
+                        h_dim=8,
+                        ff_size=16,
+                        num_layers=1,
+                        num_heads=1,
+                        dropout=0.0,
+                        activation="relu",
+                        history_shape=(2, 276),
+                        noise_shape=(1, 3),
+                    ),
+                )
+            ),
+            SimpleNamespace(),
+            inf_mod.MVAEArgs(model_args=inf_mod.VAEArgs(latent_dim=(1, 3), nfeats=276)),
+            _FakeVAE(),
+        ),
+    )
+    mean_std_path = tmp_path / "mean_std.pkl"
+    import pickle
+
+    mean_std_path.write_bytes(
+        pickle.dumps(
+            (
+                torch.zeros((1, 1, 276), dtype=torch.float32),
+                torch.ones((1, 1, 276), dtype=torch.float32),
+            )
+        )
+    )
+    init_infer = inf_mod.DartControlInference(
+        denoiser_checkpoint=str(tmp_path / "denoiser.pt"),
+        vae_checkpoint=str(tmp_path / "vae.pt"),
+        mean_std_path=str(mean_std_path),
+        device="cpu",
+        respacing="ddim2",
+        clip_version="demo",
+    )
+    assert init_infer.noise_shape == (1, 3)
+    assert init_infer.history_shape == (2, 276)
+    assert clip_model.eval_called is True
+    assert all(param.requires_grad is False for param in clip_model.parameters())
 
     infer = object.__new__(inf_mod.DartControlInference)
     infer.device = "cpu"

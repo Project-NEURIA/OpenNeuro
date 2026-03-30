@@ -52,7 +52,7 @@ dependencies = [
 ]
 
 [tool.mypy]
-exclude = '(^tests/)'
+exclude = '(^tests/)|(^tests_runtime/)|(^pytest[^/\\]*(?:$|[\\/]))'
 
 [[tool.mypy.overrides]]
 module = [
@@ -132,12 +132,11 @@ rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-tri
 addopts = [
     "--cov=src",
     "--cov-report=term-missing",
-    "--cov-report=xml:coverage.xml",
-    "--basetemp=pytest_temp_workspace",
+    "--cov-report=xml:tests_runtime/coverage/coverage.xml",
     "-p",
     "no:cacheprovider",
 ]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-data_file = ".coverage.local"
+data_file = "tests_runtime/coverage/.coverage"

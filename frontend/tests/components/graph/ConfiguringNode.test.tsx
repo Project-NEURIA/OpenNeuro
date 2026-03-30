@@ -1,6 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfiguringNode } from "@/components/graph/ConfiguringNode";
+import {
+  applyOptionDefaults,
+  ConfiguringNode,
+  collectFields,
+  flattenOptions,
+  getDefaultValue,
+  resolveSchema,
+} from "@/components/graph/ConfiguringNode";
 import * as api from "@/lib/api";
 
 vi.mock("@/components/ui/Dropdown", () => ({
@@ -36,6 +43,119 @@ describe("ConfiguringNode", () => {
     vi.restoreAllMocks();
   });
 
+  it("covers schema resolution and field collection helpers", () => {
+    expect(getDefaultValue({ type: "boolean" })).toBe(false);
+    expect(getDefaultValue({ type: "string", default: "preset" })).toBe("preset");
+    expect(getDefaultValue({ type: "string" })).toBe("");
+
+    expect(
+      resolveSchema({
+        anyOf: [
+          { $ref: "#/$defs/Nested" },
+        ],
+        $defs: {
+          Nested: {
+            type: "object",
+            properties: {
+              mode: { type: "string" },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      type: "object",
+      properties: {
+        mode: { type: "string" },
+      },
+    });
+    expect(
+      resolveSchema({
+        anyOf: [
+          { $ref: "#/$defs/Scalar" },
+        ],
+        $defs: {
+          Scalar: {
+            type: "string",
+          },
+        },
+      }),
+    ).toBeNull();
+    expect(
+      resolveSchema({
+        $ref: "#/$defs/Nested",
+        $defs: {
+          Nested: {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      type: "object",
+      properties: {
+        path: { type: "string" },
+      },
+    });
+    expect(
+      resolveSchema({
+        $ref: "#/$defs/Scalar",
+        $defs: {
+          Scalar: {
+            type: "string",
+          },
+        },
+      }),
+    ).toBeNull();
+    expect(resolveSchema({ type: "string" })).toBeNull();
+
+    const { fields, optionFields } = collectFields({
+      nested: {
+        type: "object",
+        options: {
+          mode: {},
+        },
+        properties: {
+          mode: { type: "string" },
+        },
+      },
+      simple: { type: "string" },
+    });
+    expect(fields["nested.mode"]).toEqual({ type: "string" });
+    expect(fields.simple).toEqual({ type: "string" });
+    expect(optionFields.has("nested.mode")).toBe(true);
+    expect(optionFields.has("simple")).toBe(true);
+
+    expect(
+      flattenOptions({
+        nested: {
+          mode: [{ value: "fast", label: "Fast" }],
+          ignored: { label: "skip" },
+        },
+        simple: [{ value: "plain", label: "Plain" }],
+        primitive: "skip",
+      }),
+    ).toEqual({
+      "nested.mode": [{ value: "fast", label: "Fast" }],
+      simple: [{ value: "plain", label: "Plain" }],
+    });
+    expect(
+      applyOptionDefaults(
+        { "nested.mode": "", simple: "kept", untouched: undefined },
+        {
+          "nested.mode": [{ value: "fast", label: "Fast" }],
+          simple: [{ value: "plain", label: "Plain" }],
+          untouched: [{ value: "set", label: "Set" }],
+        },
+      ),
+    ).toEqual({
+      "nested.mode": "fast",
+      simple: "kept",
+      untouched: "set",
+    });
+  });
+
   it("renders nested and simple fields, applies fetched options, and submits nested config", async () => {
     vi.spyOn(api, "fetchOptions").mockResolvedValue({
       settings: {
@@ -62,10 +182,14 @@ describe("ConfiguringNode", () => {
             init: {
               settings: {
                 type: "object",
+                options: {
+                  mode: {},
+                },
                 properties: {
                   enabled: { type: "boolean", default: true },
                   mode: { type: "string" },
                   threshold: { type: "number", default: 1.5 },
+                  notes: { type: "string", default: "hello" },
                 },
               },
               refSettings: {
@@ -127,6 +251,9 @@ describe("ConfiguringNode", () => {
     fireEvent.change(screen.getByTestId("dropdown-high"), { target: { value: "high" } });
     fireEvent.change(screen.getByTestId("dropdown-opt"), { target: { value: "opt" } });
     fireEvent.change(screen.getByTestId("dropdown-a-b"), { target: { value: "b" } });
+    const notesField = screen.getByDisplayValue("hello");
+    Object.defineProperty(notesField, "scrollHeight", { configurable: true, value: 48 });
+    fireEvent.change(notesField, { target: { value: "updated notes" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(onConfirm).toHaveBeenCalledWith({
@@ -134,6 +261,7 @@ describe("ConfiguringNode", () => {
         enabled: false,
         mode: "slow",
         threshold: 2.75,
+        notes: "updated notes",
       },
       refSettings: {
         mode: "safe",
@@ -243,6 +371,99 @@ describe("ConfiguringNode", () => {
     await waitFor(() => expect(screen.getByText("demo.txt")).toBeInTheDocument());
   });
 
+  it("leaves path values unchanged when tauri or browser file selection is cancelled", async () => {
+    vi.spyOn(api, "fetchOptions").mockResolvedValue({});
+    const tauriWindow = window as Window & { __TAURI__?: unknown };
+    tauriWindow.__TAURI__ = {};
+
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    vi.mocked(dialog.open).mockResolvedValueOnce(null);
+
+    const { rerender } = render(
+      <ConfiguringNode
+        id="cfg"
+        data={{
+          componentInfo: {
+            type_: "Uploader",
+            tags: { io: ["source"], functionality: ["other"], gpu: ["cpu"] },
+            init: {
+              file: { type: "string", format: "path" },
+            },
+            inputs: {},
+            outputs: {},
+            ui_inputs: {},
+            ui_outputs: {},
+          },
+          onConfirm: vi.fn(),
+          onCancel: vi.fn(),
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="configuring"
+        isConnectable
+        xPos={0}
+        yPos={0}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse" }));
+    expect(screen.getByText("No file selected")).toBeInTheDocument();
+
+    delete tauriWindow.__TAURI__;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const realCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      const element = realCreateElement(tagName);
+      if (tagName === "input") {
+        const input = element as HTMLInputElement;
+        Object.defineProperty(input, "files", {
+          configurable: true,
+          value: [],
+        });
+        input.click = () => {
+          input.onchange?.(new Event("change"));
+        };
+        return input;
+      }
+      return element;
+    }) as typeof document.createElement);
+
+    rerender(
+      <ConfiguringNode
+        id="cfg"
+        data={{
+          componentInfo: {
+            type_: "Uploader",
+            tags: { io: ["source"], functionality: ["other"], gpu: ["cpu"] },
+            init: {
+              file: { type: "string", format: "path" },
+            },
+            inputs: {},
+            outputs: {},
+            ui_inputs: {},
+            ui_outputs: {},
+          },
+          onConfirm: vi.fn(),
+          onCancel: vi.fn(),
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="configuring"
+        isConnectable
+        xPos={0}
+        yPos={0}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browse" }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("No file selected")).toBeInTheDocument();
+  });
+
   it("keeps defaults when options fail to load and leaves failed uploads unchanged", async () => {
     vi.spyOn(api, "fetchOptions").mockRejectedValue(new Error("no options"));
     const onConfirm = vi.fn();
@@ -311,6 +532,92 @@ describe("ConfiguringNode", () => {
       plainText: "keep",
       choice: "right",
       file: "",
+    });
+  });
+
+  it("covers edit-mode defaults, direct anyOf objects, and ignored invalid numeric input", async () => {
+    vi.spyOn(api, "fetchOptions").mockResolvedValue({
+      nestedChoice: {
+        value: [{ value: "preset", label: "Preset" }],
+      },
+      plainChoice: [],
+      ignoredObject: {
+        notAnArray: { label: "skip" },
+      },
+    });
+    const onConfirm = vi.fn();
+
+    render(
+      <ConfiguringNode
+        id="cfg"
+        data={{
+          componentInfo: {
+            type_: "Editor",
+            tags: { io: ["conduit"], functionality: ["misc"], gpu: ["cpu"] },
+            init: {
+              nestedChoice: {
+                anyOf: [
+                  {
+                    type: "object",
+                    properties: {
+                      value: { type: "string" },
+                    },
+                  },
+                ],
+              },
+              refChoice: {
+                $ref: "#/$defs/RefChoice",
+                $defs: {
+                  RefChoice: {
+                    type: "object",
+                    properties: {
+                      path: { type: "string" },
+                    },
+                  },
+                },
+              },
+              integerValue: { type: "integer" },
+              booleanValue: { type: "boolean" },
+              nullableField: null as never,
+            },
+            inputs: {},
+            outputs: {},
+            ui_inputs: {},
+            ui_outputs: {},
+          },
+          mode: "edit",
+          initialValues: {
+            refChoice: { path: "existing" },
+          },
+          onConfirm,
+          onCancel: vi.fn(),
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="configuring"
+        isConnectable
+        xPos={0}
+        yPos={0}
+      />,
+    );
+
+    await waitFor(() => expect(api.fetchOptions).toHaveBeenCalledWith("Editor"));
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(screen.getByDisplayValue(""), { target: { value: "12x" } });
+    expect(screen.getByDisplayValue("")).toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue(""), { target: { value: "-" } });
+    fireEvent.blur(screen.getByDisplayValue("-"));
+    fireEvent.change(screen.getByTestId("dropdown-preset"), { target: { value: "preset" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onConfirm).toHaveBeenCalledWith({
+      nestedChoice: { value: "preset" },
+      refChoice: { path: "existing" },
+      integerValue: "-",
+      booleanValue: true,
     });
   });
 });

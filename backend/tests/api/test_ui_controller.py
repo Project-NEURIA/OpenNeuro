@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import struct
-import threading
 import types
 
 from fastapi import WebSocketDisconnect
@@ -91,7 +90,9 @@ class _FakeManager:
 
 
 class _FakeWebSocket:
-    def __init__(self, manager: _FakeManager, messages: list[str] | None = None) -> None:
+    def __init__(
+        self, manager: _FakeManager, messages: list[str] | None = None
+    ) -> None:
         self.app = types.SimpleNamespace(state=types.SimpleNamespace(manager=manager))
         self._messages = iter(messages or [])
         self.accepted = False
@@ -127,15 +128,24 @@ def test_ui_type_resolution_helpers() -> None:
         "missing_args": _MissingReceiver,
     }
 
-    assert ui_controller._resolve_ui_output_type(manager, "missing-node", "video") is None
-    assert ui_controller._resolve_ui_output_type(manager, "node", "missing-slot") is None
+    assert (
+        ui_controller._resolve_ui_output_type(manager, "missing-node", "video") is None
+    )
+    assert (
+        ui_controller._resolve_ui_output_type(manager, "node", "missing-slot") is None
+    )
     assert ui_controller._resolve_ui_output_type(manager, "node", "video") is bytes
     assert ui_controller._resolve_ui_output_type(manager, "node", "payload") is _Payload
     assert ui_controller._resolve_ui_output_type(manager, "node", "missing") is None
 
-    assert ui_controller._resolve_ui_input_type(manager, "missing-node", "payload_in") is None
+    assert (
+        ui_controller._resolve_ui_input_type(manager, "missing-node", "payload_in")
+        is None
+    )
     assert ui_controller._resolve_ui_input_type(manager, "node", "missing-slot") is None
-    assert ui_controller._resolve_ui_input_type(manager, "node", "payload_in") is _Payload
+    assert (
+        ui_controller._resolve_ui_input_type(manager, "node", "payload_in") is _Payload
+    )
     assert ui_controller._resolve_ui_input_type(manager, "node", "text_in") is TextFrame
     assert ui_controller._resolve_ui_input_type(manager, "node", "missing_args") is None
 
@@ -149,13 +159,16 @@ def test_read_ui_output_variants() -> None:
         ws = _FakeWebSocket(_FakeManager())
 
         if failing:
+
             async def send_json(_payload: object) -> None:
                 raise RuntimeError("boom")
 
             ws.send_json = send_json  # type: ignore[method-assign]
 
         task = asyncio.create_task(
-            ui_controller._read_ui_output(ws, "node", "slot", receiver, inner_type, stop_event)
+            ui_controller._read_ui_output(
+                ws, "node", "slot", receiver, inner_type, stop_event
+            )
         )
         await asyncio.sleep(0)
         sender.send(item)
@@ -199,7 +212,9 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
         tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
         calls: list[tuple[str, str, type | None]] = []
 
-        async def fake_read_ui_output(ws, node_id, slot, receiver, inner_type, stop_event):
+        async def fake_read_ui_output(
+            ws, node_id, slot, receiver, inner_type, stop_event
+        ):
             calls.append((node_id, slot, inner_type))
             await stop_event.wait()
 
@@ -264,8 +279,24 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
                 json.dumps({"type": "ignored"}),
             ],
         )
+        cancelled = {"watcher": False, "task": False}
+        original_receive_text = ws.receive_text
+
+        async def delayed_receive_text() -> str:
+            await asyncio.sleep(0)
+            return await original_receive_text()
+
+        ws.receive_text = delayed_receive_text  # type: ignore[method-assign]
 
         async def fake_watch_ui_channels(ws, manager, stop_event, tasks):
+            class _Task:
+                def cancel(self) -> None:
+                    cancelled["task"] = True
+
+                def __await__(self):
+                    return stop_event.wait().__await__()
+
+            tasks[("node", "payload")] = _Task()
             await stop_event.wait()
 
         monkeypatch.setattr(ui_controller, "_watch_ui_channels", fake_watch_ui_channels)
@@ -278,6 +309,7 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
         assert isinstance(manager.sent_payloads[1], TextFrame)
         assert manager.sent_payloads[1].get() == "hello"
         assert manager.sent_payloads[2] == 3
+        assert cancelled["task"] is True
 
     asyncio.run(run_watch_ui_channels())
     asyncio.run(run_ui_ws())

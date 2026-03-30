@@ -61,7 +61,9 @@ class _FakeExecutor:
 
 def test_heading_helpers() -> None:
     quarter_turn = math.radians(90.0 / 2.0)
-    heading = _heading_from_quat(math.cos(quarter_turn), 0.0, math.sin(quarter_turn), 0.0)
+    heading = _heading_from_quat(
+        math.cos(quarter_turn), 0.0, math.sin(quarter_turn), 0.0
+    )
     assert abs(heading + 90.0) < 1e-6
     assert _angle_diff(10.0, 350.0) == 20.0
     assert _angle_diff(350.0, 10.0) == -20.0

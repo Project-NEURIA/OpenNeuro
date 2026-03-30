@@ -9,7 +9,6 @@ from pydantic import BaseModel
 
 from src.core.channel import Receiver, Sender, Channel, UIReceiver, UISender
 from src.core.component import (
-    Component,
     PrimitiveComponent,
     ThreadedComponent,
     EmitOnStart,

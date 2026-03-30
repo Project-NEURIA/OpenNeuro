@@ -105,6 +105,7 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     token_out = []
     text_out = []
     tool_out = []
+    eos_out = []
     messages = [
         MessageFrame.new(role="user", content="hi"),
         MessageFrame.new(
@@ -137,6 +138,7 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             token=SimpleNamespace(send=lambda value: token_out.append(value)),
             text=SimpleNamespace(send=lambda value: text_out.append(value)),
             tool_calls=SimpleNamespace(send=lambda value: tool_out.append(value)),
+            eos=SimpleNamespace(send=lambda value: eos_out.append(value)),
         ),
     )
     assert captured_kwargs["model"] == "demo"
@@ -147,6 +149,7 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert text_out[0].get() == "Hello world"
     assert tool_out[0].call_id == "id-1"
     assert tool_out[0].arguments == '{"a":1}'
+    assert eos_out[-1] is EOS.END
 
     def interrupt_completion(**kwargs):
         return [
@@ -157,6 +160,7 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_mod, "completion", interrupt_completion)
     interrupt_tokens = []
     interrupt_text = []
+    interrupt_eos = []
     llm.run(
         llm_mod.LLMInputs(
             messages=_FakeRecv([[MessageFrame.new(role="user", content="hi")], None]),
@@ -166,10 +170,12 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
             token=SimpleNamespace(send=lambda value: interrupt_tokens.append(value)),
             text=SimpleNamespace(send=lambda value: interrupt_text.append(value)),
             tool_calls=SimpleNamespace(send=lambda value: tool_out.append(value)),
+            eos=SimpleNamespace(send=lambda value: interrupt_eos.append(value)),
         ),
     )
     assert interrupt_text[0].get() == "Hi"
     assert interrupt_tokens[-1] is EOS.END
+    assert interrupt_eos[-1] is EOS.END
 
 
 def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:

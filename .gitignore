@@ -21,5 +21,26 @@ backend/src/core/conduit/yolo/*.pt
 backend/uv.lock
 backend/.coverage
 backend/coverage.xml
+backend/.coverage.local
+backend/.pytest_cache/
+backend/.pytest_temp/
+backend/.ruff_cache/
+backend/.uv-cache/
+backend/pytest_temp_workspace/
+backend/pytest-cache-files-*/
+backend/tests_runtime/*
+!backend/tests_runtime/.gitkeep
+!backend/tests_runtime/coverage/
+!backend/tests_runtime/coverage/.gitkeep
+!backend/tests_runtime/pytest/
+!backend/tests_runtime/pytest/.gitkeep
+backend/tests_runtime/coverage/*
+!backend/tests_runtime/coverage/.gitkeep
+backend/tests_runtime/pytest/*
+!backend/tests_runtime/pytest/.gitkeep
+backend/tests_runtime/agent_state/
+backend/tests_runtime/tmp/
+frontend/coverage/
+frontend/node_modules/.vite-temp/
 
 backend/uv.lockanalysis-report.html

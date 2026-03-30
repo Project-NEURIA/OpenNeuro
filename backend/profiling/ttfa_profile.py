@@ -457,7 +457,7 @@ class NullSink(ThreadedComponent[NullSinkInputs, tuple[()]]):
         self._count = 0
 
     def run(self, inputs: NullSinkInputs, outputs: tuple[()]) -> None:
-        for frame in inputs.audio(self):
+        for frame in inputs.audio:
             if frame is None:
                 break
             self._count += 1

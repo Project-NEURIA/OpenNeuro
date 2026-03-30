@@ -190,6 +190,17 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         )
     model_out = transformer_model(inputs_embeds=torch.ones((1, 3, 4)))
     assert model_out.last_hidden_state.shape == (1, 3, 4)
+    with pytest.raises(ValueError):
+        transformer_model(
+            input_ids=torch.ones((1, 3), dtype=torch.long),
+            inputs_embeds=torch.ones((1, 3, 4)),
+        )
+
+    cached_out = transformer_model(
+        inputs_embeds=torch.ones((1, 3, 4)),
+        use_cache=True,
+    )
+    assert cached_out.past_key_values is not None
 
     snake = tokv2_mod.SnakeBeta(4)
     assert snake(torch.ones((1, 4, 3))).shape == (1, 4, 3)
@@ -226,6 +237,15 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     assert rvq_proj.decode(
         torch.tensor([[[0, 1], [1, 0]]], dtype=torch.long)
     ).shape == (1, 4, 2)
+    rvq_identity = tokv2_mod.ResidualVectorQuantizer(
+        dimension=2,
+        input_dimension=2,
+        output_dimension=2,
+        n_q=2,
+        bins=4,
+    )
+    assert isinstance(rvq_identity.input_proj, torch.nn.Identity)
+    assert isinstance(rvq_identity.output_proj, torch.nn.Identity)
 
     split = tokv2_mod.SplitResidualVectorQuantizer(
         n_q=3,
@@ -315,6 +335,17 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
         torch.tensor([[[1, 2], [3, 4], [1, 0]]], dtype=torch.long), return_dict=False
     )
     assert len(decoded_tuple[0]) == 1
+
+    monkeypatch.setattr(tokv2_mod.MimiModel, "__init__", lambda self, config: None)
+    monkeypatch.setattr(
+        tokv2_mod.Qwen3TTSTokenizerV2Encoder,
+        "post_init",
+        lambda self: setattr(self, "post_inited", True),
+    )
+    encoder = tokv2_mod.Qwen3TTSTokenizerV2Encoder(
+        cfg_mod.MimiConfig(hidden_size=4, num_hidden_layers=1)
+    )
+    assert encoder.post_inited is True
 
 
 def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:

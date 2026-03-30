@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NodeSidebar } from "@/components/graph/NodeSidebar";
+import { InlineMarkdown, NodeSidebar, groupComponents } from "@/components/graph/NodeSidebar";
 import type { ComponentInfo } from "@/lib/types";
 
 const components: ComponentInfo[] = [
@@ -50,6 +50,21 @@ describe("NodeSidebar", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
+  });
+
+  it("covers inline markdown and grouping helpers directly", () => {
+    const { container } = render(<InlineMarkdown text="plain `code` text" />);
+    expect(container.textContent).toBe("plain code text");
+    expect(container.querySelector("code")).toHaveTextContent("code");
+
+    const groups = groupComponents([
+      components[0]!,
+      {
+        ...components[0]!,
+        type_: "MicTwo",
+      },
+    ]);
+    expect(groups.source.audio).toHaveLength(2);
   });
 
   it("searches, collapses, shows hover info, and serializes drag payloads", () => {
@@ -164,5 +179,78 @@ describe("NodeSidebar", () => {
     expect(screen.queryByText("plain hover text")).not.toBeInTheDocument();
 
     rectSpy.mockRestore();
+  });
+
+  it("keeps hover cards alive while the pointer is over them and clears them after leaving", () => {
+    const { container } = render(
+      <NodeSidebar
+        components={components}
+        currentProject="Current"
+      />,
+    );
+
+    const micItem = screen.getByText("Mic").closest("div[draggable='true']")!;
+    fireEvent.mouseEnter(micItem);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByText("bold")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(micItem);
+    const hoverWrapper = container.querySelector("div.fixed.z-50.w-64")?.parentElement as HTMLElement;
+    fireEvent.mouseEnter(hoverWrapper);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(screen.getByText("bold")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(hoverWrapper);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(screen.queryByText("bold")).not.toBeInTheDocument();
+
+    const projectItem = screen.getByText("Another").closest("div[draggable='true']")!;
+    fireEvent.mouseEnter(projectItem);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.getByText("plain hover text")).toBeInTheDocument();
+  });
+
+  it("renders code-only markdown, unknown gpu tags, and multi-group components", () => {
+    const mixedComponents: ComponentInfo[] = [
+      {
+        type_: "Hybrid",
+        description: "`snippet`",
+        tags: { io: ["source", "sink"], functionality: ["audio", "misc"], gpu: ["mystery" as never] },
+        init: {},
+        inputs: {},
+        outputs: {},
+        ui_inputs: {},
+        ui_outputs: {},
+      },
+    ];
+
+    render(
+      <NodeSidebar
+        components={mixedComponents}
+        currentProject="Current"
+      />,
+    );
+
+    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText("Sinks")).toBeInTheDocument();
+    expect(screen.getAllByText("Audio").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Misc").length).toBeGreaterThan(0);
+
+    const item = screen.getAllByText("Hybrid")[0]!.closest("div[draggable='true']")!;
+    fireEvent.mouseEnter(item);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("snippet")).toBeInTheDocument();
+    expect(screen.getByText("mystery")).toBeInTheDocument();
   });
 });

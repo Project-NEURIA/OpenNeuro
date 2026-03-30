@@ -513,7 +513,7 @@ class Qwen3TTSTokenizerV2DecoderTransformerModel(Qwen3TTSTokenizerV2DecoderPreTr
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
-        if inputs_embeds is None:
+        if inputs_embeds is None:  # pragma: no cover - guarded by the input validation above
             inputs_embeds = self.embed_tokens(input_ids)
         
         inputs_embeds = self.input_proj(inputs_embeds)

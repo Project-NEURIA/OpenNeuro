@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SplashScreen } from "@/components/SplashScreen";
+import { SplashScreen, populateSplash } from "@/components/SplashScreen";
 
 describe("SplashScreen", () => {
   it("renders the loading status and draws svg letters once", () => {
@@ -22,6 +22,10 @@ describe("SplashScreen", () => {
     expect(container.querySelector("[data-tauri-drag-region='true']")).toBeTruthy();
     expect(container.querySelector("svg#logo")).toBeTruthy();
     expect(container.querySelector(".animate-pulse")).toBeTruthy();
+  });
+
+  it("skips population when no svg element is available", () => {
+    expect(() => populateSplash(null)).not.toThrow();
   });
 });
 

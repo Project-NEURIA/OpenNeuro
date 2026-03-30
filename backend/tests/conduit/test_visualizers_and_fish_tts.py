@@ -187,7 +187,7 @@ def test_fish_tts_and_visualizers(monkeypatch) -> None:
             [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0], [np.nan, 0.0, 0.0]], dtype=np.float32
         ),
         depths=np.array([1.0, 1.0, 1.0], dtype=np.float32),
-        scores=np.array([0.9, 0.1, 0.9], dtype=np.float32),
+        scores=np.array([0.9, -0.1, 0.9], dtype=np.float32),
         boxes=np.array([[0, 0, 5, 5], [0, 0, 2, 2], [1, 1, 3, 3]], dtype=np.float32),
         object_ids=np.array([1, 2, 3], dtype=np.int64),
     )

@@ -591,6 +591,20 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     assert ids2.tolist() == [0]
     assert labels2 == ("dog",)
 
+    fake_yolo.responses = [
+        _Result(
+            _Boxes(
+                xyxy=[[0, 0, 1, 1]],
+                conf=[0.5],
+                cls=[99],
+                ids=None,
+                is_track=False,
+            ),
+            None,
+        )
+    ]
+    assert segmenter._infer(np.zeros((2, 2, 3), dtype=np.uint8)) is None
+
     listener = seg_mod.ObjectSegmenter(seg_mod.ObjectSegmenterConfig())
     updated = []
     monkeypatch.setattr(
@@ -657,15 +671,44 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     run_segmenter2.run(
         seg_mod.ObjectSegmenterInputs(
             video=_FakeRecv([frame, frame, None]),
-            prompts=_FakeRecv([TextFrame.new(text="cat"), None]),
+            prompts=_FakeRecv(
+                [TextFrame.new(text="cat"), TextFrame.new(text="cat"), None]
+            ),
         ),
         seg_mod.ObjectSegmenterOutputs(
             segmentations=SimpleNamespace(send=lambda value: sent_seg.append(value)),
             video=SimpleNamespace(send=lambda value: sent_video.append(value)),
         ),
     )
-    assert len(sent_seg) == 1
-    assert len(sent_video) == 1
+    assert len(sent_seg) == 2
+    assert len(sent_video) == 2
+    assert sent_seg[0].masks.shape == (0, 0, 0)
+    assert sent_seg[1].masks.shape == (1, 2, 2)
+
+    run_segmenter3 = seg_mod.ObjectSegmenter(seg_mod.ObjectSegmenterConfig())
+    run_segmenter3._model = SimpleNamespace(set_classes=lambda prompts: None)
+    run_segmenter3._infer = lambda rgb: (
+        np.ones((1, 1, 1), dtype=bool),
+        np.array([[1, 2, 3, 4]], dtype=np.float32),
+        np.array([0.9], dtype=np.float32),
+        np.array([5], dtype=np.int64),
+        ("cat",),
+    )
+    sent_seg_happy = []
+    run_segmenter3.run(
+        seg_mod.ObjectSegmenterInputs(
+            video=_FakeRecv([frame, None]),
+            prompts=_FakeRecv([TextFrame.new(text="cat"), None]),
+        ),
+        seg_mod.ObjectSegmenterOutputs(
+            segmentations=SimpleNamespace(
+                send=lambda value: sent_seg_happy.append(value)
+            ),
+            video=SimpleNamespace(send=lambda value: None),
+        ),
+    )
+    assert len(sent_seg_happy) == 1
+    assert sent_seg_happy[0].object_ids.tolist() == [5]
 
 
 def test_discord_paths(monkeypatch) -> None:
@@ -701,6 +744,7 @@ def test_discord_paths(monkeypatch) -> None:
     register_calls = []
     real_register_handlers = discord_mod.DiscordIO._register_handlers_for_bot
     real_thread = threading.Thread
+    real_event = threading.Event
     monkeypatch.setattr(discord_mod.os, "getenv", lambda key: "token")
     monkeypatch.setattr(discord_mod.discord.Intents, "default", lambda: "intents")
     monkeypatch.setattr(discord_mod.discord, "Bot", _FakeBot)
@@ -716,6 +760,29 @@ def test_discord_paths(monkeypatch) -> None:
     assert register_calls and register_calls[0].token == "token"
     discord_mod._discord_running = True
     io._ensure_discord_running()
+
+    discord_mod._discord_bot = None
+    discord_mod._discord_running = False
+    waited = {"count": 0}
+
+    class _WaitingThread:
+        def __init__(self, target, daemon=False):
+            self.target = target
+            self.daemon = daemon
+
+        def start(self):
+            return None
+
+    class _WaitingEvent:
+        def wait(self, timeout=None):
+            waited["count"] += 1
+            discord_mod._discord_bot = SimpleNamespace(user="later")
+
+    monkeypatch.setattr(discord_mod.threading, "Thread", _WaitingThread)
+    monkeypatch.setattr(discord_mod.threading, "Event", lambda: _WaitingEvent())
+    io._ensure_discord_running()
+    assert waited["count"] == 1
+    monkeypatch.setattr(discord_mod.threading, "Event", real_event)
 
     monkeypatch.setattr(
         discord_mod.DiscordIO, "_register_handlers_for_bot", real_register_handlers
@@ -935,6 +1002,45 @@ def test_discord_paths(monkeypatch) -> None:
     leave_no_guild_ctx = _Ctx(author=_Member(voice=None), guild=None)
     asyncio.run(bot.commands["leave"](leave_no_guild_ctx))
     assert leave_no_guild_ctx.responses == ["Must be used in a guild"]
+
+    bad_existing_guild = _Guild(14)
+
+    class _BadExistingVC:
+        def __init__(self, guild):
+            self.guild = guild
+            self.recording = False
+
+        async def disconnect(self, force=True):
+            raise RuntimeError("disconnect")
+
+        def cleanup(self):
+            raise RuntimeError("cleanup")
+
+    bad_existing_vc = _BadExistingVC(bad_existing_guild)
+    bad_existing_guild.voice_client = bad_existing_vc
+    bad_join_ctx = _Ctx(
+        author=_Member(voice=SimpleNamespace(channel=_Channel(_NewVC()))),
+        guild=bad_existing_guild,
+    )
+    asyncio.run(bot.commands["join"](bad_join_ctx))
+    assert bad_join_ctx.followup.messages == ["Connected"]
+
+    class _BadLeaveVC:
+        recording = True
+
+        def stop_recording(self):
+            raise RuntimeError("stop")
+
+        async def disconnect(self, force=True):
+            raise RuntimeError("disconnect")
+
+    discord_mod._voice_clients[15] = _BadLeaveVC()
+    bad_leave_ctx = _Ctx(
+        author=_Member(voice=SimpleNamespace(channel=None)),
+        guild=SimpleNamespace(id=15),
+    )
+    asyncio.run(bot.commands["leave"](bad_leave_ctx))
+    assert bad_leave_ctx.responses == ["Disconnected"]
 
     play_vc_break = SimpleNamespace(
         played=None,

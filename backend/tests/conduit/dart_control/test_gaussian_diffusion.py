@@ -78,6 +78,8 @@ def test_extract_and_basic_q_functions() -> None:
 
     sample = diffusion.q_sample(x_start, t, noise=torch.zeros_like(x_start))
     assert sample.shape == x_start.shape
+    sampled_default = diffusion.q_sample(x_start, t)
+    assert sampled_default.shape == x_start.shape
 
     with pytest.raises(AssertionError):
         diffusion.q_sample(x_start, t, noise=torch.zeros((1, 1, 1, 1)))
@@ -186,8 +188,18 @@ def test_sampling_loops_and_progress_paths(monkeypatch) -> None:
         noise=torch.zeros((2, 1, 1, 1), dtype=torch.float32),
         dump_steps=[0],
     )
+    seeded = list(
+        diffusion.p_sample_loop_progressive(
+            model,
+            shape=(2, 1, 1, 1),
+            noise=None,
+            skip_timesteps=1,
+            init_image=None,
+        )
+    )
     assert final.shape == (2, 1, 1, 1)
     assert len(dumped) == 1
+    assert seeded
 
 
 def test_ddim_sampling_paths(monkeypatch) -> None:
@@ -232,4 +244,14 @@ def test_ddim_sampling_paths(monkeypatch) -> None:
         noise=torch.zeros((2, 1, 1, 1), dtype=torch.float32),
         eta=0.1,
     )
+    seeded = list(
+        diffusion.ddim_sample_loop_progressive(
+            model,
+            shape=(2, 1, 1, 1),
+            noise=None,
+            skip_timesteps=1,
+            init_image=None,
+        )
+    )
     assert final.shape == (2, 1, 1, 1)
+    assert seeded

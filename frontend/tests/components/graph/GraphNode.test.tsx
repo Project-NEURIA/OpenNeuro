@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphNode } from "@/components/graph/GraphNode";
+import { GraphNode, hasUIWidgets } from "@/components/graph/GraphNode";
 import * as textHook from "@/hooks/useUITextOutput";
 import * as videoHook from "@/hooks/useUIVideoOutput";
 import * as outputHook from "@/hooks/useUIOutput";
@@ -18,6 +18,12 @@ vi.mock("@xyflow/react", () => ({
 describe("GraphNode", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("detects visible ui widgets from either input or output channels", () => {
+    expect(hasUIWidgets(undefined, undefined)).toBe(false);
+    expect(hasUIWidgets({ textIn: "UITextReceiver" }, undefined)).toBe(true);
+    expect(hasUIWidgets(undefined, { textOut: "UITextSender" })).toBe(true);
   });
 
   it("renders selected node widgets, handles, metrics, and sends UI input", () => {
@@ -214,6 +220,108 @@ describe("GraphNode", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Send" })[1]!);
 
     expect(sendUIInput).not.toHaveBeenCalled();
+    expect(sendGeneric).not.toHaveBeenCalled();
+  });
+
+  it("covers sink styling and omits the widget section when no ui channels are present", () => {
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue(null);
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue(null);
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(vi.fn());
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    render(
+      <GraphNode
+        id="node-4"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "SinkNode",
+          category: "sink",
+          inputs: ["input"],
+          outputs: [],
+          inputTypes: { input: { name: "Audio", optional: false } },
+          outputTypes: {},
+          status: "idle",
+          nodeMetrics: {
+            name: "SinkNode",
+            status: "idle",
+            senders: {},
+            receivers: {},
+          },
+          ui_inputs: {},
+          ui_outputs: {},
+        }}
+      />,
+    );
+
+    expect(screen.getByText("sink")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/JSON/)).not.toBeInTheDocument();
+  });
+
+  it("keeps non-enter keys and empty output payloads on the non-submitting path", () => {
+    const sendGeneric = vi.fn();
+    const sendUIInput = vi.fn();
+    vi.spyOn(videoHook, "useUIVideoOutput").mockReturnValue(null);
+    vi.spyOn(textHook, "useUITextOutput").mockReturnValue(null);
+    vi.spyOn(outputHook, "useUIOutput").mockReturnValue(null);
+    vi.spyOn(inputHook, "useUIInput").mockReturnValue(sendGeneric);
+    vi.spyOn(channelContext, "useUIChannel").mockReturnValue({
+      connected: true,
+      sendUIInput,
+      subscribe: vi.fn(() => vi.fn()),
+    });
+
+    render(
+      <GraphNode
+        id="node-5"
+        selected={false}
+        dragging={false}
+        zIndex={1}
+        type="graph"
+        isConnectable
+        xPos={0}
+        yPos={0}
+        data={{
+          label: "QuietNode",
+          category: "conduit",
+          inputs: [],
+          outputs: [],
+          inputTypes: {},
+          outputTypes: {},
+          status: "stopped",
+          nodeMetrics: null,
+          ui_inputs: {
+            textIn: "UITextReceiver",
+            genericIn: "UICustomReceiver",
+          },
+          ui_outputs: {
+            textOut: "UITextSender",
+            dataOut: "UICustomSender",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("", { selector: "span, pre" }).length).toBeGreaterThan(0);
+
+    const textInput = screen.getByPlaceholderText("textIn...");
+    fireEvent.change(textInput, { target: { value: "hello" } });
+    fireEvent.keyDown(textInput, { key: "Tab" });
+    expect(sendUIInput).not.toHaveBeenCalled();
+
+    const genericInput = screen.getByPlaceholderText("genericIn (JSON)...");
+    fireEvent.change(genericInput, { target: { value: "{\"value\":2}" } });
+    fireEvent.keyDown(genericInput, { key: "Escape" });
     expect(sendGeneric).not.toHaveBeenCalled();
   });
 });

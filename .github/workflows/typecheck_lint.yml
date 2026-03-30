@@ -15,6 +15,8 @@ jobs:
       contents: read
     env:
       UV_CACHE_DIR: /home/runner/.cache/uv
+      CUDA_VISIBLE_DEVICES: ""
+      PYTORCH_TEST_WITHOUT_CUDA: "1"
     defaults:
       run:
         working-directory: backend
@@ -39,7 +41,7 @@ jobs:
             typecheck-lint-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --no-default-groups
 
       - name: Ruff format check
         run: uv run ruff format --check .

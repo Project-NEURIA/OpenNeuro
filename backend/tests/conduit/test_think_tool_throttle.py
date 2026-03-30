@@ -33,7 +33,9 @@ def test_think_tool_emit_and_run_paths(capsys) -> None:
 
     outputs = ThinkToolOutputs(
         tool_def=types.SimpleNamespace(send=lambda value: tool_defs.append(value)),
-        tool_result=types.SimpleNamespace(send=lambda value: tool_results.append(value)),
+        tool_result=types.SimpleNamespace(
+            send=lambda value: tool_results.append(value)
+        ),
     )
 
     tool.emit(outputs)
@@ -42,8 +44,12 @@ def test_think_tool_emit_and_run_paths(capsys) -> None:
             tool_call=_FakeRecv(
                 [
                     ToolCall.new(call_id="skip", name="other", arguments="{}"),
-                    ToolCall.new(call_id="json", name="think", arguments='{"thought":"plan"}'),
-                    ToolCall.new(call_id="fallback", name="think", arguments="not-json"),
+                    ToolCall.new(
+                        call_id="json", name="think", arguments='{"thought":"plan"}'
+                    ),
+                    ToolCall.new(
+                        call_id="fallback", name="think", arguments="not-json"
+                    ),
                     None,
                 ]
             )
@@ -64,12 +70,16 @@ def test_throttle_forwards_newest_items(monkeypatch) -> None:
     sent = []
     throttle = Throttle[int](ThrottleConfig(interval=0.25))
 
-    monkeypatch.setattr("src.core.conduit.throttle.time.sleep", lambda value: sleeps.append(value))
+    monkeypatch.setattr(
+        "src.core.conduit.throttle.time.sleep", lambda value: sleeps.append(value)
+    )
 
     recv = _FakeRecv([1, 2, None])
     throttle.run(
         ThrottleInputs(data=recv),
-        ThrottleOutputs(data=types.SimpleNamespace(send=lambda value: sent.append(value))),
+        ThrottleOutputs(
+            data=types.SimpleNamespace(send=lambda value: sent.append(value))
+        ),
     )
 
     assert recv.newest is True

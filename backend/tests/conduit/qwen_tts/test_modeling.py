@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 import numpy as np
@@ -507,7 +506,7 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
     assert updated["tts_pad_embed"] == "pad"
 
 
-def test_qwen_tts_modeling_full_model_paths(monkeypatch) -> None:
+def test_qwen_tts_modeling_full_model_paths(monkeypatch, tmp_path: Path) -> None:
     _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
@@ -535,36 +534,35 @@ def test_qwen_tts_modeling_full_model_paths(monkeypatch) -> None:
     assert model.get_supported_speakers() == qcfg.talker_config.spk_id.keys()
     assert model.get_supported_languages() == model.supported_languages
 
-    with TemporaryDirectory() as tmpdir:
-        root = Path(tmpdir)
-        (root / "speech_tokenizer").mkdir()
-        (root / "speech_tokenizer" / "config.json").write_text("{}", encoding="utf-8")
-        gen_path = root / "generation_config.json"
-        gen_path.write_text(json.dumps({"temperature": 0.5}), encoding="utf-8")
-        base_instance = mod.Qwen3TTSForConditionalGeneration(qcfg)
-        monkeypatch.setattr(
-            mod.Qwen3TTSPreTrainedModel,
-            "from_pretrained",
-            classmethod(lambda cls, *args, **kwargs: base_instance),
-        )
-        monkeypatch.setattr(
-            mod, "download_weights_from_hf_specific", lambda *args, **kwargs: str(root)
-        )
-        monkeypatch.setattr(
-            mod,
-            "cached_file",
-            lambda model_name, filename, **kwargs: str(root / filename),
-        )
-        monkeypatch.setattr(
-            mod.Qwen3TTSTokenizer,
-            "from_pretrained",
-            classmethod(lambda cls, path, *args, **kwargs: SimpleNamespace(path=path)),
-        )
-        loaded = mod.Qwen3TTSForConditionalGeneration.from_pretrained(
-            "remote-model", config=qcfg
-        )
-        assert loaded.speech_tokenizer.path.endswith("speech_tokenizer")
-        assert loaded.generate_config["temperature"] == 0.5
+    root = tmp_path / "qwen"
+    (root / "speech_tokenizer").mkdir(parents=True)
+    (root / "speech_tokenizer" / "config.json").write_text("{}", encoding="utf-8")
+    gen_path = root / "generation_config.json"
+    gen_path.write_text(json.dumps({"temperature": 0.5}), encoding="utf-8")
+    base_instance = mod.Qwen3TTSForConditionalGeneration(qcfg)
+    monkeypatch.setattr(
+        mod.Qwen3TTSPreTrainedModel,
+        "from_pretrained",
+        classmethod(lambda cls, *args, **kwargs: base_instance),
+    )
+    monkeypatch.setattr(
+        mod, "download_weights_from_hf_specific", lambda *args, **kwargs: str(root)
+    )
+    monkeypatch.setattr(
+        mod,
+        "cached_file",
+        lambda model_name, filename, **kwargs: str(root / filename),
+    )
+    monkeypatch.setattr(
+        mod.Qwen3TTSTokenizer,
+        "from_pretrained",
+        classmethod(lambda cls, path, *args, **kwargs: SimpleNamespace(path=path)),
+    )
+    loaded = mod.Qwen3TTSForConditionalGeneration.from_pretrained(
+        "remote-model", config=qcfg
+    )
+    assert loaded.speech_tokenizer.path.endswith("speech_tokenizer")
+    assert loaded.generate_config["temperature"] == 0.5
 
     monkeypatch.setattr(
         mod,

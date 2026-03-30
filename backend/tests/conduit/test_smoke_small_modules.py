@@ -144,6 +144,11 @@ def test_small_conduit_modules_run_paths() -> None:
                         name="move",
                         arguments='{"instruction":"dance"}',
                     ),
+                    ToolCall.new(
+                        call_id="d",
+                        name="move",
+                        arguments='{"instruction":"turn","heading":45}',
+                    ),
                     None,
                 ]
             )
@@ -158,8 +163,10 @@ def test_small_conduit_modules_run_paths() -> None:
     assert move_defs[0].name == "move"
     assert move_results[0].content == "Executing 'walk' toward (1, 2)"
     assert move_results[1].content == "Executing 'dance'"
+    assert move_results[2].content == "Executing 'turn' facing 45°"
     assert goals[0].x == 1.0 and goals[0].z == 2.0
-    assert [t.get() for t in instructions] == ["walk", "dance"]
+    assert goals[1].heading == 45.0
+    assert [t.get() for t in instructions] == ["walk", "dance", "turn"]
 
     adapted = []
     adapter = StereoCameraParamsAdapter()

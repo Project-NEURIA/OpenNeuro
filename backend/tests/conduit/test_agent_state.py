@@ -68,7 +68,9 @@ def test_agent_state_helper_methods(capsys) -> None:
     assert state._heading_from_quat(1.0, 0.0, 0.0, 0.0) == 0.0
 
     tool_call = ToolCall.new(call_id="call-1", name="lookup", arguments='{"q":"x"}')
-    tool_msg = MessageFrame.new(role="assistant", content="tool", tool_calls=[tool_call])
+    tool_msg = MessageFrame.new(
+        role="assistant", content="tool", tool_calls=[tool_call]
+    )
     result_msg = MessageFrame.new(role="tool", content="done", tool_call_id="call-1")
     empty_msg = MessageFrame.new(role="system", content=None)
 
@@ -147,8 +149,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
     assert any("memory note" in (content or "") for content in contents)
     assert any("Currently visible objects" in (content or "") for content in contents)
     assert any(
-        "Heading (from +Z clockwise): -0" in (content or "")
-        for content in contents
+        "Heading (from +Z clockwise): -0" in (content or "") for content in contents
     )
     assert any(msg.tool_calls and msg.tool_calls[0].name == "lookup" for msg in msgs)
     assert any(
@@ -160,3 +161,12 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
     assert dumped[0]["content"] == "init"
     assert any(entry.get("tool_calls") for entry in dumped)
     assert any(entry.get("tool_call_id") == "tool-1" for entry in dumped)
+
+
+def test_agent_state_dump_messages_without_current_project(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.conduit.agent_state.AppConfig.load_config",
+        lambda: SimpleNamespace(current_project=None),
+    )
+
+    AgentState._dump_messages([MessageFrame.new(role="user", content="hello")])

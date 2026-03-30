@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 from pathlib import Path
+import threading
 from types import SimpleNamespace
 
 import numpy as np
@@ -246,6 +247,13 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     assert fake_model.generated["languages"] == ["English", "English"]
     assert fake_model.generated["non_streaming_mode"] is False
 
+    qwen.generate_voice_clone(
+        ["a", "b"],
+        language=["English"],
+        voice_clone_prompt=[same_sr_items[0]],
+    )
+    assert fake_model.generated["languages"] == ["English", "English"]
+
     monkeypatch.setattr(utils_mod, "auto_device", lambda cfg: torch.device("cpu"))
     monkeypatch.setattr(utils_mod, "auto_dtype", lambda device: torch.float32)
     monkeypatch.setattr(model_mod.torch.cuda, "is_available", lambda: False)
@@ -345,6 +353,32 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     )
     with pytest.raises(RuntimeError):
         list(streaming_err.generate_streaming("hi", tmp_path / "voice.pt"))
+
+    sparse_streaming = model_mod.SimpleStreamingTTS(
+        fake_model, processor, torch.device("cpu")
+    )
+    sparse_streaming._talker = _Talker()
+    monkeypatch.setattr(
+        model_mod,
+        "_streaming_config",
+        model_mod.StreamingConfig(min_initial_frames=2, yield_every_n_frames=2),
+    )
+    monkeypatch.setattr(model_mod.threading, "Thread", _SyncThread)
+    monkeypatch.setattr(
+        model_mod.torch, "load", lambda path, weights_only=False: "prompt"
+    )
+    sparse_streaming._decode_audio = lambda codes: np.arange(
+        len(codes), dtype=np.float32
+    )
+    sparse_streaming._model.generate_voice_clone = lambda **kwargs: [
+        sparse_streaming._talker.forward(),
+        sparse_streaming._talker.forward(),
+        sparse_streaming._talker.forward(),
+    ]
+    sparse_chunks = list(
+        sparse_streaming.generate_streaming("hi", tmp_path / "voice.pt")
+    )
+    assert sparse_chunks[0][1]["frame_idx"] == 2
 
 
 def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
@@ -544,6 +578,7 @@ def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
         yield np.array([0.1], dtype=np.float32), {}
         worker_comp._generation = 1
         yield np.array([0.2], dtype=np.float32), {}
+        yield np.array([0.3], dtype=np.float32), {}
 
     worker_comp._tts = SimpleNamespace(
         sample_rate=24000,
@@ -557,6 +592,48 @@ def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
         )
     )
     assert len(mismatch_audio) == 1
+
+    cancelled_comp = comp_mod.QwenTTS(comp_mod.QwenTTSConfig())
+    cancelled_comp._voice_paths = {"good": Path("good.pt")}
+    cancelled_comp._stop_event = threading.Event()
+
+    class _ImmediateQueue:
+        def __init__(self, owner):
+            self.owner = owner
+            self.items = [(0, "hello")]
+
+        def get(self, timeout=None):
+            if self.items:
+                return self.items.pop(0)
+            self.owner.stop_event.set()
+            raise comp_mod.Empty
+
+        def empty(self):
+            return not self.items
+
+    class _PreCancelledEvent:
+        def is_set(self) -> bool:
+            return True
+
+        def set(self) -> None:
+            return None
+
+    cancelled_comp._tts = SimpleNamespace(
+        sample_rate=24000,
+        generate_streaming=lambda *args, **kwargs: iter(
+            [(np.array([0.1], dtype=np.float32), {})]
+        ),
+    )
+    cancelled_comp._task_queue = _ImmediateQueue(cancelled_comp)
+    monkeypatch.setattr(comp_mod.threading, "Event", _PreCancelledEvent)
+    cancelled_audio = []
+    cancelled_comp._worker(
+        comp_mod.QwenTTSOutputs(
+            audio=SimpleNamespace(send=lambda value: cancelled_audio.append(value)),
+            text=SimpleNamespace(send=lambda value: None),
+        )
+    )
+    assert cancelled_audio == []
 
     run_comp = comp_mod.QwenTTS(comp_mod.QwenTTSConfig())
     run_comp._load_model = lambda: None

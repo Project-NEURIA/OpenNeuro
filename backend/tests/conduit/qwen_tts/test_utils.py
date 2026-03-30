@@ -33,6 +33,14 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
         "layer_type_validation",
         lambda layer_types: layer_calls.append(list(layer_types)),
     )
+    config_logs = []
+    tok_config_logs = []
+    monkeypatch.setattr(
+        cfg_mod.logger, "info", lambda message: config_logs.append(message)
+    )
+    monkeypatch.setattr(
+        tok_cfg_mod.logger, "info", lambda message: tok_config_logs.append(message)
+    )
 
     speaker_cfg = cfg_mod.Qwen3TTSSpeakerEncoderConfig(sample_rate=16000, enc_dim=256)
     assert speaker_cfg.sample_rate == 16000
@@ -76,6 +84,9 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
     assert tts_cfg.speaker_encoder_config.enc_dim == 32
     assert tts_cfg.tokenizer_type == "demo"
     assert tts_cfg.tts_model_type == "base"
+    default_tts_cfg = cfg_mod.Qwen3TTSConfig()
+    assert default_tts_cfg.talker_config is not None
+    assert len(config_logs) >= 2
 
     decoder_cfg = tok_cfg_mod.Qwen3TTSTokenizerV2DecoderConfig(num_hidden_layers=3)
     assert decoder_cfg.layer_types == ["sliding_attention"] * 3
@@ -87,6 +98,9 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
     assert full_tok_cfg.decoder_config.num_hidden_layers == 2
     assert full_tok_cfg.input_sample_rate == 22050
     assert full_tok_cfg.output_sample_rate == 44100
+    default_tok_cfg = tok_cfg_mod.Qwen3TTSTokenizerV2Config()
+    assert default_tok_cfg.encoder_config is not None
+    assert len(tok_config_logs) >= 2
 
     def _proc_init(self, tokenizer=None, chat_template=None):
         self.tokenizer = tokenizer
@@ -252,6 +266,11 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     assert tokenizer._is_probably_base64("x/y.wav") is False
     assert tokenizer._is_url("https://example.com/a.wav") is True
     assert tokenizer._is_url("not-a-url") is False
+    monkeypatch.setattr(
+        tok_mod, "urlparse", lambda value: (_ for _ in ()).throw(ValueError("boom"))
+    )
+    assert tokenizer._is_url("broken") is False
+    monkeypatch.setattr(tok_mod, "urlparse", tok_mod.urllib.parse.urlparse)
     assert (
         tokenizer._decode_base64_to_wav_bytes(
             "data:audio/wav;base64," + base64.b64encode(b"abc").decode("ascii")
@@ -364,6 +383,20 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
         {"audio_codes": torch.tensor([[1, 2], [3, 4]], dtype=torch.long)}
     )
     assert len(wavs4) == 1
+    wavs5, _ = tokenizer.decode(
+        {"audio_codes": [np.array([[1, 2], [3, 4]], dtype=np.int64)]}
+    )
+    assert len(wavs5) == 1
+
+    model.config.model_type = "qwen3_tts_tokenizer_25hz"
+    wavs6, _ = tokenizer.decode(
+        {
+            "audio_codes": [torch.tensor([1, 2], dtype=torch.long)],
+            "xvectors": torch.tensor([0.1, 0.2], dtype=torch.float32),
+            "ref_mels": torch.tensor([[0.1, 0.2]], dtype=torch.float32),
+        }
+    )
+    assert len(wavs6) == 1
 
     with pytest.raises(TypeError):
         tokenizer.decode(123)

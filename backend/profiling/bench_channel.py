@@ -150,9 +150,9 @@ def bench_1p3c_channel(n: int) -> tuple[float, bool]:
     sums = [[0], [0], [0]]
 
     def consumer(sub_id: int, acc: list[int]):
-        ch._register(sub_id, latest=False)
+        ch._register(sub_id, newest=False)
         for _ in range(n):
-            item = ch._wait_and_get(sub_id, stop)
+            item = ch._get(sub_id, stop, blocking=True)
             if item is None:
                 break
             acc[0] += item
@@ -329,10 +329,10 @@ def bench_pipeline_channel(n: int) -> tuple[float, bool]:
         transform,
         acc: list[int] | None,
     ):
-        in_ch._register(sub_id, latest=False)
+        in_ch._register(sub_id, newest=False)
         out_sender = Sender(out_ch) if out_ch else None
         for _ in range(n):
-            item = in_ch._wait_and_get(sub_id, stop)
+            item = in_ch._get(sub_id, stop, blocking=True)
             if item is None:
                 break
             val = transform(item)
@@ -645,14 +645,14 @@ def bench_latency_channel(n: int) -> list[float]:
     t.start()
     ready.wait()
 
-    ch_pong._register(2, latest=False)
+    ch_pong._register(2, newest=False)
     pinger = Sender(ch_ping)
     latencies = []
 
     for _ in range(n):
         t0 = time.perf_counter()
         pinger.send(0)
-        ch_pong._wait_and_get(2, stop)
+        ch_pong._get(2, stop, blocking=True)
         latencies.append(time.perf_counter() - t0)
 
     stop.set()

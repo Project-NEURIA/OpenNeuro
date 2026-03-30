@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pickle
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -62,7 +61,9 @@ class _QueueExecutor:
 
 
 def _make_component(**kwargs) -> DartControl:
-    config = DartControlConfig(device="cpu", batch_size=1, future_length=2, fps=60.0, **kwargs)
+    config = DartControlConfig(
+        device="cpu", batch_size=1, future_length=2, fps=60.0, **kwargs
+    )
     return DartControl(config)
 
 
@@ -78,15 +79,28 @@ def test_component_math_and_pose_helpers(monkeypatch) -> None:
     assert rotmat.shape == (3, 3)
 
     assert len(dart_mod._rotmat_to_quaternion(torch.eye(3))) == 4
-    assert len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([2.0, -1.0, -1.0])))) == 4
-    assert len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([-1.0, 2.0, -1.0])))) == 4
-    assert len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([-1.0, -1.0, 2.0])))) == 4
+    assert (
+        len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([2.0, -1.0, -1.0]))))
+        == 4
+    )
+    assert (
+        len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([-1.0, 2.0, -1.0]))))
+        == 4
+    )
+    assert (
+        len(dart_mod._rotmat_to_quaternion(torch.diag(torch.tensor([-1.0, -1.0, 2.0]))))
+        == 4
+    )
 
     monkeypatch.setattr(dart_mod, "_rot6d_to_matrix", lambda _rot6d: torch.eye(3))
-    monkeypatch.setattr(dart_mod, "_rotmat_to_quaternion", lambda _m: (1.0, 0.0, 0.0, 0.0))
+    monkeypatch.setattr(
+        dart_mod, "_rotmat_to_quaternion", lambda _m: (1.0, 0.0, 0.0, 0.0)
+    )
     features = torch.zeros(276, dtype=torch.float32)
     joints = torch.arange(22 * 3, dtype=torch.float32).reshape(22, 3)
-    features[dart_mod._JOINTS_OFFSET : dart_mod._JOINTS_OFFSET + 22 * 3] = joints.reshape(-1)
+    features[dart_mod._JOINTS_OFFSET : dart_mod._JOINTS_OFFSET + 22 * 3] = (
+        joints.reshape(-1)
+    )
     poses = dart_mod._features_to_body_pose(features)
     assert poses["waist"] is not None
     assert poses["waist"].pos_x == -joints[0, 0].item()
@@ -127,7 +141,9 @@ def test_component_lazy_loaders_and_prepare_frames(monkeypatch) -> None:
     assert frames[0]["left_foot"].pos_y == 0.0
 
 
-def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Path) -> None:
+def test_component_init_from_stand_and_history_updates(
+    monkeypatch, tmp_path: Path
+) -> None:
     component = _make_component(stand_path=str(tmp_path / "stand.pkl"))
 
     stand_data = {
@@ -141,7 +157,9 @@ def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(
         dart_mod.transforms,
         "axis_angle_to_matrix",
-        lambda values: torch.eye(3, dtype=torch.float32).expand(*values.shape[:-1], 3, 3).clone(),
+        lambda values: (
+            torch.eye(3, dtype=torch.float32).expand(*values.shape[:-1], 3, 3).clone()
+        ),
     )
 
     engine = SimpleNamespace(
@@ -155,7 +173,11 @@ def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Pa
             return torch.ones((1, 3), dtype=torch.float32)
 
         def canonicalize(self, primitive_dict):
-            return primitive_dict["transf_rotmat"], primitive_dict["transf_transl"], primitive_dict
+            return (
+                primitive_dict["transf_rotmat"],
+                primitive_dict["transf_transl"],
+                primitive_dict,
+            )
 
         def calc_features(self, primitive_dict):
             return {
@@ -200,7 +222,9 @@ def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Pa
                     "transl": torch.zeros((1, 2, 3), dtype=torch.float32),
                     "poses_6d": torch.zeros((1, 2, 22 * 6), dtype=torch.float32),
                     "transl_delta": torch.zeros((1, 2, 3), dtype=torch.float32),
-                    "global_orient_delta_6d": torch.zeros((1, 2, 6), dtype=torch.float32),
+                    "global_orient_delta_6d": torch.zeros(
+                        (1, 2, 6), dtype=torch.float32
+                    ),
                     "joints": torch.zeros((1, 2, 22 * 3), dtype=torch.float32),
                     "joints_delta": torch.zeros((1, 2, 22 * 3), dtype=torch.float32),
                 },
@@ -230,7 +254,9 @@ def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Pa
     component._transf_rotmat = torch.eye(3).unsqueeze(0)
     component._transf_transl = torch.zeros((1, 1, 3), dtype=torch.float32)
     component._pelvis_delta = torch.zeros((1, 3), dtype=torch.float32)
-    world = component._get_world_features(engine, putil, torch.ones((1, 2, 276), dtype=torch.float32))
+    world = component._get_world_features(
+        engine, putil, torch.ones((1, 2, 276), dtype=torch.float32)
+    )
     assert world.shape == (1, 2, 276)
 
     component._engine = engine
@@ -239,7 +265,9 @@ def test_component_init_from_stand_and_history_updates(monkeypatch, tmp_path: Pa
     assert joints.shape == (1, 2, 22, 3)
 
 
-def test_component_observation_policy_and_generation(monkeypatch, tmp_path: Path) -> None:
+def test_component_observation_policy_and_generation(
+    monkeypatch, tmp_path: Path
+) -> None:
     component = _make_component(policy_checkpoint="")
     component._engine = SimpleNamespace(
         denormalize=lambda value: value,
@@ -273,7 +301,9 @@ def test_component_observation_policy_and_generation(monkeypatch, tmp_path: Path
     monkeypatch.setattr(
         dart_mod.transforms,
         "euler_angles_to_matrix",
-        lambda angles, convention: torch.eye(3).unsqueeze(0).repeat(angles.shape[0], 1, 1),
+        lambda angles, convention: (
+            torch.eye(3).unsqueeze(0).repeat(angles.shape[0], 1, 1)
+        ),
     )
 
     text_embedding = torch.zeros((1, 512), dtype=torch.float32)
@@ -324,15 +354,29 @@ def test_component_observation_policy_and_generation(monkeypatch, tmp_path: Path
             return torch.ones((1, 4), dtype=torch.float32)
 
     monkeypatch.setattr(dart_mod, "PolicyReachLocationMLP", _Policy)
-    monkeypatch.setattr(dart_mod.torch, "load", lambda *args, **kwargs: {"model_state_dict": {"weight": torch.ones(1), "critic": torch.ones(1)}})
+    monkeypatch.setattr(
+        dart_mod.torch,
+        "load",
+        lambda *args, **kwargs: {
+            "model_state_dict": {"weight": torch.ones(1), "critic": torch.ones(1)}
+        },
+    )
     policy = loaded._load_policy(component._engine)
     assert policy is not None
     assert all(param.requires_grad is False for param in policy.parameters())
 
-    loaded._compute_observation = lambda *args, **kwargs: torch.ones((1, 10), dtype=torch.float32)  # type: ignore[method-assign]
-    loaded._get_world_features = lambda *args, **kwargs: torch.zeros((1, 2, 276), dtype=torch.float32)  # type: ignore[method-assign]
+    loaded._last_goal_dist = 0.25
+    loaded._last_heading_diff = 12.5
+    loaded._compute_observation = lambda *args, **kwargs: torch.ones(
+        (1, 10), dtype=torch.float32
+    )  # type: ignore[method-assign]
+    loaded._get_world_features = lambda *args, **kwargs: torch.zeros(
+        (1, 2, 276), dtype=torch.float32
+    )  # type: ignore[method-assign]
     updated = {"count": 0}
-    loaded._update_history = lambda *args, **kwargs: updated.__setitem__("count", updated["count"] + 1)  # type: ignore[method-assign]
+    loaded._update_history = lambda *args, **kwargs: updated.__setitem__(
+        "count", updated["count"] + 1
+    )  # type: ignore[method-assign]
     world_features, goal_dist, heading_diff = loaded._generate_primitive(
         component._engine,
         SimpleNamespace(),
@@ -370,10 +414,18 @@ def test_component_run_additional_branches(monkeypatch) -> None:
     monkeypatch.setattr(component, "_ensure_primitive_util", lambda: SimpleNamespace())
     monkeypatch.setattr(component, "_init_from_stand", lambda engine, putil: None)
     monkeypatch.setattr(component, "_load_policy", lambda engine: None)
-    monkeypatch.setattr(component, "_prepare_frames", lambda world_features: [{"waist": BonePose(rot_w=1.0)}])
+    monkeypatch.setattr(
+        component,
+        "_prepare_frames",
+        lambda world_features: [{"waist": BonePose(rot_w=1.0)}],
+    )
     monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)
-    monkeypatch.setattr(dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor)
-    monkeypatch.setattr("src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False)
+    monkeypatch.setattr(
+        dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+    )
 
     sent = []
 
@@ -383,7 +435,11 @@ def test_component_run_additional_branches(monkeypatch) -> None:
 
     # Goal reached path
     executor.values = [(torch.zeros((1, 2, 276), dtype=torch.float32), 0.1, None)]
-    component._generate_primitive = lambda *args, **kwargs: (torch.zeros((1, 2, 276), dtype=torch.float32), 0.4, None)  # type: ignore[method-assign]
+    component._generate_primitive = lambda *args, **kwargs: (
+        torch.zeros((1, 2, 276), dtype=torch.float32),
+        0.4,
+        None,
+    )  # type: ignore[method-assign]
     component.run(
         DartControlInputs(
             goal=_FakeReceiver([GoalFrame.new(x=1.0, z=2.0), None]),
@@ -401,7 +457,9 @@ def test_component_run_additional_branches(monkeypatch) -> None:
     monkeypatch.setattr(component2, "_load_policy", lambda engine: None)
     monkeypatch.setattr(component2, "_prepare_frames", lambda world_features: [])
     monkeypatch.setattr(component2.stop_event, "wait", lambda timeout=None: None)
-    monkeypatch.setattr(dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: _QueueExecutor())
+    monkeypatch.setattr(
+        dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: _QueueExecutor()
+    )
 
     def _boom(*args, **kwargs):
         component2.stop_event.set()
@@ -409,6 +467,173 @@ def test_component_run_additional_branches(monkeypatch) -> None:
 
     component2._generate_primitive = _boom  # type: ignore[method-assign]
     component2.run(
-        DartControlInputs(goal=_FakeReceiver([None]), instruction=_FakeReceiver([None])),
+        DartControlInputs(
+            goal=_FakeReceiver([None]), instruction=_FakeReceiver([None])
+        ),
         DartControlOutputs(motion=SimpleNamespace(send=lambda frame: None)),
     )
+
+
+def test_component_run_goal_and_heading_completion(monkeypatch) -> None:
+    executor = _QueueExecutor()
+    component = _make_component(policy_checkpoint="")
+
+    encoded: list[str] = []
+    engine = SimpleNamespace(
+        encode_text=lambda items: (
+            encoded.append(items[0]) or torch.ones((1, 4), dtype=torch.float32)
+        ),
+        noise_shape=(1, 4),
+    )
+
+    monkeypatch.setattr(component, "_ensure_engine", lambda: engine)
+    monkeypatch.setattr(component, "_ensure_primitive_util", lambda: SimpleNamespace())
+    monkeypatch.setattr(component, "_init_from_stand", lambda engine, putil: None)
+    monkeypatch.setattr(component, "_load_policy", lambda engine: None)
+    monkeypatch.setattr(
+        component,
+        "_prepare_frames",
+        lambda world_features: [{"waist": BonePose(rot_w=1.0)}],
+    )
+    monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)
+    monkeypatch.setattr(
+        dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+    )
+
+    sent: list[object] = []
+
+    def _send(frame) -> None:
+        sent.append(frame)
+        if len(sent) >= 3:
+            component.stop_event.set()
+
+    initial_world = torch.zeros((1, 2, 276), dtype=torch.float32)
+    executor.values = [
+        (initial_world, 0.1, 5.0),
+        (initial_world, None, 2.0),
+    ]
+    component._generate_primitive = lambda *args, **kwargs: (  # type: ignore[method-assign]
+        torch.zeros((1, 2, 276), dtype=torch.float32),
+        0.6,
+        30.0,
+    )
+    component.run(
+        DartControlInputs(
+            goal=_FakeReceiver([GoalFrame.new(x=1.0, z=2.0, heading=90.0), None, None]),
+            instruction=_FakeReceiver([TextFrame.new(text="walk"), None, None]),
+        ),
+        DartControlOutputs(motion=SimpleNamespace(send=_send)),
+    )
+
+    assert len(sent) == 3
+    assert "stand" in encoded
+
+
+def test_component_run_heading_completion_and_stop_before_send(monkeypatch) -> None:
+    executor = _QueueExecutor()
+    component = _make_component(policy_checkpoint="")
+
+    encoded: list[str] = []
+    engine = SimpleNamespace(
+        encode_text=lambda items: (
+            encoded.append(items[0]) or torch.ones((1, 4), dtype=torch.float32)
+        ),
+        noise_shape=(1, 4),
+    )
+
+    monkeypatch.setattr(component, "_ensure_engine", lambda: engine)
+    monkeypatch.setattr(component, "_ensure_primitive_util", lambda: SimpleNamespace())
+    monkeypatch.setattr(component, "_init_from_stand", lambda engine, putil: None)
+    monkeypatch.setattr(component, "_load_policy", lambda engine: None)
+
+    def _prepare_frames(world_features):
+        component.stop_event.set()
+        return [{"waist": BonePose(rot_w=1.0)}]
+
+    monkeypatch.setattr(component, "_prepare_frames", _prepare_frames)
+    monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)
+    monkeypatch.setattr(
+        dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+    )
+
+    sends: list[object] = []
+    executor.values = [(torch.zeros((1, 2, 276), dtype=torch.float32), None, 2.0)]
+    component._generate_primitive = lambda *args, **kwargs: (  # type: ignore[method-assign]
+        torch.zeros((1, 2, 276), dtype=torch.float32),
+        None,
+        45.0,
+    )
+    component.run(
+        DartControlInputs(
+            goal=_FakeReceiver(
+                [GoalFrame.new(heading=45.0), GoalFrame.new(y=3.0), None]
+            ),
+            instruction=_FakeReceiver([None]),
+        ),
+        DartControlOutputs(
+            motion=SimpleNamespace(send=lambda frame: sends.append(frame))
+        ),
+    )
+
+    assert sends == []
+    assert "stand" in encoded
+
+
+def test_component_run_position_only_goal_completion(monkeypatch) -> None:
+    executor = _QueueExecutor()
+    component = _make_component(policy_checkpoint="")
+
+    encoded: list[str] = []
+    engine = SimpleNamespace(
+        encode_text=lambda items: (
+            encoded.append(items[0]) or torch.ones((1, 4), dtype=torch.float32)
+        ),
+        noise_shape=(1, 4),
+    )
+
+    monkeypatch.setattr(component, "_ensure_engine", lambda: engine)
+    monkeypatch.setattr(component, "_ensure_primitive_util", lambda: SimpleNamespace())
+    monkeypatch.setattr(component, "_init_from_stand", lambda engine, putil: None)
+    monkeypatch.setattr(component, "_load_policy", lambda engine: None)
+    monkeypatch.setattr(
+        component,
+        "_prepare_frames",
+        lambda world_features: [{"waist": BonePose(rot_w=1.0)}],
+    )
+    monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)
+    monkeypatch.setattr(
+        dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
+    )
+    monkeypatch.setattr(
+        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+    )
+
+    sends: list[object] = []
+
+    def _send(frame) -> None:
+        sends.append(frame)
+        if len(sends) >= 2:
+            component.stop_event.set()
+
+    executor.values = [(torch.zeros((1, 2, 276), dtype=torch.float32), 0.1, None)]
+    component._generate_primitive = lambda *args, **kwargs: (  # type: ignore[method-assign]
+        torch.zeros((1, 2, 276), dtype=torch.float32),
+        0.6,
+        None,
+    )
+    component.run(
+        DartControlInputs(
+            goal=_FakeReceiver([GoalFrame.new(x=1.0, z=2.0), None]),
+            instruction=_FakeReceiver([TextFrame.new(text="walk"), None]),
+        ),
+        DartControlOutputs(motion=SimpleNamespace(send=_send)),
+    )
+
+    assert len(sends) == 2
+    assert "stand" in encoded

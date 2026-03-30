@@ -120,7 +120,9 @@ def test_subgraph_create_and_ungroup(monkeypatch) -> None:
         def from_args(cls, _args):
             return _FakeComp()
 
-    monkeypatch.setattr(PrimitiveComponent, "registered_subclasses", lambda: {"A": _Cls})
+    monkeypatch.setattr(
+        PrimitiveComponent, "registered_subclasses", lambda: {"A": _Cls}
+    )
     node_service.ungroup(m, "c1")
     assert "c1" not in m.graph.nodes
     assert "n1" in m.graph.nodes
@@ -209,7 +211,9 @@ def test_subgraph_rewires_boundary_edges(monkeypatch) -> None:
         def from_args(cls, _args):
             return _FakeComp()
 
-    monkeypatch.setattr(PrimitiveComponent, "registered_subclasses", lambda: {"A": _Cls})
+    monkeypatch.setattr(
+        PrimitiveComponent, "registered_subclasses", lambda: {"A": _Cls}
+    )
     node_service.ungroup(m, cid)
     assert (
         Edge(
