@@ -12,13 +12,12 @@ import torch
 def _ensure_transformers_patch(monkeypatch) -> None:
     import transformers.utils.generic as transformers_generic
 
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    monkeypatch.setattr(
+        transformers_generic,
+        "check_model_inputs",
+        lambda *args, **kwargs: lambda func: func,
+        raising=False,
+    )
 
 
 def _tiny_qwen_config(cfg_mod):

@@ -7,16 +7,19 @@ import pytest
 import torch
 
 
-def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
+def _ensure_transformers_patch(monkeypatch) -> None:
     import transformers.utils.generic as transformers_generic
 
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    monkeypatch.setattr(
+        transformers_generic,
+        "check_model_inputs",
+        lambda *args, **kwargs: lambda func: func,
+        raising=False,
+    )
+
+
+def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
     import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
@@ -349,15 +352,7 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
 
 
 def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
     import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod

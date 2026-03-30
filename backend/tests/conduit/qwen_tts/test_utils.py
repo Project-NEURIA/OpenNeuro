@@ -8,16 +8,19 @@ import pytest
 import torch
 
 
-def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
+def _ensure_transformers_patch(monkeypatch) -> None:
     import transformers.utils.generic as transformers_generic
 
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    monkeypatch.setattr(
+        transformers_generic,
+        "check_model_inputs",
+        lambda *args, **kwargs: lambda func: func,
+        raising=False,
+    )
+
+
+def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as tok_cfg_mod
@@ -156,15 +159,7 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
 
 
 def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod
 
@@ -414,15 +409,7 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
 
 
 def test_qwen_tts_config_and_tokenizer_remaining_paths(monkeypatch) -> None:
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
     import src.core.conduit.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod

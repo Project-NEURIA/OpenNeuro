@@ -41,6 +41,17 @@ from src.core.frames import (
 )
 
 
+def _ensure_transformers_patch(monkeypatch) -> None:
+    import transformers.utils.generic as transformers_generic
+
+    monkeypatch.setattr(
+        transformers_generic,
+        "check_model_inputs",
+        lambda *args, **kwargs: lambda func: func,
+        raising=False,
+    )
+
+
 class _FakeRecv:
     def __init__(self, items):
         self._items = list(items)
@@ -200,15 +211,7 @@ def test_heavy_module_import_smoke(monkeypatch, tmp_path) -> None:
             ),
         ),
     )
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     qwen_voice_dir = tmp_path / "voices"
     qwen_voice_dir.mkdir()

@@ -40,19 +40,21 @@ class _FakeRecv:
         return iter(self._items)
 
 
+def _ensure_transformers_patch(monkeypatch) -> None:
+    import transformers.utils.generic as transformers_generic
+
+    monkeypatch.setattr(
+        transformers_generic,
+        "check_model_inputs",
+        lambda *args, **kwargs: lambda func: func,
+        raising=False,
+    )
+
+
 def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None:
     # Prevent real CUDA usage — CI runners may have mismatched drivers
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.model as model_mod
     import src.core.utils as utils_mod
@@ -382,15 +384,7 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
 
 
 def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
-    import transformers.utils.generic as transformers_generic
-
-    if not hasattr(transformers_generic, "check_model_inputs"):
-        monkeypatch.setattr(
-            transformers_generic,
-            "check_model_inputs",
-            lambda *args, **kwargs: lambda func: func,
-            raising=False,
-        )
+    _ensure_transformers_patch(monkeypatch)
 
     import src.core.conduit.qwen_tts.component as comp_mod
     import src.core.conduit.qwen_tts.model as qwen_model_mod
