@@ -93,6 +93,7 @@ explicit = true
 [tool.uv]
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
+cache-dir = "cache/uv"
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
@@ -133,9 +134,11 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=xml:tests_runtime/coverage/coverage.xml",
+    "--basetemp=cache/pytest-temp",
     "-p",
     "no:cacheprovider",
 ]
+cache_dir = "cache/pytest-cache"
 testpaths = ["tests"]
 
 [tool.coverage.run]

@@ -22,6 +22,8 @@ backend/uv.lock
 backend/.coverage
 backend/coverage.xml
 backend/.coverage.local
+backend/cache/*
+!backend/cache/.gitkeep
 backend/.pytest_cache/
 backend/.pytest_temp/
 backend/.ruff_cache/
