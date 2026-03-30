@@ -86,8 +86,13 @@ explicit = true
 
 [tool.uv]
 index-strategy = "unsafe-best-match"
-# DA3 lists open3d but open3d lacks 3.13+ wheels
-override-dependencies = ["open3d ; python_version < '0'", "numpy>=2.4.2", "torch>=2.10.0,<2.11"]
+# DA3 lists open3d but open3d lacks 3.13+ wheels;
+# nvblox_torch pins numpy<1.27 and torch<=2.9.1 — override both.
+override-dependencies = [
+    "open3d ; python_version < '0'",
+    "numpy>=2.4.2",
+    "torch>=2.10.0",
+]
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
@@ -113,14 +118,14 @@ pytorch-triton-rocm = [
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform == 'linux'" },
 ]
 nvblox-torch = [
-    { url = "https://github.com/nvidia-isaac/nvblox/releases/download/v0.0.9/nvblox_torch-0.0.9+cu12ubuntu22-py3-none-linux_x86_64.whl", group = "nvblox" },
+    { path = "lib/nvblox_torch-0.0.9.dev1+cu12ubuntu22-py3-none-linux_x86_64.whl", group = "nvblox" },
 ]
 
 [dependency-groups]
 dev = [
     "ruff>=0.15.1",
 ]
-cuda12 = ["torch>=2.10.0,<2.11", "torchaudio>=2.10.0,<2.11", "torchvision>=0.25.0,<0.26"]
-cuda13 = ["torch>=2.9.1", "torchaudio>=2.9.1", "torchvision>=0.24.1"]
+cuda12 = ["torch>=2.10.0", "torchaudio>=2.10.0", "torchvision>=0.25.0"]
+cuda13 = ["torch>=2.11.0", "torchaudio>=2.11.0", "torchvision>=0.26.0"]
 rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
 nvblox = ["nvblox-torch"]
