@@ -66,7 +66,7 @@ class StereoDepthEstimator(
         self._buf_h: int = 0
         self._buf_w: int = 0
 
-    def setup(self) -> None:
+    def setup(self, outputs: StereoDepthEstimatorOutputs) -> None:
         import torch
 
         print(f"[StereoDepthEstimator] Loading FFS model on {self._device}")
