@@ -55,7 +55,9 @@ module = [
     "pyrender", "pyrender.*",
     "trimesh", "trimesh.*",
     "core", "core.*",
-    "Utils"
+    "Utils",
+    "nvblox_torch", "nvblox_torch.*",
+    "open3d",
 ]
 ignore_missing_imports = true
 
