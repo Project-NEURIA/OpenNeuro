@@ -77,6 +77,7 @@ function toReactFlowNode(
         inputs: Record<string, Record<string, SlotType>>;
         outputs: Record<string, Record<string, SlotType>>
     },
+    onEditConfig?: () => void,
 ): Node<GraphNodeData> {
     const isComposite = n.is_composite;
     const info = componentMap[n.type];
@@ -109,10 +110,12 @@ function toReactFlowNode(
             outputs,
             inputTypes,
             outputTypes,
+            initArgs: n.init_args ?? {},
             status: n.status,
             nodeMetrics: null,
             ui_inputs: info?.ui_inputs ?? {},
             ui_outputs: info?.ui_outputs ?? {},
+            onEditConfig,
         } satisfies GraphNodeData,
     };
 }
@@ -379,7 +382,7 @@ function AppInner({
                 setNodes(
                     backendNodes.map((n) => {
                         const pos = posMap.get(n.id) ?? {x: 0, y: 0};
-                        return toReactFlowNode(n, pos, componentMap, componentTypeInfo);
+                        return toReactFlowNode(n, pos, componentMap, componentTypeInfo, () => openNodeConfigEditor(n.id));
                     }),
                 );
 
@@ -541,14 +544,14 @@ function AppInner({
         ) => {
             apiCreateNode(item.type_, initArgs)
                 .then((res) => {
-                    const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
+                    const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo, () => openNodeConfigEditor(res.id));
                     setNodes((nds) => [...nds, newNode]);
                     runTypeCheck();
                     triggerSave();
                 })
                 .catch(console.error);
         },
-        [setNodes, triggerSave, runTypeCheck, componentMap, componentTypeInfo],
+        [setNodes, triggerSave, runTypeCheck, componentMap, componentTypeInfo, openNodeConfigEditor],
     );
 
     const onDrop = useCallback(
@@ -570,7 +573,7 @@ function AppInner({
                 const position = screenToFlowPosition({x: e.clientX, y: e.clientY});
                 apiCreateNode(parsed.name as string)
                     .then((res) => {
-                        const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo);
+                        const newNode = toReactFlowNode(res, position, componentMap, componentTypeInfo, () => openNodeConfigEditor(res.id));
                         setNodes((nds) => [...nds, newNode]);
                         runTypeCheck();
                         triggerSave();
@@ -631,7 +634,7 @@ function AppInner({
         ]);
         setNodes(
             backendNodes.map((n) =>
-                toReactFlowNode(n, {x: n.x, y: n.y}, componentMap, componentTypeInfo),
+                toReactFlowNode(n, {x: n.x, y: n.y}, componentMap, componentTypeInfo, () => openNodeConfigEditor(n.id)),
             ),
         );
         setEdges(

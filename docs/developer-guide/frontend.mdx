@@ -37,7 +37,7 @@ Modal form for creating/editing a node:
 - Handles nested Pydantic models (flattened to `param.field` keys)
 - Supports `Literal` types as dropdowns (unwraps `anyOf` for nullable literals)
 - Supports `Path` types as file picker (Tauri native dialog or Vite upload)
-- Fetches dynamic options via `POST /component/{name}/options`
+- Fetches dynamic options via `POST /component/{'{name}'}/options`
 
 ### NodeSidebar.tsx
 

@@ -188,7 +188,7 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     ts = datetime.fromtimestamp(tc.pts / 1e9).strftime("%H:%M:%S")
                     msg_tc = MessageFrame.new(
                         role="assistant",
-                        content=f"[{ts}]",
+                        content="",
                         tool_calls=[tc],
                     )
                     self._history.append(msg_tc)
@@ -211,7 +211,7 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                         if m.tool_call_id == tr.call_id and m.content == "(pending)":
                             self._history[i] = MessageFrame.new(
                                 role="tool",
-                                content=f"[{ts}] {tr.content}",
+                                content=tr.content,
                                 tool_call_id=tr.call_id,
                             )
                             self._print_message(self._history[i])
