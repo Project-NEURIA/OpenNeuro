@@ -43,9 +43,17 @@ dependencies = [
     "fish-audio-sdk>=1.0.0",
     "ultralytics>=8.3.0",
     "lap>=0.5.12",
+    "coverage==7.13.5",
+    "iniconfig==2.3.0",
+    "pluggy==1.6.0",
+    "pytest==9.0.2",
+    "pytest-cov==7.1.0",
+    "ruff==0.15.7",
 ]
 
 [tool.mypy]
+exclude = '(^tests/)|(^tests_runtime/)|(^pytest[^/\\]*(?:$|[\\/]))'
+
 [[tool.mypy.overrides]]
 module = [
     "sounddevice", "onnxruntime", "clip", "smplx", "yaml",
@@ -85,6 +93,7 @@ explicit = true
 [tool.uv]
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
+cache-dir = "cache/uv"
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
@@ -112,8 +121,25 @@ pytorch-triton-rocm = [
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.1",
 ]
 cuda12 = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0"]
 cuda13 = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0"]
 rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml:tests_runtime/coverage/coverage.xml",
+    "--basetemp=cache/pytest-temp",
+    "-p",
+    "no:cacheprovider",
+]
+cache_dir = "cache/pytest-cache"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+data_file = "tests_runtime/coverage/.coverage"

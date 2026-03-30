@@ -18,4 +18,31 @@ backend/src/core/conduit/yolo/*.ts
 backend/src/core/conduit/yolo/*.pt
 
 # uv lock file — generated per-machine (GPU-dependent)
+backend/uv.lock
+backend/.coverage
+backend/coverage.xml
+backend/.coverage.local
+backend/cache/*
+!backend/cache/.gitkeep
+backend/.pytest_cache/
+backend/.pytest_temp/
+backend/.ruff_cache/
+backend/.uv-cache/
+backend/pytest_temp_workspace/
+backend/pytest-cache-files-*/
+backend/tests_runtime/*
+!backend/tests_runtime/.gitkeep
+!backend/tests_runtime/coverage/
+!backend/tests_runtime/coverage/.gitkeep
+!backend/tests_runtime/pytest/
+!backend/tests_runtime/pytest/.gitkeep
+backend/tests_runtime/coverage/*
+!backend/tests_runtime/coverage/.gitkeep
+backend/tests_runtime/pytest/*
+!backend/tests_runtime/pytest/.gitkeep
+backend/tests_runtime/agent_state/
+backend/tests_runtime/tmp/
+frontend/coverage/
+frontend/node_modules/.vite-temp/
+
 backend/uv.lockanalysis-report.html

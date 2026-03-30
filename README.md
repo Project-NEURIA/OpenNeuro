@@ -1,4 +1,6 @@
 # OpenNeuro
+[![Frontend Test Coverage](docs/frontend-coverage.svg)](./docs/frontend-coverage.svg)
+[![Backend Test Coverage](docs/backend-coverage.svg)](./docs/backend-coverage.svg)
 
 ## Prerequisites
 
@@ -29,3 +31,15 @@ bun tauri dev
 ```sh
 bun tauri build
 ```
+
+## Test Coverage
+
+- A Windows operating system with NVIDIA is highly recommended for coverage reports.
+- Run both suites and refresh both badges locally: `bun run coverage:update`
+- Run only backend coverage and refresh the backend badge: `bun run coverage:backend`
+- Run only frontend coverage and refresh the frontend badge: `bun run coverage:frontend`
+- Refresh both badges from existing coverage reports: `bun run coverage:badges`
+- CI workflow: `.github/workflows/coverage.yml`
+- CI backend coverage skips `tests/conduit/dart_control` to keep GitHub Actions runtime down; the local coverage commands above still run the full backend suite.
+- Pushes to `main` refresh both README badges automatically.
+- PRs get an automatic sticky coverage comment with frontend and backend coverage.

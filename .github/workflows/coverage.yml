@@ -1,0 +1,97 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches: [ A5, main ]
+  push:
+    branches: [ A5, main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      UV_CACHE_DIR: /home/runner/.cache/uv
+      CUDA_VISIBLE_DEVICES: ""
+      PYTORCH_TEST_WITHOUT_CUDA: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Restore uv cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/.cache/uv
+            backend/.venv
+          key: coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('backend/uv.lock') }}
+          restore-keys: |
+            coverage-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libportaudio2
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --group dev --no-default-groups
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run backend tests with coverage
+        working-directory: backend
+        run: uv run pytest
+
+      - name: Run frontend tests with coverage
+        working-directory: frontend
+        run: bun run coverage
+
+      - name: Generate coverage badges and PR summary
+        run: |
+          python scripts/generate_coverage_badges.py \
+            --backend-xml backend/tests_runtime/coverage/coverage.xml \
+            --backend-svg docs/backend-coverage.svg \
+            --frontend-lcov frontend/coverage/lcov.info \
+            --frontend-svg docs/frontend-coverage.svg \
+            --comment coverage-comment.md
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            backend/tests_runtime/coverage/coverage.xml
+            frontend/coverage/lcov.info
+            coverage-comment.md
+
+      - name: Post PR coverage comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: coverage-comment.md
+
+      - name: Commit coverage badges
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: update coverage badges"
+          file_pattern: |
+            docs/backend-coverage.svg
+            docs/frontend-coverage.svg
