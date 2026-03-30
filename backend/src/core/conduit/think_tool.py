@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from src.core.channel import Receiver, Sender
-from src.core.component import EmitOnStart, ThreadedComponent, Tag
+from src.core.component import ThreadedComponent, Tag
 from src.core.frames import ToolCall, ToolDef, ToolResult
 
 
@@ -18,12 +18,11 @@ class ThinkToolOutputs(NamedTuple):
 
 class ThinkTool(
     ThreadedComponent[ThinkToolInputs, ThinkToolOutputs],
-    EmitOnStart[ThinkToolOutputs],
 ):
     description = "A scratchpad tool for the agent to think, plan, or reflect"
     tags = Tag(io={"conduit"}, functionality={"llm"})
 
-    def emit(self, outputs: ThinkToolOutputs) -> None:
+    def setup(self, outputs: ThinkToolOutputs) -> None:
         outputs.tool_def.send(
             ToolDef.new(
                 name="think",

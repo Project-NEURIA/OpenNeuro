@@ -60,6 +60,12 @@ class Component[
     def status(self) -> Status:
         return self._status
 
+    def setup(self, outputs: O) -> None:
+        """Called synchronously by GraphManager before threads start.
+
+        Override to perform initialization or emit initial values into outputs.
+        """
+
     def start(self, inputs: I, outputs: O) -> None:
         """Start the component. Subclasses override with their execution model."""
         self._status = Status.RUNNING
@@ -292,7 +298,6 @@ class PrimitiveComponent[
         skip = {
             PrimitiveComponent,
             ThreadedComponent,
-            EmitOnStart,
         }
 
         def walk(subclass: type[PrimitiveComponent[Any, Any]]) -> None:
@@ -332,15 +337,8 @@ class ThreadedComponent[
     @abstractmethod
     def run(self, inputs: I, outputs: O) -> None: ...
 
-    def setup(self) -> None:
-        """Override to perform heavy initialization before run()."""
-
     def _safe_run(self, inputs: I, outputs: O) -> None:
         try:
-            self._status = Status.SETUP
-            self.setup()
-            if self._stop_event.is_set():
-                return
             self._status = Status.RUNNING
             self.run(inputs, outputs)
         except Exception:
@@ -369,23 +367,7 @@ class ThreadedComponent[
         if self.status == Status.STOPPED:
             return
         self._stop_event.set()
-
-
-# ---------------------------------------------------------------------------
-# EmitOnStart — mixin for components that send values synchronously on start
-# ---------------------------------------------------------------------------
-
-
-class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
-    """Mixin for components that need to send values before threads start.
-
-    GraphManager calls emit(outputs) synchronously during run(),
-    before start() is called. This guarantees values are in channels
-    before any downstream component's thread reads them.
-    """
-
-    @abstractmethod
-    def emit(self, outputs: E) -> None: ...
+        # destruct is called in _safe_run's finally block (in the thread)
 
 
 # ---------------------------------------------------------------------------

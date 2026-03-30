@@ -107,7 +107,7 @@ def test_small_conduit_modules_run_paths() -> None:
     tool_defs = []
     tool_results = []
     do_nothing = DoNothingTool()
-    do_nothing.emit(
+    do_nothing.setup(
         DoNothingToolOutputs(
             tool_def=types.SimpleNamespace(send=lambda x: tool_defs.append(x)),
             tool_result=types.SimpleNamespace(send=lambda x: tool_results.append(x)),
@@ -132,7 +132,7 @@ def test_small_conduit_modules_run_paths() -> None:
     goals = []
     instructions = []
     movement = MovementTool()
-    movement.emit(
+    movement.setup(
         MovementToolOutputs(
             tool_def=types.SimpleNamespace(send=lambda x: move_defs.append(x)),
             tool_result=types.SimpleNamespace(send=lambda x: move_results.append(x)),

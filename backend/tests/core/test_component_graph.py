@@ -11,7 +11,6 @@ from src.core.channel import Receiver, Sender, Channel, UIReceiver, UISender
 from src.core.component import (
     PrimitiveComponent,
     ThreadedComponent,
-    EmitOnStart,
     CompositeComponent,
     Status,
 )
@@ -45,8 +44,7 @@ class DemoComp(PrimitiveComponent[InT, OutT]):
 
 
 class DemoThread(
-    ThreadedComponent[tuple[Receiver[TextFrame] | None], tuple[Sender[TextFrame]]],
-    EmitOnStart[tuple[Sender[TextFrame]]],
+    ThreadedComponent[tuple[Receiver[TextFrame] | None], tuple[Sender[TextFrame]]]
 ):
     _registerable = True
 
@@ -54,11 +52,9 @@ class DemoThread(
         super().__init__()
         self.started = False
 
-    def emit(self, outputs):
+    def setup(self, outputs) -> None:
         if outputs and outputs[0] is not None:
             outputs[0].send(TextFrame.new(text="boot"))
-
-    def setup(self) -> None:
         self.started = True
 
     def run(self, inputs, outputs) -> None:

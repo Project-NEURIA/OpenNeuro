@@ -14,49 +14,36 @@ class Channel[T]:
         self._offset = 0
         self._condition = threading.Condition()
         self._cursors: dict[int, int] = {}
-        self._newest_subs: dict[int, int] = {}
+        self._newest: set[int] = set()
 
     def _send(self, item: T) -> None:
         with self._condition:
-            if not self._cursors and not self._newest_subs:
+            if not self._cursors:
                 return
             self._items.append(item)
-            # Newest-only channel: aggressively trim to 1 item
-            if not self._cursors and len(self._items) > 1:
-                self._offset += len(self._items) - 1
-                self._items[:] = self._items[-1:]
             self._condition.notify_all()
 
     def _register(self, sub_id: int, newest: bool = False) -> None:
         with self._condition:
             head = self._offset + len(self._items)
+            self._cursors[sub_id] = head
             if newest:
-                self._newest_subs[sub_id] = head
-            else:
-                self._cursors[sub_id] = head
+                self._newest.add(sub_id)
 
     def _unregister(self, sub_id: int) -> None:
         """Idempotent."""
         with self._condition:
-            removed = self._cursors.pop(sub_id, None)
-            if removed is not None:
-                self._gc()
-            else:
-                self._newest_subs.pop(sub_id, None)
+            self._cursors.pop(sub_id, None)
+            self._newest.discard(sub_id)
+            self._gc()
 
     def _reregister(self, sub_id: int, newest: bool) -> None:
-        """Atomically switch a subscriber between cursor and newest mode."""
+        """Switch a subscriber between cursor and newest mode."""
         with self._condition:
-            removed = self._cursors.pop(sub_id, None)
-            if removed is None:
-                self._newest_subs.pop(sub_id, None)
-            else:
-                self._gc()
-            head = self._offset + len(self._items)
             if newest:
-                self._newest_subs[sub_id] = head
+                self._newest.add(sub_id)
             else:
-                self._cursors[sub_id] = head
+                self._newest.discard(sub_id)
 
     def _get(
         self,
@@ -64,59 +51,34 @@ class Channel[T]:
         stop_event: threading.Event,
         blocking: bool = True,
     ) -> T | None:
-        """Unified read. Dispatches based on subscriber type."""
         with self._condition:
-            is_newest = sub_id in self._newest_subs
-        if is_newest:
-            return self._get_newest(sub_id, stop_event, blocking)
-        return self._get_cursor(sub_id, stop_event, blocking)
+            # Fast-forward to latest if newest mode
+            if sub_id in self._newest:
+                head = self._offset + len(self._items)
+                if head > 0 and self._cursors.get(sub_id, head) < head - 1:
+                    self._cursors[sub_id] = head - 1
+                    self._gc()
 
-    def _get_cursor(
-        self,
-        sub_id: int,
-        stop_event: threading.Event,
-        blocking: bool,
-    ) -> T | None:
-        with self._condition:
-            index = self._cursors[sub_id]
+            index = self._cursors.get(sub_id)
+            if index is None:
+                return None
+
             if blocking:
                 while index >= self._offset + len(self._items):
                     self._condition.wait(0.1)
                     if stop_event.is_set():
                         return None
+                    index = self._cursors.get(sub_id, index)
             else:
                 if index >= self._offset + len(self._items):
                     return None
-            # Guard against stale index: if the subscriber was unwired and
-            # re-wired (or GC advanced past us) while we were waiting, the
-            # offset may have moved beyond our captured index.
+
             if index < self._offset:
                 return None
+
             item = self._items[index - self._offset]
             self._cursors[sub_id] = index + 1
             self._gc()
-        return item
-
-    def _get_newest(
-        self,
-        sub_id: int,
-        stop_event: threading.Event,
-        blocking: bool,
-    ) -> T | None:
-        with self._condition:
-            last_seen = self._newest_subs[sub_id]
-            head = self._offset + len(self._items) - 1
-            if blocking:
-                while head < last_seen or not self._items:
-                    self._condition.wait(0.1)
-                    if stop_event.is_set():
-                        return None
-                    head = self._offset + len(self._items) - 1
-            else:
-                if head < last_seen or not self._items:
-                    return None
-            item = self._items[-1]
-            self._newest_subs[sub_id] = head + 1
         return item
 
     def _gc(self) -> None:

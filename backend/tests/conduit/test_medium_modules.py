@@ -119,7 +119,12 @@ def test_monocular_depth_estimator_paths(monkeypatch) -> None:
         "value"
     ]
 
-    estimator.setup()
+    estimator.setup(
+        mono_mod.MonocularDepthEstimatorOutputs(
+            depth=SimpleNamespace(send=lambda value: None),
+            video=SimpleNamespace(send=lambda value: None),
+        )
+    )
     assert fake_model.to_device.type == "cpu"
     assert fake_model.eval_called is True
 
@@ -368,7 +373,12 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
             max_disp=10,
         )
     )
-    estimator.setup()
+    estimator.setup(
+        stereo_mod.StereoDepthEstimatorOutputs(
+            depth=SimpleNamespace(send=lambda value: None),
+            stereo_video=SimpleNamespace(send=lambda value: None),
+        )
+    )
     assert fake_model.args.valid_iters == 3
     assert fake_model.args.max_disp == 10
     assert fake_model.device.type == "cpu"
@@ -535,7 +545,12 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     assert yaml_path.is_file()
     assert "track_high_thresh: 0.4" in yaml_path.read_text(encoding="utf-8")
 
-    segmenter.setup()
+    segmenter.setup(
+        seg_mod.ObjectSegmenterOutputs(
+            segmentations=SimpleNamespace(send=lambda value: None),
+            video=SimpleNamespace(send=lambda value: None),
+        )
+    )
     assert segmenter._model is fake_yolo
     assert segmenter._tracker_yaml is not None
 

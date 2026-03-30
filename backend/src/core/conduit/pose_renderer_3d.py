@@ -281,9 +281,7 @@ class PoseRenderer3D(ThreadedComponent[PoseRenderer3DInputs, PoseRenderer3DOutpu
             z = np.array([0, 0, 1], dtype=np.float64)
             if np.allclose(d, z):
                 R = np.eye(4)
-            elif np.allclose(
-                d, -z
-            ):  # pragma: no cover - axes here are limited to +x/+y/+z
+            elif np.allclose(d, -z):
                 R = self._trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0])
             else:
                 axis = np.cross(z, d)

@@ -29,17 +29,20 @@ class _StubComponent(ThreadedComponent[_StubInputs, _StubOutputs]):
 
 
 class _ProbeComponent(ThreadedComponent[tuple[()], tuple[()]]):
-    def __init__(self, *, stop_during_setup: bool = False) -> None:
+    def __init__(self, *, raise_in_run: bool = False) -> None:
         super().__init__()
-        self.stop_during_setup = stop_during_setup
+        self.raise_in_run = raise_in_run
         self.ran = False
 
-    def setup(self) -> None:
-        if self.stop_during_setup:
-            self.stop_event.set()
+    def setup(self, outputs: tuple[()]) -> None:
+        _ = outputs
 
     def run(self, inputs: tuple[()], outputs: tuple[()]) -> None:
+        _ = inputs
+        _ = outputs
         self.ran = True
+        if self.raise_in_run:
+            raise RuntimeError("boom")
 
 
 def test_channel_remaining_paths(monkeypatch) -> None:
@@ -61,11 +64,12 @@ def test_channel_remaining_paths(monkeypatch) -> None:
     newest.newest = False
     newest.newest = False
     assert newest._sub_id in channel._cursors
+    assert channel._get(123456, stop_event, blocking=False) is None
 
     channel._items = [10]
     channel._offset = 1
     channel._cursors[cursor._sub_id] = 0  # type: ignore[index]
-    assert channel._get_cursor(cursor._sub_id, stop_event, blocking=False) is None  # type: ignore[arg-type]
+    assert channel._get(cursor._sub_id, stop_event, blocking=False) is None  # type: ignore[arg-type]
 
     waiting_channel = Channel[int]()
     newest_blocking = Receiver(waiting_channel)
@@ -110,10 +114,11 @@ def test_threaded_component_remaining_paths(monkeypatch) -> None:
         ),
     )
 
-    stopped_in_setup = _ProbeComponent(stop_during_setup=True)
-    stopped_in_setup._safe_run((), ())
-    assert stopped_in_setup.ran is False
-    assert stopped_in_setup.status == Status.STOPPED
+    failing = _ProbeComponent(raise_in_run=True)
+    failing._safe_run((), ())
+    assert failing.ran is True
+    assert failing.status == Status.STOPPED
+    assert unregister_calls == ["unregister"]
 
     joins: list[float] = []
     started: list[bool] = []
@@ -139,7 +144,6 @@ def test_threaded_component_remaining_paths(monkeypatch) -> None:
     comp.start((), ())
     assert joins == [5.0]
     assert started == [True]
-    assert unregister_calls == ["unregister"]
 
 
 def test_composite_component_ui_types_and_graph_run_uses_dicts() -> None:

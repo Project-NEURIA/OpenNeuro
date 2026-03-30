@@ -50,7 +50,7 @@ def _write_card_png(path: Path, keyword: str = "chara") -> CharacterCardConfig:
     )
 
 
-def test_character_card_png_and_emit(
+def test_character_card_png_and_setup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     png_path = tmp_path / "card.png"
@@ -124,7 +124,7 @@ def test_character_card_png_and_emit(
         ),
     )
 
-    config_card.emit(outputs)
+    config_card.setup(outputs)
 
     prompts = sent["prompts"][0]
     assert [frame.content for frame in prompts] == [

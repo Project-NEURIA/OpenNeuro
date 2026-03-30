@@ -192,8 +192,22 @@ def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_mod, "completion", fake_completion)
 
     llm = llm_mod.LLM(llm_mod.LLMConfig(model="warmup-model"))
-    llm.setup()
-    llm.setup()
+    llm.setup(
+        llm_mod.LLMOutputs(
+            token=SimpleNamespace(send=lambda value: None),
+            text=None,
+            tool_calls=None,
+            eos=None,
+        )
+    )
+    llm.setup(
+        llm_mod.LLMOutputs(
+            token=SimpleNamespace(send=lambda value: None),
+            text=None,
+            tool_calls=None,
+            eos=None,
+        )
+    )
 
     assert calls == []
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from typing import NamedTuple
 
@@ -13,7 +14,7 @@ from src.core.frames import AudioFrame, EOS, InterruptFrame, TextFrame
 
 
 class FishTTSConfig(BaseModel):
-    api_key: str = ""
+    api_key_env_var: str = "FISH_API_KEY"
     base_url: str = "https://api.fish.audio"
     reference_id: str = "258ed8fe8f2347f6b7d56bafc2041a3a"
     model: str = "s2-pro"
@@ -37,8 +38,9 @@ class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
     def __init__(self, config: FishTTSConfig) -> None:
         super().__init__()
         self.config = config
+        api_key = os.getenv(config.api_key_env_var, "")
         self._client = FishAudio(
-            api_key=config.api_key,
+            api_key=api_key,
             base_url=config.base_url,
         )
 

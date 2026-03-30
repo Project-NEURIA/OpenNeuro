@@ -881,9 +881,7 @@ class DartControl(ThreadedComponent[DartControlInputs, DartControlOutputs]):
                                 self.config.batch_size, -1
                             )
                             # Cancel any in-flight generation since instruction changed
-                            if (
-                                pending_future is not None
-                            ):  # pragma: no cover - resolved earlier in the loop
+                            if pending_future is not None:
                                 pending_future.cancel()
                                 pending_future = None
 

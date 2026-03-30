@@ -26,7 +26,7 @@ class _FakeRecv:
         return next(self._iter)
 
 
-def test_think_tool_emit_and_run_paths(capsys) -> None:
+def test_think_tool_setup_and_run_paths(capsys) -> None:
     tool_defs = []
     tool_results = []
     tool = ThinkTool()
@@ -38,7 +38,7 @@ def test_think_tool_emit_and_run_paths(capsys) -> None:
         ),
     )
 
-    tool.emit(outputs)
+    tool.setup(outputs)
     tool.run(
         ThinkToolInputs(
             tool_call=_FakeRecv(
