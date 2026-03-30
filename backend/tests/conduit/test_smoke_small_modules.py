@@ -43,7 +43,14 @@ from src.core.frames import (
 
 class _FakeRecv:
     def __init__(self, items):
-        self._items = items
+        self._items = list(items)
+        self._iter = iter(self._items)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._iter)
 
     def __call__(self, *args, **kwargs):
         return iter(self._items)
@@ -149,7 +156,8 @@ def test_small_conduit_modules_run_paths() -> None:
         ),
     )
     assert move_defs[0].name == "move"
-    assert move_results[0].content == "unknown tool"
+    assert move_results[0].content == "Executing 'walk' toward (1, 2)"
+    assert move_results[1].content == "Executing 'dance'"
     assert goals[0].x == 1.0 and goals[0].z == 2.0
     assert [t.get() for t in instructions] == ["walk", "dance"]
 

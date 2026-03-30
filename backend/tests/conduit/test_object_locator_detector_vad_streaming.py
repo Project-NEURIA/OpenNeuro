@@ -22,7 +22,14 @@ from src.core.frames import (
 
 class _FakeRecv:
     def __init__(self, items):
-        self._items = items
+        self._items = list(items)
+        self._iter = iter(self._items)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._iter)
 
     def __call__(self, *args, **kwargs):
         return iter(self._items)
@@ -123,13 +130,15 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
     import src.core.conduit.streaming_vlm as vlm_mod
 
     class _Client:
-        def __init__(self, base_url, api_key):
+        def __init__(self, base_url, api_key=None):
             self.base_url = base_url
             self.api_key = api_key
-            self.chat = SimpleNamespace(completions=SimpleNamespace(create=self.create))
+            self.beta = SimpleNamespace(
+                chat=SimpleNamespace(completions=SimpleNamespace(parse=self.parse))
+            )
             self.responses = []
 
-        def create(self, **kwargs):
+        def parse(self, **kwargs):
             if self.responses:
                 return self.responses.pop(0)
             raise RuntimeError("boom")
@@ -138,6 +147,7 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
     vlm = vlm_mod.StreamingVLM(
         vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2)
     )
+    assert vlm._client.base_url == "http://vlm"
 
     class _Image:
         def __init__(self):
@@ -151,82 +161,66 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
     assert vlm._should_use_key_window_prompt(2) is True
     assert vlm._should_use_key_window_prompt(1) is False
 
-    success_response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=" caption "))]
+    parsed_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    parsed=SimpleNamespace(caption="caption", objects="chair, table"),
+                    content=None,
+                )
+            )
+        ]
     )
-    vlm._client.responses = [success_response]
-    assert vlm._call_vllm([_Image()], "prompt") == "caption"
-    assert vlm._call_vllm([_Image()], "prompt") == ""
+    fallback_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(parsed=None, content=" raw "))]
+    )
+    vlm._client.responses = [parsed_response, fallback_response]
+    assert vlm._call_vllm([_Image()], "prompt") == ("caption", "chair, table")
+    assert vlm._call_vllm([_Image()], "prompt") == ("raw", "")
+    assert vlm._call_vllm([_Image()], "prompt") == ("", "")
 
-    monkeypatch.setattr(vlm_mod.time, "time", lambda: 10.0)
-    assert vlm._sample_window() is None
-    frame = VideoFrame.new(
-        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
-    )
-    vlm._frame_buffer.extend([(8.0, frame), (9.0, frame), (10.0, frame)])
-    sample = vlm._sample_window()
-    assert sample is not None and len(sample) >= 1
     assert vlm._build_prompt(1) == vlm.config.prompt_window1
     vlm._captions_history = ["seen"]
     assert "seen" in vlm._build_prompt(3)
-    out = []
-    vlm._handle_caption(
-        "",
-        SimpleNamespace(
-            observation=SimpleNamespace(send=lambda value: out.append(value))
-        ),
+
+    observations = []
+    objects = []
+    outputs = SimpleNamespace(
+        observation=SimpleNamespace(send=lambda value: observations.append(value)),
+        objects=SimpleNamespace(send=lambda value: objects.append(value)),
     )
+    vlm._handle_result("", "", outputs)
     vlm._captions_history = ["a", "b", "c", "d"]
-    vlm._handle_caption(
-        "new",
-        SimpleNamespace(
-            observation=SimpleNamespace(send=lambda value: out.append(value))
-        ),
-    )
-    assert out[-1].get() == "new"
+    vlm._handle_result("new", "cat, dog", outputs)
+    assert observations[-1].get() == "new"
+    assert objects[-1].get() == "cat, dog"
     assert len(vlm._captions_history) == vlm.config.memory_size
 
-    class _Future:
-        def __init__(self, result, done):
-            self._result = result
-            self._done = done
-
-        def done(self):
-            return self._done
-
-        def result(self):
-            return self._result
-
-    class _Executor:
-        def __init__(self, max_workers):
-            self.submissions = []
-
-        def submit(self, fn, frames, prompt):
-            self.submissions.append((frames, prompt))
-            if len(self.submissions) == 1:
-                return _Future("first caption", True)
-            return _Future("last caption", False)
-
-        def shutdown(self, wait=False):
-            self.wait = wait
-
-    vlm.config.window_duration = 1.0
-    times = iter([0.0, 2.0, 2.0, 4.0, 4.0, 4.0, 4.5, 4.5])
-    monkeypatch.setattr(vlm_mod.time, "time", lambda: next(times, 8.0))
-    monkeypatch.setattr(vlm_mod, "ThreadPoolExecutor", _Executor)
-    monkeypatch.setattr(vlm, "_sample_window", lambda: [_Image()])
-    monkeypatch.setattr(vlm, "_build_prompt", lambda count: f"prompt-{count}")
-    handled = []
-    monkeypatch.setattr(
-        vlm, "_handle_caption", lambda caption, outputs: handled.append(caption)
+    run_vlm = vlm_mod.StreamingVLM(
+        vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2)
     )
-    vlm.run(
-        vlm_mod.StreamingVLMInputs(video=_FakeRecv([frame, frame, None])),
+    prompts = []
+
+    def fake_call(frames, prompt):
+        prompts.append(prompt)
+        return ("first caption", "chair") if len(prompts) == 1 else ("", "")
+
+    monkeypatch.setattr(run_vlm, "_call_vllm", fake_call)
+    video = VideoFrame.new(
+        data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
+    )
+    run_obs = []
+    run_obj = []
+    run_vlm.run(
+        vlm_mod.StreamingVLMInputs(video=_FakeRecv([video, video, None])),
         vlm_mod.StreamingVLMOutputs(
-            observation=SimpleNamespace(send=lambda value: handled.append(value.get()))
+            observation=SimpleNamespace(send=lambda value: run_obs.append(value)),
+            objects=SimpleNamespace(send=lambda value: run_obj.append(value)),
         ),
     )
-    assert handled == ["first caption", "last caption"]
+    assert prompts[0] == run_vlm.config.prompt_window1
+    assert run_obs[0].get() == "first caption"
+    assert run_obj[0].get() == "chair"
 
 
 def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
@@ -431,6 +425,9 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
 
         def start(self):
             return
+
+        def join(self, timeout=None):
+            self.timeout = timeout
 
     monkeypatch.setattr(vad_mod.threading, "Thread", _Thread)
     monkeypatch.setattr(

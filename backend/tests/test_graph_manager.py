@@ -47,7 +47,7 @@ from unittest.mock import patch
 import pytest
 
 from src.core.channel import Receiver, Sender
-from src.core.component import Component, ThreadedComponent, Status
+from src.core.component import PrimitiveComponent, ThreadedComponent, Status
 from src.core.graph import Edge, Graph, GraphManager
 
 
@@ -72,7 +72,7 @@ class StubComponent(ThreadedComponent[StubInputs, StubOutputs]):
             self.stop_event.wait(0.05)
 
 
-def _stub_registry() -> dict[str, type[Component[Any, Any]]]:
+def _stub_registry() -> dict[str, type[PrimitiveComponent[Any, Any]]]:
     """Return a registry containing only StubComponent."""
     return {"StubComponent": StubComponent}
 
@@ -81,7 +81,7 @@ def _stub_registry() -> dict[str, type[Component[Any, Any]]]:
 @pytest.fixture(autouse=True)
 def _patch_registry():
     with patch.object(
-        Component, "registered_subclasses", return_value=_stub_registry()
+        PrimitiveComponent, "registered_subclasses", return_value=_stub_registry()
     ):
         yield
 

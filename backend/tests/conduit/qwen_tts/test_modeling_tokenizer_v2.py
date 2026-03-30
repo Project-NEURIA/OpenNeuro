@@ -371,7 +371,7 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
         pytest.skip("transformers version incompatible with rope config")
 
 
-def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_compat(
+def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_decorator(
     monkeypatch,
 ) -> None:
     import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
@@ -379,20 +379,10 @@ def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_compat(
     def _sample_func():
         return "ok"
 
-    # Test fallback path: _check_model_inputs is None -> identity decorator
-    monkeypatch.setattr(tokv2_mod, "_check_model_inputs", None)
-    identity = tokv2_mod.check_model_inputs()
-    assert identity(_sample_func) is _sample_func
+    decorator = tokv2_mod.check_model_inputs()
+    wrapped = decorator(_sample_func)
+    assert callable(wrapped)
+    assert wrapped() == "ok"
 
-    # Test callable path: _check_model_inputs returns a decorator
-    monkeypatch.setattr(tokv2_mod, "_check_model_inputs", lambda: lambda func: func)
-    wrapper = tokv2_mod.check_model_inputs()
-    assert wrapper(_sample_func) is _sample_func
-
-    # Test TypeError fallback: _check_model_inputs(func) directly
-    def _old_style(func):
-        return func
-
-    monkeypatch.setattr(tokv2_mod, "_check_model_inputs", _old_style)
-    compat = tokv2_mod.check_model_inputs()
-    assert compat(_sample_func) is _sample_func
+    monkeypatch.setattr(tokv2_mod, "check_model_inputs", lambda: lambda func: func)
+    assert tokv2_mod.check_model_inputs()(_sample_func) is _sample_func

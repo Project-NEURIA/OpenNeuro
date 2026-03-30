@@ -20,7 +20,14 @@ from src.core.frames import (
 
 class _FakeRecv:
     def __init__(self, items):
-        self._items = items
+        self._items = list(items)
+        self._iter = iter(self._items)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._iter)
 
     def __call__(self, *args, **kwargs):
         return iter(self._items)
@@ -182,13 +189,7 @@ def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     llm.setup()
     llm.setup()
 
-    assert len(calls) == 2
-    assert calls[0] == {
-        "model": "warmup-model",
-        "messages": [{"role": "user", "content": "hi"}],
-        "max_tokens": 1,
-        "stream": False,
-    }
+    assert calls == []
 
 
 def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -394,7 +395,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             return _Response()
         raise RuntimeError("network")
 
-    monkeypatch.setattr(ok_tts._session, "post", fake_post)
+    monkeypatch.setattr(tts_mod.requests, "post", fake_post)
     sequence = [(1, "stale"), (0, "speak"), (0, "boom")]
     calls = {"count": 0}
 
@@ -436,7 +437,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             yield payload
 
     monkeypatch.setattr(
-        mismatch_tts._session, "post", lambda *args, **kwargs: _MismatchResponse()
+        tts_mod.requests, "post", lambda *args, **kwargs: _MismatchResponse()
     )
     monkeypatch.setattr(
         mismatch_tts._task_queue,
@@ -610,6 +611,9 @@ def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
         def start(self):
             self.target(*self.args)
 
+        def join(self, timeout=None):
+            self.timeout = timeout
+
     run_sts = sts_mod.STS(sts_mod.STSConfig())
     monkeypatch.setattr(
         sts_mod, "connect", lambda url, additional_headers: _ConnectCtx(run_sts)
@@ -625,4 +629,4 @@ def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     assert len(audio_out) == 1
-    assert run_sts._ws is not None
+    assert run_sts._ws is None

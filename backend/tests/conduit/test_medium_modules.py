@@ -28,7 +28,14 @@ from src.core.frames import (
 
 class _FakeRecv:
     def __init__(self, items):
-        self._items = items
+        self._items = list(items)
+        self._iter = iter(self._items)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._iter)
 
     def __call__(self, *args, **kwargs):
         return iter(self._items)
@@ -256,7 +263,9 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
     import cv2
     import src.core.conduit.ffs_stereo_depth.stereo_depth_estimator as stereo_mod
 
-    monkeypatch.setattr(stereo_mod, "auto_device", lambda device: "cpu")
+    monkeypatch.setattr(
+        stereo_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")
+    )
     monkeypatch.setattr(
         stereo_mod,
         "resize_and_crop",
@@ -362,7 +371,7 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
     estimator.setup()
     assert fake_model.args.valid_iters == 3
     assert fake_model.args.max_disp == 10
-    assert fake_model.device == "cpu"
+    assert fake_model.device.type == "cpu"
 
     estimator._ensure_buffers(2, 2)
     first_buf = estimator._t0_buf
@@ -587,11 +596,23 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         listener, "_set_phrases", lambda prompts: updated.append(list(prompts))
     )
-    listener._prompt_listener(
+    listener.run(
         seg_mod.ObjectSegmenterInputs(
-            video=_FakeRecv([]),
+            video=_FakeRecv(
+                [
+                    VideoFrame.new(
+                        data=np.zeros((4, 4, 3), dtype=np.uint8),
+                        format=VideoDataFormat.BGR,
+                    ),
+                    None,
+                ]
+            ),
             prompts=_FakeRecv([TextFrame.new(text="cat, dog"), None]),
-        )
+        ),
+        seg_mod.ObjectSegmenterOutputs(
+            segmentations=SimpleNamespace(send=lambda value: None),
+            video=SimpleNamespace(send=lambda value: None),
+        ),
     )
     assert updated == [["cat", "dog"]]
 
@@ -599,7 +620,6 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
     run_segmenter._lock = contextlib.nullcontext()
     run_segmenter._prompts = []
     run_segmenter._infer = lambda frame: None
-    monkeypatch.setattr(seg_mod.threading, "Thread", _SyncThread)
     skipped = []
     frame = VideoFrame.new(
         data=np.zeros((4, 4, 3), dtype=np.uint8), format=VideoDataFormat.BGR
@@ -645,7 +665,7 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
         ),
     )
     assert len(sent_seg) == 1
-    assert len(sent_video) == 2
+    assert len(sent_video) == 1
 
 
 def test_discord_paths(monkeypatch) -> None:

@@ -10,7 +10,14 @@ from src.core.frames import InterruptFrame, TextFrame
 
 class _FakeRecv:
     def __init__(self, items):
-        self._items = items
+        self._items = list(items)
+        self._iter = iter(self._items)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._iter)
 
     def __call__(self, *args, **kwargs):
         return iter(self._items)

@@ -71,10 +71,11 @@ class DemoThread(
 def test_component_helpers_and_from_args() -> None:
     init_types = DemoComp.get_init_types()
     assert "p" in init_types and "model" in init_types
-    assert "inp" in DemoComp.get_input_types()
-    assert "out" in DemoComp.get_output_types()
-    assert "ui_in" in DemoComp.get_ui_input_types()
-    assert "ui_out" in DemoComp.get_ui_output_types()
+    comp = DemoComp(Path("demo"), InitModel(v=1))
+    assert "inp" in comp.get_input_types()
+    assert "out" in comp.get_output_types()
+    assert "ui_in" in comp.get_ui_input_types()
+    assert "ui_out" in comp.get_ui_output_types()
     assert DemoComp.get_options({}) == {}
     c = DemoComp.from_args({"p": "a/b", "model": {"v": 2}, "opt": 3})
     assert isinstance(c.p, Path)
@@ -101,7 +102,7 @@ def test_threaded_component_lifecycle(monkeypatch) -> None:
 def test_composite_component_and_graph_manager(monkeypatch) -> None:
     classes = {"DemoThread": DemoThread, "DemoComp": DemoComp}
     monkeypatch.setattr(
-        Component, "registered_subclasses", classmethod(lambda cls: classes)
+        PrimitiveComponent, "registered_subclasses", classmethod(lambda cls: classes)
     )
 
     n1 = Node(id_="n1", type="DemoThread", init_args={})
@@ -143,7 +144,7 @@ def test_composite_component_and_graph_manager(monkeypatch) -> None:
 def test_composite_component_start_stop(monkeypatch) -> None:
     classes = {"DemoThread": DemoThread}
     monkeypatch.setattr(
-        Component, "registered_subclasses", classmethod(lambda cls: classes)
+        PrimitiveComponent, "registered_subclasses", classmethod(lambda cls: classes)
     )
     n1 = Node(id_="a", type="DemoThread", init_args={})
     sub = Graph(nodes={"a": n1}, edges=[])

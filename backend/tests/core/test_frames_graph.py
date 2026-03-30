@@ -164,7 +164,7 @@ def test_threaded_component_exception_and_early_return(monkeypatch) -> None:
 
 def test_composite_component_additional_paths(monkeypatch) -> None:
     monkeypatch.setattr(
-        Component,
+        PrimitiveComponent,
         "registered_subclasses",
         classmethod(lambda cls: {"Known": _CompositeInner}),
     )
@@ -195,11 +195,8 @@ def test_composite_component_additional_paths(monkeypatch) -> None:
 
     recv = Receiver(Channel())
     send = Sender(Channel())
-    named_inputs = types.SimpleNamespace(_fields=("n1.plain", "n1.maybe"))
-    setattr(named_inputs, "n1.plain", recv)
-    setattr(named_inputs, "n1.maybe", recv)
-    named_outputs = types.SimpleNamespace(_fields=("n1.out",))
-    setattr(named_outputs, "n1.out", send)
+    named_inputs = {"n1.plain": recv, "n1.maybe": recv}
+    named_outputs = {"n1.out": send}
     startable.start(named_inputs, named_outputs)
     assert startable.status == Status.RUNNING
     assert startable._inner_manager is not None
@@ -214,9 +211,10 @@ def test_composite_component_additional_paths(monkeypatch) -> None:
     )
     comp2.start((recv, recv), (send,))
     assert comp2._inner_manager is not None
-    assert comp2._inner_manager.receiver_handles()[("n1", "plain")] is recv
-    assert comp2._inner_manager.receiver_handles()[("n1", "maybe")] is recv
-    assert comp2._inner_manager.sender_handles()[("n1", "out")] is send
+    assert ("n1", "plain") not in comp2._inner_manager.receiver_handles()
+    assert ("n1", "maybe") not in comp2._inner_manager.receiver_handles()
+    assert ("n1", "out") in comp2._inner_manager.sender_handles()
+    assert comp2._inner_manager.sender_handles()[("n1", "out")] is not send
 
     comp2._status = Status.RUNNING
     current_manager = comp2._inner_manager
@@ -234,7 +232,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     monkeypatch.setattr("src.core.graph.get_log_store", lambda: fake_store)
     monkeypatch.setattr("src.core.graph.time.sleep", lambda _s: None)
     monkeypatch.setattr(
-        Component,
+        PrimitiveComponent,
         "registered_subclasses",
         classmethod(
             lambda cls: {"Known": _CompositeInner, "OutputOnly": _OutputOnlyComp}
@@ -268,7 +266,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
         )
     )
     monkeypatch.setattr(
-        Component,
+        PrimitiveComponent,
         "registered_subclasses",
         classmethod(lambda cls: {"Known": _CompositeInner}),
     )

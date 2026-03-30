@@ -17,7 +17,7 @@ from src.api.logs import controller as logs_controller
 from src.api.metrics.service import MetricsCollector
 from src.api.project import service as project_service
 from src.core.channel import Channel, Receiver, Sender
-from src.core.component import Tag
+from src.core.component import PrimitiveComponent, Tag
 from src.core.frames import TextFrame
 from src.core.graph import Edge, Graph, Node
 from src.main import _copy_presets
@@ -31,8 +31,9 @@ class FakeManager:
         self._run_called = False
         self._stop_called = False
         self._reset_called = False
-        self._sender = Sender(Channel())
-        self._receiver = Receiver(Channel())
+        channel = Channel()
+        self._sender = Sender(channel)
+        self._receiver = Receiver(channel)
 
     def get_node(self, node_id: str):
         return self.graph.nodes.get(node_id)
@@ -108,6 +109,22 @@ def test_component_controller_and_service(monkeypatch) -> None:
         def get_options(cls, values):
             return {"seen": values}
 
+        @classmethod
+        def _class_input_types(cls):
+            return cls.get_input_types()
+
+        @classmethod
+        def _class_output_types(cls):
+            return cls.get_output_types()
+
+        @classmethod
+        def _class_ui_input_types(cls):
+            return cls.get_ui_input_types()
+
+        @classmethod
+        def _class_ui_output_types(cls):
+            return cls.get_ui_output_types()
+
     original = component_controller.service.list_components
     monkeypatch.setattr(
         component_controller.service,
@@ -127,9 +144,30 @@ def test_component_controller_and_service(monkeypatch) -> None:
 
     monkeypatch.setattr(component_controller.service, "list_components", original)
     monkeypatch.setattr(
-        component_service.Component, "registered_subclasses", lambda: {"A": object}
+        PrimitiveComponent, "registered_subclasses", lambda: {"A": object}
     )
     assert component_service.list_components() == {"A": object}
+
+
+def test_component_controller_project_branches(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(component_controller.service, "list_components", lambda: {})
+    monkeypatch.setattr(component_controller, "PROJECTS_DIR", tmp_path)
+
+    valid = tmp_path / "ValidProject"
+    valid.mkdir()
+    (valid / "graph.json").write_text('{"nodes": {}, "edges": []}', encoding="utf-8")
+    (valid / "thumbnail.png").write_bytes(b"x")
+
+    invalid = tmp_path / "BrokenProject"
+    invalid.mkdir()
+    (invalid / "graph.json").write_text("{not-json", encoding="utf-8")
+
+    (tmp_path / "not_a_dir.txt").write_text("x", encoding="utf-8")
+
+    out = component_controller.list_components()
+    assert [item.type_ for item in out] == ["ValidProject"]
+    assert out[0].is_composite is True
+    assert out[0].has_thumbnail is True
 
 
 def test_env_controller(monkeypatch, tmp_path) -> None:
@@ -186,18 +224,18 @@ def test_logs_controller(monkeypatch) -> None:
 def test_metrics_collector_collect() -> None:
     manager = FakeManager()
     frame = TextFrame.new(text="hello")
+    stop_event = types.SimpleNamespace(is_set=lambda: False)
+    manager._receiver.blocking = False
+    manager._receiver._wire(stop_event)
     manager._sender.send(frame)
-    receiver_it = manager._receiver(
-        types.SimpleNamespace(stop_event=types.SimpleNamespace(is_set=lambda: False)),
-        no_block=True,
-    )
-    next(receiver_it)
+    next(manager._receiver)
 
     collector = MetricsCollector()
     first = collector.collect(manager)
     second = collector.collect(manager)
     assert "a" in first.nodes
     assert second.nodes["a"].senders["out"].msg_count_delta == 0
+    manager._receiver._unwire()
 
 
 def test_project_service(monkeypatch, tmp_path) -> None:

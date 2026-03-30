@@ -133,5 +133,11 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=xml:coverage.xml",
+    "--basetemp=pytest_temp_workspace",
+    "-p",
+    "no:cacheprovider",
 ]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+data_file = ".coverage.local"
