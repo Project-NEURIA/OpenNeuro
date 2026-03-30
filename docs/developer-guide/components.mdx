@@ -152,4 +152,4 @@ def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
     }
 ```
 
-The `values` dict contains current form selections, enabling dependent dropdowns (field B's options depend on field A's choice). The frontend calls `POST /component/{name}/options` after each form change.
+The `values` dict contains current form selections, enabling dependent dropdowns (field B's options depend on field A's choice). The frontend calls `POST /component/{'{name}'}/options` after each form change.
