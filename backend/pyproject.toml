@@ -91,28 +91,28 @@ index-strategy = "unsafe-best-match"
 override-dependencies = [
     "open3d ; python_version < '0'",
     "numpy>=2.4.2",
-    # nvblox_torch pins torch<=2.9.1 — relax to allow any version.
-    "torch>=2.0.0",
 ]
 conflicts = [
-    [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
-    [{ group = "nvblox" }, { group = "rocm" }],
+    [{ group = "cuda12" }, { group = "cuda12-nvblox" }, { group = "cuda13" }, { group = "rocm" }],
 ]
 default-groups = ["cuda12"]
 
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12-nvblox", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchaudio = [
     { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12-nvblox", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
 torchvision = [
     { index = "pytorch-cu128", group = "cuda12", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu128", group = "cuda12-nvblox", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-cu130", group = "cuda13", marker = "sys_platform != 'darwin'" },
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform != 'darwin'" },
 ]
@@ -128,6 +128,6 @@ dev = [
     "ruff>=0.15.1",
 ]
 cuda12 = ["torch>=2.10.0", "torchaudio>=2.10.0", "torchvision>=0.25.0"]
+cuda12-nvblox = ["torch>=2.8.0,<=2.9.1", "torchaudio>=2.8.0,<=2.9.1", "torchvision>=0.23.0,<=0.24.1", "nvblox-torch"]
 cuda13 = ["torch>=2.11.0", "torchaudio>=2.11.0", "torchvision>=0.26.0"]
 rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
-nvblox = ["nvblox-torch"]
