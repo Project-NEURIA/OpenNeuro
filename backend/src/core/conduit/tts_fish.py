@@ -60,7 +60,7 @@ class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
 
         def text_stream():
             for frame in inputs.text:
-                if frame is None or interrupted.is_set():
+                if frame is None or interrupted.is_set() or self.stop_event.is_set():
                     break
                 yield frame.text
 
@@ -72,7 +72,7 @@ class FishTTS(ThreadedComponent[FishTTSInputs, FishTTSOutputs]):
             latency="balanced",
             model=self.config.model,
         ):
-            if interrupted.is_set():
+            if interrupted.is_set() or self.stop_event.is_set():
                 break
             if chunk:
                 data = remainder + chunk

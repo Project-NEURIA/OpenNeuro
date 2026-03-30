@@ -14,29 +14,31 @@ from src.core.component import ThreadedComponent, Tag
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat
 
 
-class VLMResponse(BaseModel):
+class CaptionResponse(BaseModel):
     caption: str
+
+
+class ObjectsResponse(BaseModel):
     objects: str
 
 
 class StreamingVLMConfig(BaseModel):
     base_url: str = "https://api.openai.com/v1"
     model_id: str = "gpt-5.4"
-    memory_size: int = 4
-    key_window_interval: int | None = 4
-    prompt_window1: str = (
-        "You are an advanced real-time vision module for blind people. "
-        "Given the current observation, use short phrases to caption what you see, include movement and composition if needed. "
-        'Keep it short, efficient, real-time, relavant. Think "What would the blind person like to know?" '
-        "Also list the distinct objects/items visible as a unique comma-separated list in the objects field. No duplicates."
+    max_history: int = 3
+    caption_prompt: str = (
+        "You are a real-time vision module. "
+        "If there are previous frames, describe only what is NEW or CHANGED. "
+        "Do not repeat what was already described. "
+        "If this is the first frame, describe the full scene."
     )
-    prompt_window2_template: str = (
-        "You are an advanced real-time vision module for blind people. "
-        "Given the current observation history, generate an efficient delta caption "
-        "only introducing new observations that were not mentioned in the history context. "
-        'Keep it efficient, no redundant information, Think "What would the blind person like to know?"\nDO NOT REPEAT anything that is already mentioned.\n\n'
-        "Also list the distinct objects/items visible as a unique comma-separated list in the objects field. No duplicates.\n\n"
-        "History context:\n{context}"
+    objects_prompt: str = (
+        "You are a real-time vision module tracking visible objects. "
+        "Given the latest caption and the current active objects list, "
+        "output the updated active objects list reflecting what is currently visible. "
+        "Maintain consistency with the existing list — keep the same naming for objects that are still present, "
+        "add new ones, and remove ones no longer visible. "
+        "Output as a single comma-separated string in the objects field."
     )
 
 
@@ -50,13 +52,7 @@ class StreamingVLMOutputs(NamedTuple):
 
 
 class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
-    description = "Streams **visual language model** inference on `VideoFrame` input. Maintains a rolling frame buffer and submits VLM caption requests to a thread pool, outputting `TextFrame` descriptions."
-
-    """Streaming VLM component that generates captions from video frames.
-
-    Single-threaded main loop consumes frames into a rolling buffer and
-    submits VLM calls to a thread pool, polling for results each iteration.
-    """
+    description = "Real-time vision module that captions video frames and tracks visible objects."
 
     tags = Tag(
         io={"conduit"}, functionality={"video", "llm"}, gpu={"cpu", "nvidia", "apple"}
@@ -66,7 +62,8 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         super().__init__()
         self.config = config
         self._client = OpenAI(base_url=config.base_url)
-        self._captions_history: list[str] = []
+        self._history: list[dict] = []  # [{image_uri, caption}]
+        self._active_objects: str = ""
 
     def _encode_pil_to_base64_uri(self, img: Image.Image) -> str:
         buf = io.BytesIO()
@@ -74,75 +71,112 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
         return f"data:image/jpeg;base64,{b64}"
 
-    def _should_use_key_window_prompt(self, window_index: int) -> bool:
-        interval = self.config.key_window_interval
-        return interval is not None and interval > 0 and window_index % interval == 0
-
-    def _call_vllm(self, frames: list[Image.Image], prompt: str) -> tuple[str, str]:
-        """Call VLM and return (caption, objects_csv)."""
-        content: list[ChatCompletionContentPartParam] = [
-            {
-                "type": "image_url",
-                "image_url": {"url": self._encode_pil_to_base64_uri(img)},
-            }
-            for img in frames
+    def _call_caption(self, current_image_uri: str) -> str | None:
+        msgs: list[dict] = [
+            {"role": "system", "content": self.config.caption_prompt}
         ]
-        content.append({"type": "text", "text": prompt})
+
+        # History: oldest to newest, each is image + caption pair
+        for entry in self._history:
+            msgs.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": entry["image_uri"]},
+                        },
+                    ],
+                }
+            )
+            msgs.append(
+                {
+                    "role": "assistant",
+                    "content": entry["caption"],
+                }
+            )
+
+        # Current frame
+        msgs.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": current_image_uri},
+                    },
+                ],
+            }
+        )
 
         try:
             response = self._client.beta.chat.completions.parse(
                 model=self.config.model_id,
-                messages=[{"role": "user", "content": content}],
-                response_format=VLMResponse,
+                messages=msgs,  # type: ignore[arg-type]
+                response_format=CaptionResponse,
                 max_completion_tokens=512,
-                temperature=0.7,
             )
             parsed = response.choices[0].message.parsed
-            if parsed is not None:
-                return parsed.caption, parsed.objects
-            # Fallback if parsing failed but content exists
-            text = (response.choices[0].message.content or "").strip()
-            return text, ""
+            return parsed.caption if parsed else None
         except Exception as e:
-            print(f"[StreamingVLM] VLLM call failed: {e}")
-            return "", ""
+            print(f"[StreamingVLM] Caption call failed: {e}")
+            return None
 
-    def _build_prompt(self, window_count: int) -> str:
-        if not self._captions_history or self._should_use_key_window_prompt(
-            window_count
-        ):
-            return self.config.prompt_window1
-        history_str = " ".join(self._captions_history)
-        return self.config.prompt_window2_template.format(context=history_str)
+    def _call_objects(self, caption: str) -> str | None:
+        msgs: list[dict] = [
+            {"role": "system", "content": self.config.objects_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"Latest caption: {caption}\n\n"
+                    f"Current active objects: {self._active_objects or '(none)'}"
+                ),
+            },
+        ]
 
-    def _handle_result(
-        self, caption: str, objects: str, outputs: StreamingVLMOutputs
-    ) -> None:
-        if caption:
-            print(f"[StreamingVLM] Caption: {caption}")
-            self._captions_history.append(caption)
-            if len(self._captions_history) > self.config.memory_size:
-                self._captions_history.pop(0)
-            outputs.observation.send(TextFrame.new(text=caption))
-        if objects:
-            print(f"[StreamingVLM] Objects: {objects}")
-            outputs.objects.send(TextFrame.new(text=objects))
+        try:
+            response = self._client.beta.chat.completions.parse(
+                model=self.config.model_id,
+                messages=msgs,  # type: ignore[arg-type]
+                response_format=ObjectsResponse,
+                max_completion_tokens=256,
+            )
+            parsed = response.choices[0].message.parsed
+            return parsed.objects if parsed else None
+        except Exception as e:
+            print(f"[StreamingVLM] Objects call failed: {e}")
+            return None
 
     def run(self, inputs: StreamingVLMInputs, outputs: StreamingVLMOutputs) -> None:
         print("[StreamingVLM] Starting Streaming VLM component")
 
         inputs.video.newest = True
 
-        window_count = 0
-
         for frame in inputs.video:
             if frame is None:
                 break
 
             pil_img = Image.fromarray(frame.get(VideoDataFormat.RGB))
-            window_count += 1
-            prompt = self._build_prompt(window_count)
-            caption, objects = self._call_vllm([pil_img], prompt)
-            self._handle_result(caption, objects, outputs)
+            image_uri = self._encode_pil_to_base64_uri(pil_img)
+
+            # Call 1: caption
+            caption = self._call_caption(image_uri)
+            if caption is None:
+                continue
+
+            # Update history
+            self._history.append({"image_uri": image_uri, "caption": caption})
+            if len(self._history) > self.config.max_history:
+                self._history.pop(0)
+
+            print(f"[StreamingVLM] Caption: {caption}")
+            outputs.observation.send(TextFrame.new(text=caption))
+
+            # Call 2: objects
+            new_objects = self._call_objects(caption)
+            if new_objects is not None:
+                self._active_objects = new_objects
+                print(f"[StreamingVLM] Objects: {self._active_objects}")
+                outputs.objects.send(TextFrame.new(text=self._active_objects))
 
         print("[StreamingVLM] Streaming VLM component stopped")

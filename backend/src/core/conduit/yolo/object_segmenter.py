@@ -120,6 +120,8 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
 
         if dedup == self._prompts:
             return
+        if not dedup:
+            return
 
         self._prompts = dedup
         prev_cwd = os.getcwd()
@@ -213,19 +215,17 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
 
         inputs.video.newest = True
         inputs.prompts.newest = True
+        inputs.prompts.blocking = False
 
         print("[ObjectSegmenter] Running inference loop")
-        while not self.stop_event.is_set():
-            frame = next(inputs.video, None)
+        for frame in inputs.video:
             if frame is None:
                 break
 
             prompt_frame = next(inputs.prompts, None)
-            if prompt_frame is None:
-                break
-
-            new_prompts = [p.strip() for p in prompt_frame.text.split(",") if p.strip()]
-            self._set_phrases(new_prompts)
+            if prompt_frame is not None:
+                new_prompts = [p.strip() for p in prompt_frame.text.split(",") if p.strip()]
+                self._set_phrases(new_prompts)
 
             rgb = frame.get(VideoDataFormat.RGB)
             rgb = resize_and_crop(rgb, 640, 640)
