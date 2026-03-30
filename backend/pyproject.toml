@@ -91,9 +91,11 @@ index-strategy = "unsafe-best-match"
 override-dependencies = [
     "open3d ; python_version < '0'",
     "numpy>=2.4.2",
+    "torch>=2.10.0",
 ]
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
+    [{ group = "nvblox" }, { group = "rocm" }],
 ]
 default-groups = ["cuda12"]
 
