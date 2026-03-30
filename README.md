@@ -16,8 +16,21 @@ bun install
 
 ### Browser (backend + frontend)
 
+**NVIDIA (default):**
 ```sh
 bun dev
+```
+
+**macOS (Apple Silicon):**
+```sh
+cd backend && uv run --no-group cuda12 python -m src.main &
+cd frontend && bun run dev
+```
+
+**AMD (ROCm):**
+```sh
+cd backend && uv sync --no-group cuda12 --group rocm && uv run python -m src.main &
+cd frontend && bun run dev
 ```
 
 ### Desktop app (Tauri)
