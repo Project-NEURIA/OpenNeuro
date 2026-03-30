@@ -47,3 +47,8 @@ from src.core.conduit.do_nothing_tool import DoNothingTool as DoNothingTool
 from src.core.conduit.movement_tool import MovementTool as MovementTool
 from src.core.conduit.think_tool import ThinkTool as ThinkTool
 from src.core.conduit.throttle import Throttle as Throttle
+from src.core.conduit.tsdf_mapper import TSDFMapper as TSDFMapper
+from src.core.conduit.tsdf_object_locator import TSDFObjectLocator as TSDFObjectLocator
+from src.core.conduit.remote_depth_estimator import (
+    RemoteDepthEstimator as RemoteDepthEstimator,
+)

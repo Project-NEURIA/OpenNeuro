@@ -137,7 +137,7 @@ class StereoDepthEstimator(
             torch.amp.autocast(
                 self._device.type,
                 enabled=self._device.type != "cpu",
-                dtype=torch.float16,
+                dtype=torch.bfloat16,
             ),
         ):
             disp = self._model.forward(
