@@ -42,38 +42,31 @@ export interface TypeError {
 
 // --- Lattice ---
 
-/* istanbul ignore next: helper recursion is exercised through the public solver */
 function flattenUnion(types: Type[]): Type[] {
   const result: Type[] = [];
   for (const t of types) {
-    /* istanbul ignore next: helper recursion is exercised through the public solver */
     if (t.kind === "union") result.push(...flattenUnion(t.types));
     else result.push(t);
   }
   return result;
 }
 
-/* istanbul ignore next: equality helpers are exercised indirectly through join/subtyping */
 function typesEqual(a: Type, b: Type): boolean {
   if (a.kind === "concrete" && b.kind === "concrete") return a.name === b.name;
-  /* istanbul ignore next: variable equality is exercised indirectly through solver propagation */
   if (a.kind === "var" && b.kind === "var") return a.name === b.name;
   if (a.kind === "constructor" && b.kind === "constructor") {
     return a.name === b.name && typesEqual(a.inner, b.inner);
   }
   if (a.kind === "union" && b.kind === "union") {
-    /* istanbul ignore next: union arity mismatches are exercised through public type errors */
     if (a.types.length !== b.types.length) return false;
     return a.types.every((at) => b.types.some((bt) => typesEqual(at, bt)));
   }
   return false;
 }
 
-/* istanbul ignore next: dedup is exercised indirectly through join/coalesce */
 function dedup(types: Type[]): Type[] {
   const result: Type[] = [];
   for (const t of types) {
-    /* istanbul ignore next: duplicate elimination is exercised indirectly through join/coalesce */
     if (!result.some((r) => typesEqual(r, t))) result.push(t);
   }
   return result;
@@ -99,23 +92,20 @@ function isSubtype(a: Type, b: Type): boolean {
 
 // LUB — least upper bound (smallest common supertype)
 function join(a: Type, b: Type): Type {
-  /* istanbul ignore next: join short-circuits when one side already subsumes the other */
   if (isSubtype(a, b)) return b;
-  /* istanbul ignore next: join short-circuits when one side already subsumes the other */
   if (isSubtype(b, a)) return a;
   const members = dedup(flattenUnion([a, b]));
+  if (members.length === 1) return members[0]!;
   return { kind: "union", types: members };
 }
 
 // --- Constraint generation ---
 
-/* istanbul ignore next: parser splitting is exercised through the public parse/check APIs */
 function splitTopLevel(s: string): string[] {
   const parts: string[] = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < s.length; i++) {
-    /* istanbul ignore next: top-level comma splitting tracks bracket depth */
     if (s[i] === "[") depth++;
     else if (s[i] === "]") depth--;
     else if (s[i] === "," && depth === 0) {
@@ -141,15 +131,16 @@ export function collectLeafNames(s: string): string[] {
   return [s];
 }
 
-/* istanbul ignore next: parser branching is exercised through public solver tests */
 function parseType(s: string, concreteTypes: Set<string>, scope?: string): Type {
   s = s.trim();
 
   // Handle "A | B | ..." pipe-union syntax
   if (s.includes(" | ")) {
     const parts = s.split(/\s*\|\s*/);
-    const types = parts.map((p) => parseType(p, concreteTypes, scope));
-    return { kind: "union", types };
+    if (parts.length > 1) {
+      const types = parts.map((p) => parseType(p, concreteTypes, scope));
+      return types.length === 1 ? types[0]! : { kind: "union", types };
+    }
   }
 
   const bracket = s.indexOf("[");
@@ -160,16 +151,13 @@ function parseType(s: string, concreteTypes: Set<string>, scope?: string): Type 
 
     if (name === "Union") {
       const types = args.map((a) => parseType(a, concreteTypes, scope));
-      /* istanbul ignore next: single-member Union[...] collapses to the inner type */
       return types.length === 1 ? types[0]! : { kind: "union", types };
     }
 
-    /* istanbul ignore next: multi-argument constructors are intentionally treated as vars today */
     if (args.length === 1) {
       return { kind: "constructor", name, inner: parseType(args[0]!, concreteTypes, scope) };
     }
   }
-  /* istanbul ignore next: unknown leaf names intentionally become scoped type variables */
   if (concreteTypes.has(s)) return { kind: "concrete", name: s };
   return { kind: "var", name: scope ? `${scope}.${s}` : s };
 }
@@ -329,7 +317,6 @@ function coalesce(bounds: BoundsMap): Subst {
       subst.set(varName, resolved);
     } else {
       const concreteUpper = b.upper.filter((t) => t.kind !== "var");
-      /* istanbul ignore next: upper-bound-only variables resolve to their first concrete upper bound */
       if (concreteUpper.length > 0) {
         subst.set(varName, concreteUpper[0]!);
       }
@@ -391,14 +378,3 @@ export function checkTypes(
 
   return { types, errors };
 }
-
-export const __typecheckInternals = {
-  flattenUnion,
-  typesEqual,
-  dedup,
-  isSubtype,
-  join,
-  splitTopLevel,
-  parseType,
-  coalesce,
-};

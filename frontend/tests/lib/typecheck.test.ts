@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "@/lib/api";
 import {
-  __typecheckInternals,
   checkTypes,
   collectLeafNames,
   getConstraints,
@@ -13,89 +12,6 @@ import type { Graph, SlotType } from "@/lib/types";
 describe("typecheck", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("covers internal type helper branches directly", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => sub === "Cat" && sup === "Animal");
-    await warmSubtypeCache(["Cat", "Animal"]);
-
-    expect(
-      __typecheckInternals.flattenUnion([
-        { kind: "union", types: [{ kind: "concrete", name: "Cat" }] },
-        { kind: "concrete", name: "Dog" },
-      ]),
-    ).toEqual([
-      { kind: "concrete", name: "Cat" },
-      { kind: "concrete", name: "Dog" },
-    ]);
-    expect(__typecheckInternals.typesEqual({ kind: "var", name: "T" }, { kind: "var", name: "T" })).toBe(true);
-    expect(
-      __typecheckInternals.typesEqual(
-        { kind: "union", types: [{ kind: "concrete", name: "Cat" }] },
-        { kind: "union", types: [{ kind: "concrete", name: "Cat" }, { kind: "concrete", name: "Dog" }] },
-      ),
-    ).toBe(false);
-    expect(
-      __typecheckInternals.dedup([
-        { kind: "concrete", name: "Cat" },
-        { kind: "concrete", name: "Cat" },
-      ]),
-    ).toEqual([{ kind: "concrete", name: "Cat" }]);
-    expect(__typecheckInternals.join({ kind: "concrete", name: "Cat" }, { kind: "concrete", name: "Animal" })).toEqual({
-      kind: "concrete",
-      name: "Animal",
-    });
-    expect(__typecheckInternals.join({ kind: "concrete", name: "Animal" }, { kind: "concrete", name: "Cat" })).toEqual({
-      kind: "concrete",
-      name: "Animal",
-    });
-    expect(
-      __typecheckInternals.join(
-        { kind: "union", types: [{ kind: "concrete", name: "Cat" }] },
-        { kind: "union", types: [{ kind: "concrete", name: "Cat" }] },
-      ),
-    ).toEqual({ kind: "union", types: [{ kind: "concrete", name: "Cat" }] });
-    expect(__typecheckInternals.splitTopLevel("Map[Cat, Dog], Bird")).toEqual(["Map[Cat, Dog]", "Bird"]);
-    expect(__typecheckInternals.parseType("Union[Cat]", new Set(["Cat"]))).toEqual({ kind: "concrete", name: "Cat" });
-    expect(__typecheckInternals.parseType("List[Cat]", new Set(["Cat"]))).toEqual({
-      kind: "constructor",
-      name: "List",
-      inner: { kind: "concrete", name: "Cat" },
-    });
-    expect(__typecheckInternals.parseType("Map[Cat, Dog]", new Set(["Cat", "Dog"]))).toEqual({
-      kind: "var",
-      name: "Map[Cat, Dog]",
-    });
-    expect(__typecheckInternals.parseType("Mystery", new Set(["Cat"]), "scope")).toEqual({
-      kind: "var",
-      name: "scope.Mystery",
-    });
-    expect(
-      __typecheckInternals.coalesce(
-        new Map([
-          [
-            "T",
-            {
-              lower: [],
-              upper: [{ kind: "concrete", name: "Animal" }],
-            },
-          ],
-        ]),
-      ),
-    ).toEqual(new Map([["T", { kind: "concrete", name: "Animal" }]]));
-    expect(
-      __typecheckInternals.coalesce(
-        new Map([
-          [
-            "U",
-            {
-              lower: [],
-              upper: [{ kind: "var", name: "Other" }],
-            },
-          ],
-        ]),
-      ),
-    ).toEqual(new Map());
   });
 
   it("collects leaf type names from unions and constructors", () => {

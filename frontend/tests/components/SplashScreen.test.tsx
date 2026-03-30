@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SplashScreen, populateSplash } from "@/components/SplashScreen";
+import { SplashScreen } from "@/components/SplashScreen";
 
 describe("SplashScreen", () => {
   it("renders the loading status and draws svg letters once", () => {
@@ -24,8 +24,17 @@ describe("SplashScreen", () => {
     expect(container.querySelector(".animate-pulse")).toBeTruthy();
   });
 
-  it("skips population when no svg element is available", () => {
-    expect(() => populateSplash(null)).not.toThrow();
+  it("does not duplicate the svg lettering after rerenders", () => {
+    const { container, rerender } = render(<SplashScreen status="Loading..." />);
+
+    const svg = container.querySelector("svg")!;
+    expect(svg.querySelectorAll("text")).toHaveLength("OpenNeuro".length * 2);
+
+    rerender(<SplashScreen status="Still loading..." />);
+    rerender(<SplashScreen status="Almost there..." />);
+
+    expect(svg.querySelectorAll("text")).toHaveLength("OpenNeuro".length * 2);
+    expect(screen.getByText("Almost there...")).toBeInTheDocument();
   });
 });
 

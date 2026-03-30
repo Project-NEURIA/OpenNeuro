@@ -8,7 +8,8 @@
     "build": "bunx --bun vite build",
     "preview": "bunx --bun vite preview",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage:raw": "vitest run --coverage",
+    "coverage": "bun ./scripts/run-coverage.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",

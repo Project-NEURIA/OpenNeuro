@@ -1,13 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  applyOptionDefaults,
-  ConfiguringNode,
-  collectFields,
-  flattenOptions,
-  getDefaultValue,
-  resolveSchema,
-} from "@/components/graph/ConfiguringNode";
+import { ConfiguringNode } from "@/components/graph/ConfiguringNode";
 import * as api from "@/lib/api";
 
 vi.mock("@/components/ui/Dropdown", () => ({
@@ -41,119 +34,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 describe("ConfiguringNode", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("covers schema resolution and field collection helpers", () => {
-    expect(getDefaultValue({ type: "boolean" })).toBe(false);
-    expect(getDefaultValue({ type: "string", default: "preset" })).toBe("preset");
-    expect(getDefaultValue({ type: "string" })).toBe("");
-
-    expect(
-      resolveSchema({
-        anyOf: [
-          { $ref: "#/$defs/Nested" },
-        ],
-        $defs: {
-          Nested: {
-            type: "object",
-            properties: {
-              mode: { type: "string" },
-            },
-          },
-        },
-      }),
-    ).toEqual({
-      type: "object",
-      properties: {
-        mode: { type: "string" },
-      },
-    });
-    expect(
-      resolveSchema({
-        anyOf: [
-          { $ref: "#/$defs/Scalar" },
-        ],
-        $defs: {
-          Scalar: {
-            type: "string",
-          },
-        },
-      }),
-    ).toBeNull();
-    expect(
-      resolveSchema({
-        $ref: "#/$defs/Nested",
-        $defs: {
-          Nested: {
-            type: "object",
-            properties: {
-              path: { type: "string" },
-            },
-          },
-        },
-      }),
-    ).toEqual({
-      type: "object",
-      properties: {
-        path: { type: "string" },
-      },
-    });
-    expect(
-      resolveSchema({
-        $ref: "#/$defs/Scalar",
-        $defs: {
-          Scalar: {
-            type: "string",
-          },
-        },
-      }),
-    ).toBeNull();
-    expect(resolveSchema({ type: "string" })).toBeNull();
-
-    const { fields, optionFields } = collectFields({
-      nested: {
-        type: "object",
-        options: {
-          mode: {},
-        },
-        properties: {
-          mode: { type: "string" },
-        },
-      },
-      simple: { type: "string" },
-    });
-    expect(fields["nested.mode"]).toEqual({ type: "string" });
-    expect(fields.simple).toEqual({ type: "string" });
-    expect(optionFields.has("nested.mode")).toBe(true);
-    expect(optionFields.has("simple")).toBe(true);
-
-    expect(
-      flattenOptions({
-        nested: {
-          mode: [{ value: "fast", label: "Fast" }],
-          ignored: { label: "skip" },
-        },
-        simple: [{ value: "plain", label: "Plain" }],
-        primitive: "skip",
-      }),
-    ).toEqual({
-      "nested.mode": [{ value: "fast", label: "Fast" }],
-      simple: [{ value: "plain", label: "Plain" }],
-    });
-    expect(
-      applyOptionDefaults(
-        { "nested.mode": "", simple: "kept", untouched: undefined },
-        {
-          "nested.mode": [{ value: "fast", label: "Fast" }],
-          simple: [{ value: "plain", label: "Plain" }],
-          untouched: [{ value: "set", label: "Set" }],
-        },
-      ),
-    ).toEqual({
-      "nested.mode": "fast",
-      simple: "kept",
-      untouched: "set",
-    });
   });
 
   it("renders nested and simple fields, applies fetched options, and submits nested config", async () => {

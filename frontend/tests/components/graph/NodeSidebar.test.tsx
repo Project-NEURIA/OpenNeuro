@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InlineMarkdown, NodeSidebar, groupComponents } from "@/components/graph/NodeSidebar";
+import { NodeSidebar } from "@/components/graph/NodeSidebar";
 import type { ComponentInfo } from "@/lib/types";
 
 const components: ComponentInfo[] = [
@@ -50,21 +50,6 @@ describe("NodeSidebar", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
-  });
-
-  it("covers inline markdown and grouping helpers directly", () => {
-    const { container } = render(<InlineMarkdown text="plain `code` text" />);
-    expect(container.textContent).toBe("plain code text");
-    expect(container.querySelector("code")).toHaveTextContent("code");
-
-    const groups = groupComponents([
-      components[0]!,
-      {
-        ...components[0]!,
-        type_: "MicTwo",
-      },
-    ]);
-    expect(groups.source.audio).toHaveLength(2);
   });
 
   it("searches, collapses, shows hover info, and serializes drag payloads", () => {

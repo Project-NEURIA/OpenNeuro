@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GraphNode, hasUIWidgets } from "@/components/graph/GraphNode";
+import { GraphNode } from "@/components/graph/GraphNode";
 import * as textHook from "@/hooks/useUITextOutput";
 import * as videoHook from "@/hooks/useUIVideoOutput";
 import * as outputHook from "@/hooks/useUIOutput";
@@ -18,12 +18,6 @@ vi.mock("@xyflow/react", () => ({
 describe("GraphNode", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  it("detects visible ui widgets from either input or output channels", () => {
-    expect(hasUIWidgets(undefined, undefined)).toBe(false);
-    expect(hasUIWidgets({ textIn: "UITextReceiver" }, undefined)).toBe(true);
-    expect(hasUIWidgets(undefined, { textOut: "UITextSender" })).toBe(true);
   });
 
   it("renders selected node widgets, handles, metrics, and sends UI input", () => {

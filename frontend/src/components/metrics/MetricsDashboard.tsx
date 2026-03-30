@@ -15,25 +15,6 @@ interface MetricsDashboardProps {
 
 const CATEGORY_ORDER: Record<string, number> = { source: 0, conduit: 1, sink: 2 };
 
-export function getMetricsCategoryOrder(category: string) {
-  return CATEGORY_ORDER[category] ?? 1;
-}
-
-export function sortMetricsNodeIds(
-  nodes: NonNullable<MetricsHistory["current"]>["nodes"],
-  componentMap: Record<string, ComponentInfo>,
-) {
-  return Object.keys(nodes).sort((a, b) => {
-    const na = nodes[a]!;
-    const nb = nodes[b]!;
-    const catA = componentMap[na.name]?.tags.io[0] ?? "conduit";
-    const catB = componentMap[nb.name]?.tags.io[0] ?? "conduit";
-    const orderDiff = getMetricsCategoryOrder(catA) - getMetricsCategoryOrder(catB);
-    if (orderDiff !== 0) return orderDiff;
-    return na.name.localeCompare(nb.name);
-  });
-}
-
 export function MetricsDashboard({ connected, history, componentMap, onClose }: MetricsDashboardProps) {
   const { current, nodeHistory, dt, snapshots } = history;
   const nodes = current?.nodes ?? {};
@@ -42,7 +23,17 @@ export function MetricsDashboard({ connected, history, componentMap, onClose }: 
   const lastSnap = snapshots[snapshots.length - 1];
   const duration = firstSnap && lastSnap ? lastSnap.timestamp - firstSnap.timestamp : 0;
 
-  const sortedNodeIds = useMemo(() => sortMetricsNodeIds(nodes, componentMap), [nodes, componentMap]);
+  const sortedNodeIds = useMemo(() => {
+    return Object.keys(nodes).sort((a, b) => {
+      const na = nodes[a]!;
+      const nb = nodes[b]!;
+      const catA = componentMap[na.name]?.tags.io[0] ?? "conduit";
+      const catB = componentMap[nb.name]?.tags.io[0] ?? "conduit";
+      const orderDiff = (CATEGORY_ORDER[catA] ?? 1) - (CATEGORY_ORDER[catB] ?? 1);
+      if (orderDiff !== 0) return orderDiff;
+      return na.name.localeCompare(nb.name);
+    });
+  }, [nodes, componentMap]);
 
   return (
     <div

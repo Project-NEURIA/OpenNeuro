@@ -1,10 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  getMetricsCategoryOrder,
-  MetricsDashboard,
-  sortMetricsNodeIds,
-} from "@/components/metrics/MetricsDashboard";
+import { MetricsDashboard } from "@/components/metrics/MetricsDashboard";
 import { NodePanel } from "@/components/metrics/NodePanel";
 import { ReceiverSection } from "@/components/metrics/ReceiverSection";
 import { SenderSection } from "@/components/metrics/SenderSection";
@@ -132,31 +128,6 @@ const populatedHistory: MetricsHistory = {
 };
 
 describe("metrics components", () => {
-  it("covers the metrics sorting helper directly", () => {
-    expect(getMetricsCategoryOrder("source")).toBe(0);
-    expect(getMetricsCategoryOrder("mystery")).toBe(1);
-
-    expect(
-      sortMetricsNodeIds(
-        {
-          zebra: { name: "ZebraNode", status: "running", senders: {}, receivers: {} },
-          alpha: { name: "AlphaNode", status: "running", senders: {}, receivers: {} },
-        },
-        {},
-      ),
-    ).toEqual(["alpha", "zebra"]);
-
-    expect(
-      sortMetricsNodeIds(
-        {
-          sink: { name: "SinkNode", status: "running", senders: {}, receivers: {} },
-          source: { name: "SourceNode", status: "running", senders: {}, receivers: {} },
-        },
-        componentMap,
-      ),
-    ).toEqual(["source", "sink"]);
-  });
-
   it("renders dashboard totals, sorted node panels, sender and receiver sections", () => {
     const onClose = vi.fn();
     render(

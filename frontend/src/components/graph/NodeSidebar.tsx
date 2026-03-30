@@ -65,7 +65,7 @@ const gpuTagColors: Record<string, { bg: string; text: string; border: string }>
 };
 
 /** Render simple inline markdown: **bold**, *italic*, `code` */
-export function InlineMarkdown({ text }: { text: string }) {
+function InlineMarkdown({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   // Match **bold**, *italic*, `code`
   const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
@@ -79,15 +79,11 @@ export function InlineMarkdown({ text }: { text: string }) {
     }
     if (match[2]) {
       parts.push(<strong key={key++} className="font-bold text-white/90">{match[2]}</strong>);
-      lastIndex = match.index + match[0].length;
-      continue;
-    }
-    if (match[3]) {
+    } else if (match[3]) {
       parts.push(<em key={key++} className="italic text-white/70">{match[3]}</em>);
-      lastIndex = match.index + match[0].length;
-      continue;
+    } else if (match[4]) {
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{match[4]}</code>);
     }
-    parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{match[4]}</code>);
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < text.length) {
@@ -102,7 +98,7 @@ interface NodeSidebarProps {
 }
 
 /** Group components by IO → Functionality */
-export function groupComponents(components: ComponentInfo[]) {
+function groupComponents(components: ComponentInfo[]) {
   const groups: Record<IOTag, Record<FunctionalityTag, ComponentInfo[]>> = {
     source: {} as Record<FunctionalityTag, ComponentInfo[]>,
     conduit: {} as Record<FunctionalityTag, ComponentInfo[]>,
@@ -112,7 +108,6 @@ export function groupComponents(components: ComponentInfo[]) {
   for (const comp of components) {
     for (const io of comp.tags.io) {
       for (const func of comp.tags.functionality) {
-        /* istanbul ignore next: the first item in a group initializes its bucket */
         if (!groups[io][func]) groups[io][func] = [];
         groups[io][func].push(comp);
       }

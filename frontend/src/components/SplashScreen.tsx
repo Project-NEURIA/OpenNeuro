@@ -5,83 +5,82 @@ const DRAW_DURATION = 1.3;
 const FILL_DURATION = 0.2;
 const OVERLAP = 1.05;
 
-export function populateSplash(svg: SVGSVGElement | null) {
-  if (!svg) return;
-
-  const ns = "http://www.w3.org/2000/svg";
-
-  // Measure total width
-  const measure = document.createElementNS(ns, "text");
-  measure.setAttribute("y", "95");
-  measure.style.fontFamily = "'Helvetica Neue', Arial, sans-serif";
-  measure.style.fontWeight = "700";
-  measure.style.fontSize = "96px";
-  measure.textContent = TEXT;
-  svg.appendChild(measure);
-  const totalWidth = measure.getComputedTextLength();
-  svg.removeChild(measure);
-
-  svg.setAttribute("viewBox", `0 0 ${totalWidth + 20} 120`);
-  svg.setAttribute("width", String(totalWidth + 20));
-  svg.setAttribute("height", "120");
-
-  // Measure each letter's x position
-  const positions: number[] = [];
-  for (let i = 0; i < TEXT.length; i++) {
-    const prev = document.createElementNS(ns, "text");
-    prev.setAttribute("y", "95");
-    prev.style.fontFamily = "'Helvetica Neue', Arial, sans-serif";
-    prev.style.fontWeight = "700";
-    prev.style.fontSize = "96px";
-    prev.textContent = TEXT.substring(0, i);
-    svg.appendChild(prev);
-    positions.push(prev.getComputedTextLength() + 10);
-    svg.removeChild(prev);
-  }
-
-  let delay = 0.3;
-
-  // Stroke pass
-  for (let i = 0; i < TEXT.length; i++) {
-    const stroke = document.createElementNS(ns, "text");
-    stroke.setAttribute("x", String(positions[i]));
-    stroke.setAttribute("y", "95");
-    stroke.setAttribute("class", "letter-stroke");
-    if (TEXT[i] === "O") stroke.style.stroke = "#ff2d2d";
-    stroke.textContent = TEXT[i];
-    svg.appendChild(stroke);
-
-    const len = 800;
-    stroke.style.strokeDasharray = String(len);
-    stroke.style.strokeDashoffset = String(len);
-    stroke.style.animation = `draw ${DRAW_DURATION}s ease-out forwards`;
-    stroke.style.animationDelay = `${delay}s`;
-
-    delay += DRAW_DURATION - OVERLAP;
-  }
-
-  // Fill pass
-  delay = 0.3;
-  for (let i = 0; i < TEXT.length; i++) {
-    const fill = document.createElementNS(ns, "text");
-    fill.setAttribute("x", String(positions[i]));
-    fill.setAttribute("y", "95");
-    fill.setAttribute("class", "letter-fill");
-    if (TEXT[i] === "O") fill.style.fill = "#ff2d2d";
-    fill.textContent = TEXT[i];
-    fill.style.animation = `fadeIn ${FILL_DURATION}s ease forwards`;
-    fill.style.animationDelay = `${delay + DRAW_DURATION * 0.2}s`;
-    svg.appendChild(fill);
-
-    delay += DRAW_DURATION - OVERLAP;
-  }
-}
-
 export function SplashScreen({ status }: { status: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const animated = useRef(false);
 
   useEffect(() => {
-    populateSplash(svgRef.current);
+    const svg = svgRef.current;
+    if (!svg || animated.current) return;
+    animated.current = true;
+
+    const ns = "http://www.w3.org/2000/svg";
+
+    // Measure total width
+    const measure = document.createElementNS(ns, "text");
+    measure.setAttribute("y", "95");
+    measure.style.fontFamily = "'Helvetica Neue', Arial, sans-serif";
+    measure.style.fontWeight = "700";
+    measure.style.fontSize = "96px";
+    measure.textContent = TEXT;
+    svg.appendChild(measure);
+    const totalWidth = measure.getComputedTextLength();
+    svg.removeChild(measure);
+
+    svg.setAttribute("viewBox", `0 0 ${totalWidth + 20} 120`);
+    svg.setAttribute("width", String(totalWidth + 20));
+    svg.setAttribute("height", "120");
+
+    // Measure each letter's x position
+    const positions: number[] = [];
+    for (let i = 0; i < TEXT.length; i++) {
+      const prev = document.createElementNS(ns, "text");
+      prev.setAttribute("y", "95");
+      prev.style.fontFamily = "'Helvetica Neue', Arial, sans-serif";
+      prev.style.fontWeight = "700";
+      prev.style.fontSize = "96px";
+      prev.textContent = TEXT.substring(0, i);
+      svg.appendChild(prev);
+      positions.push(prev.getComputedTextLength() + 10);
+      svg.removeChild(prev);
+    }
+
+    let delay = 0.3;
+
+    // Stroke pass
+    for (let i = 0; i < TEXT.length; i++) {
+      const stroke = document.createElementNS(ns, "text");
+      stroke.setAttribute("x", String(positions[i]));
+      stroke.setAttribute("y", "95");
+      stroke.setAttribute("class", "letter-stroke");
+      if (TEXT[i] === "O") stroke.style.stroke = "#ff2d2d";
+      stroke.textContent = TEXT[i];
+      svg.appendChild(stroke);
+
+      const len = 800;
+      stroke.style.strokeDasharray = String(len);
+      stroke.style.strokeDashoffset = String(len);
+      stroke.style.animation = `draw ${DRAW_DURATION}s ease-out forwards`;
+      stroke.style.animationDelay = `${delay}s`;
+
+      delay += DRAW_DURATION - OVERLAP;
+    }
+
+    // Fill pass
+    delay = 0.3;
+    for (let i = 0; i < TEXT.length; i++) {
+      const fill = document.createElementNS(ns, "text");
+      fill.setAttribute("x", String(positions[i]));
+      fill.setAttribute("y", "95");
+      fill.setAttribute("class", "letter-fill");
+      if (TEXT[i] === "O") fill.style.fill = "#ff2d2d";
+      fill.textContent = TEXT[i];
+      fill.style.animation = `fadeIn ${FILL_DURATION}s ease forwards`;
+      fill.style.animationDelay = `${delay + DRAW_DURATION * 0.2}s`;
+      svg.appendChild(fill);
+
+      delay += DRAW_DURATION - OVERLAP;
+    }
   }, []);
 
   return (

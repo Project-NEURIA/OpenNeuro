@@ -1,17 +1,28 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import App, { parseSlot, toReactFlowNode } from "@/App";
+import App from "@/App";
 import * as api from "@/lib/api";
 import * as graphDataHook from "@/hooks/useGraphData";
 import * as componentsHook from "@/hooks/useComponents";
 import * as metricsHistoryHook from "@/hooks/useMetricsHistory";
 import * as layout from "@/lib/layout";
 import * as typecheck from "@/lib/typecheck";
+import type { MetricsSnapshot } from "@/lib/types";
 
 let currentGraphCanvasProps: Record<string, unknown> | null = null;
 let cachedEditConfig: (() => void) | undefined;
-let currentMetrics = {
+type MockGraphNode = {
+  id: string;
+  type?: string;
+  data?: Record<string, unknown>;
+};
+
+type MockGraphEdge = {
+  id: string;
+};
+
+let currentMetrics: MetricsSnapshot = {
   timestamp: 1,
   nodes: {
     n1: { name: "Mic", status: "running", senders: {}, receivers: {} },
@@ -28,23 +39,23 @@ vi.mock("@xyflow/react", async () => {
   const ReactModule = await import("react");
   return {
     ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    useNodesState: (initial: unknown[]) => {
-      const [state, setState] = ReactModule.useState(initial);
+    useNodesState: (initial: MockGraphNode[]) => {
+      const [state, setState] = ReactModule.useState<MockGraphNode[]>(initial);
       return [
         state,
         setState,
         (changes: { type: string; id: string }[]) => {
-          setState((prev) => prev.filter((node: { id: string }) => !changes.some((change) => change.type === "remove" && change.id === node.id)));
+          setState((prev) => prev.filter((node) => !changes.some((change) => change.type === "remove" && change.id === node.id)));
         },
       ];
     },
-    useEdgesState: (initial: unknown[]) => {
-      const [state, setState] = ReactModule.useState(initial);
+    useEdgesState: (initial: MockGraphEdge[]) => {
+      const [state, setState] = ReactModule.useState<MockGraphEdge[]>(initial);
       return [
         state,
         setState,
         (changes: { type: string; id: string }[]) => {
-          setState((prev) => prev.filter((edge: { id: string }) => !changes.some((change) => change.type === "remove" && change.id === edge.id)));
+          setState((prev) => prev.filter((edge) => !changes.some((change) => change.type === "remove" && change.id === edge.id)));
         },
       ];
     },
@@ -75,13 +86,17 @@ vi.mock("@/components/SplashScreen", () => ({
 vi.mock("@/components/graph/GraphCanvas", () => ({
   GraphCanvas: (props: Record<string, unknown>) => {
     currentGraphCanvasProps = props;
-    const nodes = (props.nodes as { id: string; type?: string; data?: Record<string, unknown> }[]) ?? [];
-    const edges = (props.edges as { id: string }[]) ?? [];
+    const nodes = (props.nodes as MockGraphNode[]) ?? [];
+    const edges = (props.edges as MockGraphEdge[]) ?? [];
     const firstGraphNode = nodes.find((node) => node.type === "graph");
     const ghostGraphNode = nodes.find((node) => node.type === "graph" && node.data?.label === "Ghost");
     const compositeNode = nodes.find((node) => node.type === "graph" && node.data?.category === "composite");
     const configuringNode = nodes.find((node) => node.type === "configuring");
     const firstEdge = edges[0];
+    const firstGraphNodeEdit = firstGraphNode?.data?.onEditConfig as (() => void) | undefined;
+    const ghostGraphNodeEdit = ghostGraphNode?.data?.onEditConfig as (() => void) | undefined;
+    const configuringConfirm = configuringNode?.data?.onConfirm as ((config: { gain: number }) => void) | undefined;
+    const configuringCancel = configuringNode?.data?.onCancel as (() => void) | undefined;
 
     const makeDropEvent = (rawApplication: string, rawText = "") => ({
       preventDefault: vi.fn(),
@@ -131,16 +146,16 @@ vi.mock("@/components/graph/GraphCanvas", () => ({
         >
           context-composite
         </button>
-        <button onClick={() => firstGraphNode?.data?.onEditConfig?.()}>edit-first</button>
-        <button onClick={() => ghostGraphNode?.data?.onEditConfig?.()}>edit-ghost</button>
+        <button onClick={() => firstGraphNodeEdit?.()}>edit-first</button>
+        <button onClick={() => ghostGraphNodeEdit?.()}>edit-ghost</button>
         <button onClick={() => {
-          cachedEditConfig = firstGraphNode?.data?.onEditConfig as (() => void) | undefined;
+          cachedEditConfig = firstGraphNodeEdit;
         }}>
           cache-edit-first
         </button>
         <button onClick={() => cachedEditConfig?.()}>edit-cached</button>
-        <button onClick={() => configuringNode?.data?.onConfirm?.({ gain: 5 })}>confirm-configuring</button>
-        <button onClick={() => configuringNode?.data?.onCancel?.()}>cancel-configuring</button>
+        <button onClick={() => configuringConfirm?.({ gain: 5 })}>confirm-configuring</button>
+        <button onClick={() => configuringCancel?.()}>cancel-configuring</button>
         <button onClick={() => firstGraphNode && (props.onNodesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstGraphNode.id }])}>
           remove-node
         </button>
@@ -465,61 +480,65 @@ describe("App", () => {
     expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic");
   });
 
-  it("covers slot parsing and direct react-flow node construction helpers", () => {
-    expect(parseSlot(undefined)).toBe("");
-    expect(parseSlot("out-audio-main")).toBe("audio-main");
-
-    const builder = vi.fn().mockReturnValue({
-      label: "Built",
-      category: "conduit",
-      inputs: ["in"],
-      outputs: ["out"],
-      inputTypes: {},
-      outputTypes: {},
-      status: "ready",
-      nodeMetrics: null,
-      ui_inputs: {},
-      ui_outputs: {},
-    });
-
-    const graphNode = toReactFlowNode(
+  it("builds fallback and composite graph nodes through app initialization", async () => {
+    vi.spyOn(api, "fetchCurrentProject").mockResolvedValueOnce({ current_project: "Alpha" });
+    vi.spyOn(api, "fetchNodes").mockResolvedValueOnce([
       {
-        id: "node-1",
+        id: "ghost",
         type: "Ghost",
         is_composite: false,
         status: "ready",
-        x: 0,
-        y: 0,
+        x: 11,
+        y: 12,
         init_args: undefined,
       },
-      { x: 1, y: 2 },
-      componentMap as never,
-      { inputs: {}, outputs: {} },
-      builder,
-    );
-    expect(builder).toHaveBeenCalledWith("node-1", "Ghost", "ready", {});
-    expect(graphNode.position).toEqual({ x: 1, y: 2 });
-
-    const compositeNode = toReactFlowNode(
       {
-        id: "node-2",
+        id: "group",
         type: "ProjectComposite",
         is_composite: true,
         status: "running",
-        x: 0,
-        y: 0,
+        x: 21,
+        y: 22,
         init_args: {},
-        inputs: undefined,
-        outputs: undefined,
+        inputs: { "group.input-main": "Receiver[Audio]" },
+        outputs: { "group.output-main": "Sender[Audio]" },
       },
-      { x: 3, y: 4 },
-      {} as never,
-      { inputs: {}, outputs: {} },
-      builder,
-    );
-    expect(compositeNode.data.inputs).toEqual([]);
-    expect(compositeNode.data.outputs).toEqual([]);
+    ]);
+    vi.spyOn(api, "fetchEdges").mockResolvedValueOnce([
+      {
+        source_node: "ghost",
+        source_slot: "audio-main",
+        target_node: "group",
+        target_slot: "input-main",
+      },
+    ]);
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("sidebar:2:Alpha")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("ghost:graph:Ghost"));
+    expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("group:graph:ProjectComposite");
+    expect(screen.getByTestId("canvas-edges")).toHaveTextContent("ghost:audio-main->group:input-main");
+
+    const props = getCanvasProps();
+    const ghostNode = props.nodes.find((node) => node.id === "ghost") as {
+      position: { x: number; y: number };
+      data: { category: string; inputs: string[]; outputs: string[] };
+    };
+    const compositeNode = props.nodes.find((node) => node.id === "group") as {
+      position: { x: number; y: number };
+      data: { category: string; inputs: string[]; outputs: string[] };
+    };
+
+    expect(ghostNode.position).toEqual({ x: 11, y: 12 });
+    expect(ghostNode.data.category).toBe("conduit");
+    expect(ghostNode.data.inputs).toEqual([]);
+    expect(ghostNode.data.outputs).toEqual([]);
+
+    expect(compositeNode.position).toEqual({ x: 21, y: 22 });
     expect(compositeNode.data.category).toBe("composite");
+    expect(compositeNode.data.inputs).toEqual(["group.input-main"]);
+    expect(compositeNode.data.outputs).toEqual(["group.output-main"]);
   });
 
   it("retries backend polling and falls back to the chooser when auto-start fails", async () => {
