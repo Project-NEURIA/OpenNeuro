@@ -1,0 +1,81 @@
+# Frontend Architecture
+
+React 19 + TypeScript graph editor built on `@xyflow/react`.
+
+## Stack
+
+- **@xyflow/react** — Spatial graph editing (drag, pan, zoom, connect)
+- **Tailwind CSS** — Styling
+- **Lucide React** — Icons
+- **Vite** — Dev server + bundler
+
+## Key Components
+
+### App.tsx
+
+Root component. Manages:
+- ReactFlow nodes/edges state
+- Component registry (fetched from backend)
+- Metrics subscription (SSE)
+- Graph lifecycle (load/save/run/stop)
+- Routing between ProjectChooser and main editor
+
+### GraphNode.tsx
+
+Rendered node in the graph canvas:
+- Component name + status indicator (colored dot: green=running, yellow=setup, red=stopped)
+- I/O port labels with type annotations
+- Category badge (source/conduit/sink)
+- Live metrics overlay (msg/s, lag, buffer depth)
+- Embedded UI controls (text input, video stream)
+
+### ConfiguringNode.tsx
+
+Modal form for creating/editing a node:
+- Introspects `init` JSON schema from component metadata
+- Renders appropriate widgets: text input, number input, dropdown, file picker
+- Handles nested Pydantic models (flattened to `param.field` keys)
+- Supports `Literal` types as dropdowns (unwraps `anyOf` for nullable literals)
+- Supports `Path` types as file picker (Tauri native dialog or Vite upload)
+- Fetches dynamic options via `POST /component/{'{name}'}/options`
+
+### NodeSidebar.tsx
+
+Component picker panel:
+- Groups components by IO tag (source/conduit/sink) then functionality
+- Search filter at the top
+- Drag-to-create: drag a component from sidebar onto the canvas
+- Collapsible categories
+- Components with no tags appear under "Other"
+
+### MetricsOverlay.tsx
+
+Real-time stats:
+- Global message/byte throughput
+- Per-node status badges
+- Settings button for env editor
+
+## Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `useGraphData()` | Load nodes/edges, subscribe to metrics SSE |
+| `useSSE(url)` | Generic EventSource wrapper |
+| `useUIChannel()` | WebSocket connection to `/ui/ws` |
+| `useUITextOutput(nodeId, slot)` | Subscribe to component text output |
+| `useUIVideoOutput(nodeId, slot)` | Subscribe to component video output |
+| `useUIInput(nodeId, slot)` | Send text to component input |
+| `useComponentLogs(nodeId)` | Fetch + refresh component logs |
+
+## API Client (`lib/api.ts`)
+
+Thin wrappers around `fetch()` for all backend endpoints. Functions mirror the REST API: `fetchComponents()`, `createNode()`, `createEdge()`, `startAll()`, `saveGraph()`, etc.
+
+## Type System (`lib/typecheck.ts`)
+
+Edge validation:
+- Checks that output type is assignable to input type
+- Uses `/component/is-subtype` endpoint for runtime subtype checks
+- Caches concrete type set for performance
+- Runs automatically after project load and on graph changes
+- Invalid edges highlighted in the UI

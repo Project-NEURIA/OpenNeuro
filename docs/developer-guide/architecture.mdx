@@ -1,0 +1,147 @@
+# System Overview
+
+OpenNeuro has three subsystems:
+
+```
+OpenNeuro/
+├── backend/          Python FastAPI server + pipeline engine
+│   └── src/
+│       ├── core/     Component hierarchy, channels, graphs, frames
+│       ├── api/      REST/WS endpoints
+│       └── main.py   App entry point
+├── frontend/         React graph editor
+│   └── src/
+│       ├── components/
+│       ├── hooks/
+│       ├── lib/
+│       └── App.tsx
+├── src-tauri/        Rust desktop shell
+│   └── src/lib.rs
+└── docs/             Nextra docsite
+```
+
+## Communication
+
+```
+Frontend ──REST──► Backend (graph CRUD, component registry, project management)
+Frontend ◄──SSE──  Backend (live metrics every 100ms)
+Frontend ◄──WS───► Backend (UI channels: video overlays, text input/output)
+```
+
+- **REST** — Graph operations, component listing, project load/save, environment config
+- **SSE** (`/metrics`) — Per-node status, per-slot throughput/lag deltas
+- **WebSocket** (`/ui/ws`) — Bidirectional UI channels: components push video/text to frontend, frontend pushes user input to components
+
+## Backend
+
+Python 3.13, FastAPI + uvicorn on `0.0.0.0:8000`. The core is a graph of threaded components connected by pub/sub channels. Each component runs in its own daemon thread.
+
+Key packages: `torch`, `litellm`, `smplx`, `clip`, `onnxruntime`, `sounddevice`, `opencv`
+
+### Startup Sequence
+
+The FastAPI lifespan hook:
+1. Creates `~/Documents/OpenNeuro/projects/` if needed
+2. Copies bundled presets from `backend/assets/presets/` to user projects (first run only)
+3. Installs global stdout/stderr capture for per-component logging
+4. Loads `AppConfig` from `~/Documents/OpenNeuro/config.json`
+5. Initializes `GraphManager` with empty graph
+6. Starts a parent process watchdog (exits if Tauri/bun parent dies)
+
+CORS is fully open (`allow_origins=["*"]`).
+
+### Router Mounting
+
+Eight API routers:
+- `/graph` — node/edge CRUD, run/stop, save
+- `/component` — registry lookup, type checking, dynamic options
+- `/projects`, `/project` — project management
+- `/env` — environment variables (`.env` file)
+- `/metrics` — SSE metrics stream
+- `/logs` — per-component log history
+- `/ui` — WebSocket UI channels
+
+### Log Capture
+
+`ComponentLogStore` captures stdout/stderr from component threads:
+- Maps thread IDs to node IDs
+- Buffers partial lines, flushes on newline
+- Keeps up to 1000 entries per node
+- Each entry: sequence number, timestamp, stream type, text
+
+### GPU-Aware Dependencies
+
+The `pyproject.toml` has conditional dependency groups:
+- **Default (CUDA)**: PyTorch from `pytorch-cu126` index
+- **ROCm**: PyTorch from `pytorch-rocm` index (`--group rocm --no-group cuda`)
+- **macOS**: Standard PyTorch wheels with MPS acceleration
+
+CUDA and ROCm groups conflict — only one can be active.
+
+## Frontend
+
+React 19 + TypeScript. The graph editor uses `@xyflow/react` for spatial node layout with drag-to-connect wiring. Tailwind CSS for styling.
+
+The frontend is the source of truth for graph topology — it sends CRUD operations to the backend, which reconciles channels and manages execution.
+
+### Vite Configuration
+
+Dev server proxies 7 backend paths (`/graph`, `/metrics`, `/component`, `/projects`, `/project`, `/env`, `/logs`) to `localhost:8000`.
+
+A custom upload middleware handles `POST /upload` — parses multipart form data, saves files with UUID names to `frontend/dev/uploads/`, returns the file path. This is dev-only; in Tauri, the native file dialog returns paths directly.
+
+## Desktop (Tauri)
+
+Tauri 2 (Rust) wraps the frontend as a native app.
+
+### Startup Sequence
+
+1. **GPU Detection** (`detect_gpu_extra()`):
+   - macOS: returns None (uses MPS)
+   - Linux: queries `gfxinfo::active_gpu()` — NVIDIA→default, AMD→"rocm"
+   - Fallback: defaults to CUDA
+
+2. **Dependency Sync**: `uv sync` with conditional group flags
+
+3. **Backend Spawn**: `.venv/bin/python -m src.main` (working dir: `backend/`)
+
+4. **Lifecycle**: Backend PID stored in static mutex. Ctrl+C handler and app exit both kill the backend.
+
+Plugins: `tauri-plugin-shell` (process spawning), `tauri-plugin-dialog` (native file picker)
+
+## Development
+
+```bash
+# Dev mode (Vite + FastAPI, hot reload on both)
+bun dev
+
+# Desktop dev mode (Tauri + Vite + FastAPI)
+bun tauri dev
+
+# Backend only
+cd backend && uv run python -m src.main
+
+# Frontend only
+cd frontend && bun run dev
+```
+
+`bun dev` runs `scripts/dev.ts` which spawns backend (`uv run python -m src.main`) and frontend (`bun run dev`) in parallel, with a SIGINT handler that kills both.
+
+## Configuration & Paths
+
+```
+~/Documents/OpenNeuro/
+├── config.json          AppConfig (current_project name)
+├── .env                 Environment variables (API keys, etc.)
+└── projects/
+    ├── MyProject/
+    │   ├── graph.json   Serialized graph
+    │   └── thumbnail.png
+    └── Agent/           (copied from bundled presets on first run)
+        └── graph.json
+
+backend/assets/
+├── presets/             Bundled example pipelines
+├── character_cards/     SillyTavern PNG character cards
+└── dart_control/        DART model checkpoints
+```
