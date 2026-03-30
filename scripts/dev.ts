@@ -2,6 +2,7 @@ const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
   cwd: "./backend",
   stdout: "inherit",
   stderr: "inherit",
+  env: { ...process.env, UV_SKIP_WHEEL_FILENAME_CHECK: "1" },
 });
 
 const frontend = Bun.spawn(["bun", "run", "dev"], {

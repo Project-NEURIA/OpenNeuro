@@ -22,9 +22,9 @@ dependencies = [
     "trimesh>=4.0.0",
     "sounddevice>=0.5.5",
     "sse-starlette>=3.2.0",
-    "torch>=2.7.0 ; sys_platform == 'darwin'",
-    "torchaudio>=2.7.0 ; sys_platform == 'darwin'",
-    "torchvision>=0.22.0 ; sys_platform == 'darwin'",
+    "torch>=2.10.0 ; sys_platform == 'darwin'",
+    "torchaudio>=2.10.0 ; sys_platform == 'darwin'",
+    "torchvision>=0.25.0 ; sys_platform == 'darwin'",
     "transformers>=5.1.0",
     "types-requests>=2.32.4.20260107",
     "httpx>=0.27.0",
@@ -85,8 +85,9 @@ url = "https://download.pytorch.org/whl/rocm6.4"
 explicit = true
 
 [tool.uv]
-# DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
-override-dependencies = ["open3d ; python_version < '0'"]
+index-strategy = "unsafe-best-match"
+# DA3 lists open3d but open3d lacks 3.13+ wheels
+override-dependencies = ["open3d ; python_version < '0'", "numpy>=2.4.2", "torch>=2.10.0,<2.11"]
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
@@ -111,11 +112,15 @@ torchvision = [
 pytorch-triton-rocm = [
     { index = "pytorch-rocm", group = "rocm", marker = "sys_platform == 'linux'" },
 ]
+nvblox-torch = [
+    { url = "https://github.com/nvidia-isaac/nvblox/releases/download/v0.0.9/nvblox_torch-0.0.9+cu12ubuntu22-py3-none-linux_x86_64.whl", group = "nvblox" },
+]
 
 [dependency-groups]
 dev = [
     "ruff>=0.15.1",
 ]
-cuda12 = ["torch>=2.7.0", "torchaudio>=2.7.0", "torchvision>=0.22.0"]
-cuda13 = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0"]
+cuda12 = ["torch>=2.10.0,<2.11", "torchaudio>=2.10.0,<2.11", "torchvision>=0.25.0,<0.26"]
+cuda13 = ["torch>=2.9.1", "torchaudio>=2.9.1", "torchvision>=0.24.1"]
 rocm = ["torch>=2.8.0", "torchaudio>=2.8.0", "torchvision>=0.23.0", "pytorch-triton-rocm"]
+nvblox = ["nvblox-torch"]

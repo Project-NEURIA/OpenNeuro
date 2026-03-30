@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import threading
-import time
 from typing import Any, Literal, NamedTuple
 
 import numpy as np
@@ -22,21 +20,9 @@ try:
     from nvblox_torch.sensor import Sensor
 
     _NVBLOX_AVAILABLE = True
-except (ImportError, OSError):
+except (ImportError, OSError) as _nvblox_err:
     _NVBLOX_AVAILABLE = False
-
-try:
-    import open3d as _o3d  # noqa: F401
-
-    _OPEN3D_AVAILABLE = True
-except ImportError:
-    _OPEN3D_AVAILABLE = False
-
-# nvblox weighting modes (must match nvblox_torch enum).
-_WEIGHTING_MODES: dict[str, int] = {
-    "constant": 0,
-    "inverse_distance": 1,
-}
+    print(f"[TSDFMapper] nvblox_torch unavailable: {_nvblox_err}")
 
 
 class TSDFMapperConfig(BaseModel):
@@ -51,8 +37,6 @@ class TSDFMapperConfig(BaseModel):
     decay_threshold: float = 0.001
     max_vram_mb: float = 7000
     render_max_steps: int = 100
-    show_visualizer: bool = False
-    mesh_update_every: int = 5
     mesh_min_weight: float = 0.1
 
 
@@ -64,73 +48,6 @@ class TSDFMapperInputs(NamedTuple):
 
 class TSDFMapperOutputs(NamedTuple):
     depth: Sender[DepthFrame]
-
-
-class _MeshViewer:
-    """Non-blocking Open3D mesh viewer running in a background daemon thread."""
-
-    def __init__(self) -> None:
-        import open3d as o3d
-
-        self._o3d = o3d
-        self._lock = threading.Lock()
-        self._mesh: Any = None
-        self._updated = False
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def _run(self) -> None:
-        o3d = self._o3d
-        vis = o3d.visualization.Visualizer()
-        try:
-            vis.create_window("TSDF Mesh", width=1280, height=720)
-        except Exception as e:
-            print(f"[TSDFMapper] Could not create Open3D window: {e}")
-            self._stop.set()
-            return
-
-        opt = vis.get_render_option()
-        if opt is not None:
-            opt.mesh_show_back_face = True
-
-        current_mesh = o3d.geometry.TriangleMesh()
-        vis.add_geometry(current_mesh)
-        first_update = True
-
-        while not self._stop.is_set():
-            with self._lock:
-                if self._updated and self._mesh is not None:
-                    current_mesh.vertices = self._mesh.vertices
-                    current_mesh.triangles = self._mesh.triangles
-                    current_mesh.vertex_colors = self._mesh.vertex_colors
-                    current_mesh.vertex_normals = self._mesh.vertex_normals
-                    self._updated = False
-                    need_update = True
-                else:
-                    need_update = False
-
-            if need_update:
-                vis.update_geometry(current_mesh)
-                if first_update:
-                    vis.reset_view_point(True)
-                    first_update = False
-
-            if not vis.poll_events():
-                self._stop.set()
-                break
-            vis.update_renderer()
-            time.sleep(0.016)  # ~60 Hz
-
-        vis.destroy_window()
-
-    def update(self, o3d_mesh: Any) -> None:
-        with self._lock:
-            self._mesh = o3d_mesh
-            self._updated = True
-
-    def close(self) -> None:
-        self._stop.set()
 
 
 def _to_nvblox_c2w(extrinsics: np.ndarray) -> Any:
@@ -172,15 +89,14 @@ class TSDFMapper(ThreadedComponent[TSDFMapperInputs, TSDFMapperOutputs]):
         self._device = auto_device("auto")
         self._mapper: Any = None
         self._sensor: Any = None
-        self._viewer: _MeshViewer | None = None
         self._frame_count = 0
 
     def setup(self, outputs: TSDFMapperOutputs) -> None:
         if not _NVBLOX_AVAILABLE:
             raise RuntimeError(
-                "nvblox_torch is not installed. "
-                "Build and install it from https://github.com/nvidia-isaac/nvblox: "
-                "pip install -e libs/nvblox/nvblox_torch"
+                "nvblox_torch is not available (C++ library not built). "
+                "Install with: uv sync --group nvblox, then build the C++ core — "
+                "see https://github.com/nvidia-isaac/nvblox for build instructions."
             )
 
         import torch
@@ -198,9 +114,7 @@ class TSDFMapper(ThreadedComponent[TSDFMapperInputs, TSDFMapperOutputs]):
             cfg.truncation_distance_vox
         )
         proj._c_params.set_projective_integrator_max_weight(cfg.max_weight)
-        proj._c_params.set_projective_integrator_weighting_mode(
-            _WEIGHTING_MODES[cfg.weighting_mode]
-        )
+        proj._c_params.set_projective_integrator_weighting_mode(cfg.weighting_mode)
         proj._c_params.set_projective_tsdf_integrator_invalid_depth_decay_factor(
             cfg.invalid_depth_decay
         )
@@ -220,12 +134,6 @@ class TSDFMapper(ThreadedComponent[TSDFMapperInputs, TSDFMapperOutputs]):
             integrator_types=ProjectiveIntegratorType.TSDF,
             mapper_parameters=params,
         )
-
-        if cfg.show_visualizer:
-            if not _OPEN3D_AVAILABLE:
-                print("[TSDFMapper] open3d not installed, skipping 3D visualizer")
-            else:
-                self._viewer = _MeshViewer()
 
         print(
             f"[TSDFMapper] Ready  voxel_size={cfg.voxel_size}m  device={self._device}"
@@ -252,11 +160,6 @@ class TSDFMapper(ThreadedComponent[TSDFMapperInputs, TSDFMapperOutputs]):
             print(f"[TSDFMapper] VRAM {used_mb:.0f}MB > cap, clearing map")
             self._mapper.clear()
             self._sensor = None
-
-    def stop(self) -> None:
-        super().stop()
-        if self._viewer is not None:
-            self._viewer.close()
 
     def run(self, inputs: TSDFMapperInputs, outputs: TSDFMapperOutputs) -> None:
         import torch
@@ -333,15 +236,4 @@ class TSDFMapper(ThreadedComponent[TSDFMapperInputs, TSDFMapperOutputs]):
             if self._frame_count % 10 == 0:
                 self._check_vram()
 
-            # Mesh viewer update.
-            if (
-                self._viewer is not None
-                and self._frame_count % self.config.mesh_update_every == 0
-            ):
-                self._mapper.update_color_mesh()
-                mesh = self._mapper.get_color_mesh()
-                self._viewer.update(mesh.to_open3d())
-
-        if self._viewer is not None:
-            self._viewer.close()
         print("[TSDFMapper] Stopped")
