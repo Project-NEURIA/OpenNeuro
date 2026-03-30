@@ -7,6 +7,7 @@ import time
 from typing import NamedTuple
 
 import numpy as np
+from pydantic import BaseModel
 
 from src.core.channel import Sender
 from src.core.component import ThreadedComponent, Tag
@@ -15,6 +16,14 @@ from src.core.frames import (
     StereoVideoFrame,
     VideoDataFormat,
 )
+
+_DEFAULT_HOST = os.getenv("VRCHAT_IP", "127.0.0.1")
+
+
+class VRChatVideoConfig(BaseModel):
+    host: str = _DEFAULT_HOST
+    port: int = 21213
+    fps: int = 30
 
 
 class VRChatVideoOutputs(NamedTuple):
@@ -32,17 +41,12 @@ class VRChatVideo(ThreadedComponent[tuple[()], VRChatVideoOutputs]):
 
     tags = Tag(io={"source"}, functionality={"video"})
 
-    def __init__(
-        self,
-        *,
-        host: str = os.getenv("VRCHAT_IP", "127.0.0.1"),
-        port: int = 21213,
-        fps: int = 30,
-    ) -> None:
+    def __init__(self, config: VRChatVideoConfig) -> None:
         super().__init__()
-        self._host = host
-        self._port = port
-        self._frame_interval = 1.0 / fps
+        self.config = config
+        self._host = config.host
+        self._port = config.port
+        self._frame_interval = 1.0 / config.fps
 
     def run(self, inputs: tuple[()], outputs: VRChatVideoOutputs) -> None:
         from ovd_client import Client

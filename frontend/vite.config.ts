@@ -61,6 +61,9 @@ function uploadPlugin(): Plugin {
   };
 }
 
+const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+const backendWs = backendUrl.replace(/^http/, "ws");
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), uploadPlugin()],
   resolve: {
@@ -80,35 +83,35 @@ export default defineConfig({
     host: true,
     proxy: {
       "/graph": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/metrics": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/component": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/projects": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/project": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/env": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/logs": {
-        target: "http://localhost:8000",
+        target: backendUrl,
         changeOrigin: true,
       },
       "/ui/ws": {
-        target: "ws://localhost:8000",
+        target: backendWs,
         ws: true,
       },
     },
