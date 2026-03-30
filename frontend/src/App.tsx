@@ -110,6 +110,7 @@ function toReactFlowNode(
             outputs,
             inputTypes,
             outputTypes,
+            initArgs: n.init_args ?? {},
             status: n.status,
             nodeMetrics: null,
             ui_inputs: info?.ui_inputs ?? {},
