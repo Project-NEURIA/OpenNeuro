@@ -84,7 +84,8 @@ class Channel[T]:
     def _gc(self) -> None:
         if not self._cursors:
             return
-        drop = min(self._cursors.values()) - self._offset
+        min_cursor = max(min(self._cursors.values()), self._offset)
+        drop = min_cursor - self._offset
         if drop > 0:
             del self._items[:drop]
             self._offset += drop
