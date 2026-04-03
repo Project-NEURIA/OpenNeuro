@@ -97,24 +97,33 @@ interface NodeSidebarProps {
   currentProject: string;
 }
 
-/** Group components by IO → Functionality */
+/** Group components by IO → Functionality. Components with no tags go into `untagged`. */
 function groupComponents(components: ComponentInfo[]) {
   const groups: Record<IOTag, Record<FunctionalityTag, ComponentInfo[]>> = {
     source: {} as Record<FunctionalityTag, ComponentInfo[]>,
     conduit: {} as Record<FunctionalityTag, ComponentInfo[]>,
     sink: {} as Record<FunctionalityTag, ComponentInfo[]>,
   };
+  const untagged: ComponentInfo[] = [];
 
   for (const comp of components) {
-    for (const io of comp.tags.io) {
-      for (const func of comp.tags.functionality) {
+    const ioTags = comp.tags.io;
+    const funcTags = comp.tags.functionality;
+
+    if (ioTags.length === 0 || funcTags.length === 0) {
+      untagged.push(comp);
+      continue;
+    }
+
+    for (const io of ioTags) {
+      for (const func of funcTags) {
         if (!groups[io][func]) groups[io][func] = [];
         groups[io][func].push(comp);
       }
     }
   }
 
-  return groups;
+  return { groups, untagged };
 }
 
 function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: React.RefObject<HTMLDivElement | null>; y: number }) {
@@ -250,7 +259,7 @@ export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
   const filteredComposites = query
     ? composites.filter((c) => c.type_.toLowerCase().includes(query))
     : composites;
-  const groups = groupComponents(filtered);
+  const { groups, untagged } = groupComponents(filtered);
 
   return (
     <>
@@ -354,6 +363,41 @@ export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
             </div>
           );
         })}
+
+        {/* Untagged components */}
+        {untagged.length > 0 && (
+          <div>
+            <button
+              onClick={() => toggle("io:untagged")}
+              className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+            >
+              {collapsed["io:untagged"] ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+              Other
+            </button>
+            {!collapsed["io:untagged"] && untagged.map((item) => {
+              const Icon = iconMap[item.type_] ?? Puzzle;
+              return (
+                <div
+                  key={item.type_}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, item)}
+                  onMouseEnter={(e) => onItemEnter(e, item)}
+                  onMouseLeave={onItemLeave}
+                  className={cn(
+                    "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
+                    "transition-all duration-200",
+                    "hover:bg-glass-hover",
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />
+                  <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
+                    {item.type_}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Projects section */}
         {filteredComposites.length > 0 && (
