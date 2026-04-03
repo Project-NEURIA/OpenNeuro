@@ -150,6 +150,8 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
                             if full_text and outputs.text is not None:
                                 outputs.text.send(TextFrame.new(text=full_text))
                             outputs.token.send(EOS.END)
+                            if outputs.eos is not None:
+                                outputs.eos.send(EOS.END)
                             eos_sent = True
                             break
 
