@@ -57,6 +57,9 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                     if gen != self._generation:
                         continue
 
+                if self.stop_event.is_set():
+                    break
+
                 cred = os.getenv(self.config.api_key_env_var)
                 print(
                     f"[TTS] Using {self.config.api_key_env_var}: {cred[:8]}..."
@@ -92,6 +95,8 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                     )
                     r.raise_for_status()
                     for line in r.iter_lines():
+                        if self.stop_event.is_set():
+                            break
                         with self._gen_lock:
                             if gen != self._generation:
                                 break
@@ -157,5 +162,14 @@ class TTS(ThreadedComponent[TTSInputs, TTSOutputs]):
                     gen = self._generation
                 self._task_queue.put((gen, out))
 
-        worker_thread.join(timeout=1)
+        # Drain remaining tasks so the worker can exit cleanly
+        while not self._task_queue.empty():
+            try:
+                self._task_queue.get_nowait()
+            except Empty:
+                break
+
+        worker_thread.join(timeout=5)
+        if worker_thread.is_alive():
+            print("[TTS] Warning: worker thread did not exit in time")
         print("[TTS] TTS stopped")

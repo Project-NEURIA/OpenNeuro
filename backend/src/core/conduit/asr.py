@@ -21,7 +21,7 @@ class ASRConfig(BaseModel):
     api_key_env_var: str = "GROQ_API_KEY"
     model: str = "whisper-large-v3-turbo"
     language: str = "en"
-    timeout: int = 60
+    timeout: int = 10
 
 
 class ASRInputs(NamedTuple):
@@ -89,6 +89,8 @@ class ASR(ThreadedComponent[ASRInputs, ASROutputs]):
             print(f"[ASR] Failed to save debug audio: {e}")
 
     def _transcribe_audio(self, frame: AudioFrame) -> TextFrame | None:
+        if self.stop_event.is_set():
+            return None
         try:
             wav_path = self._prepare_audio_for_transcription(frame)
             try:
@@ -156,6 +158,15 @@ class ASR(ThreadedComponent[ASRInputs, ASROutputs]):
         finally:
             pass
 
+        # Drain remaining tasks so the worker can exit cleanly
+        while not self._task_queue.empty():
+            try:
+                self._task_queue.get_nowait()
+            except Empty:
+                break
+
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=1.0)
+            self._worker_thread.join(timeout=15.0)
+            if self._worker_thread.is_alive():
+                print("[ASR] Warning: worker thread did not exit in time")
         print("[ASR] Automatic Speech Recognition stopped")

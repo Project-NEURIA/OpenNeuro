@@ -509,6 +509,9 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
             self.joined = True
             self.timeout = timeout
 
+        def is_alive(self):
+            return False
+
     monkeypatch.setattr(tts_mod.threading, "Thread", _Thread)
     monkeypatch.setattr(run_tts._task_queue, "put", lambda item: puts.append(item))
     monkeypatch.setattr(run_tts._task_queue, "empty", lambda: False)
