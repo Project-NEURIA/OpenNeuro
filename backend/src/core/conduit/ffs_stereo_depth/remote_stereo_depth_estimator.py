@@ -170,13 +170,14 @@ class RemoteStereoDepthEstimator(
         )
         self._ws = ws
         ws.send(pack_init(self._build_init_config(cam_frame)))
-        ack = ws.recv()
-        tag = msg_tag(ack)
+        raw_ack = ws.recv()
+        assert isinstance(raw_ack, bytes), "Expected binary message"
+        tag = msg_tag(raw_ack)
         if tag == MSG_ERROR:
-            raise RuntimeError(f"Server error on INIT: {unpack_error(ack)}")
+            raise RuntimeError(f"Server error on INIT: {unpack_error(raw_ack)}")
         if tag != MSG_INIT_ACK:
             raise RuntimeError(f"Unexpected response to INIT: 0x{tag:02x}")
-        info = unpack_init_ack(ack)
+        info = unpack_init_ack(raw_ack)
         logger.info(
             "Connected to %s — VRAM %.0f/%.0f MB",
             self.config.server_url,
@@ -257,22 +258,23 @@ class RemoteStereoDepthEstimator(
 
             try:
                 ws.send(pack_frame(bytes(left_jpg), bytes(right_jpg), c2w))
-                resp = ws.recv()
+                raw_resp = ws.recv()
             except Exception as exc:
                 logger.warning("WebSocket error: %s — reconnecting", exc)
                 self._close_ws()
                 ws = None
                 continue
 
-            tag = msg_tag(resp)
+            assert isinstance(raw_resp, bytes), "Expected binary message"
+            tag = msg_tag(raw_resp)
             if tag == MSG_ERROR:
-                logger.warning("Server error: %s", unpack_error(resp))
+                logger.warning("Server error: %s", unpack_error(raw_resp))
                 continue
             if tag != MSG_FRAME_RESULT:
                 logger.warning("Unexpected message 0x%02x", tag)
                 continue
 
-            result = unpack_frame_result(resp)
+            result = unpack_frame_result(raw_resp)
             frame_count += 1
 
             if result.vram_warning:
@@ -289,14 +291,21 @@ class RemoteStereoDepthEstimator(
 
             # Emit resized stereo (decode server JPEGs or use local resized)
             if result.left_jpeg is not None and result.right_jpeg is not None:
-                left_out = cv2.imdecode(
+                left_decoded = cv2.imdecode(
                     np.frombuffer(result.left_jpeg, np.uint8),
                     cv2.IMREAD_COLOR,
                 )
-                right_out = cv2.imdecode(
+                right_decoded = cv2.imdecode(
                     np.frombuffer(result.right_jpeg, np.uint8),
                     cv2.IMREAD_COLOR,
                 )
+                if left_decoded is None or right_decoded is None:
+                    logger.warning("Failed to decode server stereo JPEGs — using local")
+                    left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
+                    right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)
+                else:
+                    left_out = left_decoded
+                    right_out = right_decoded
             else:
                 left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
                 right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)

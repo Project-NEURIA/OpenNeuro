@@ -158,6 +158,7 @@ def pack_frame_result(
     if d_live is not None:
         parts.append(d_live.astype(np.float16).tobytes())
     if flags & FLAG_HAS_STEREO:
+        assert left_jpeg is not None and right_jpeg is not None
         parts.append(_JPEG_LEN_PAIR.pack(len(left_jpeg), len(right_jpeg)))
         parts.append(left_jpeg)
         parts.append(right_jpeg)
