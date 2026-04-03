@@ -369,6 +369,28 @@ class ThreadedComponent[
         self._stop_event.set()
         # destruct is called in _safe_run's finally block (in the thread)
 
+    def join(self, timeout: float = 5.0) -> None:
+        """Block until the component's thread finishes or *timeout* expires."""
+        if self._thread is not None and self._thread.is_alive():
+            self._thread.join(timeout=timeout)
+
+
+# ---------------------------------------------------------------------------
+# EmitOnStart — mixin for components that send values synchronously on start
+# ---------------------------------------------------------------------------
+
+
+class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
+    """Mixin for components that need to send values before threads start.
+
+    GraphManager calls emit(outputs) synchronously during run(),
+    before start() is called. This guarantees values are in channels
+    before any downstream component's thread reads them.
+    """
+
+    @abstractmethod
+    def emit(self, outputs: E) -> None: ...
+
 
 # ---------------------------------------------------------------------------
 # CompositeComponent — subgraph wrapper
