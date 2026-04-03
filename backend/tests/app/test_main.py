@@ -96,6 +96,7 @@ def test_lifespan_sets_state(monkeypatch, tmp_path) -> None:
 def test_main_module_dunder_main(monkeypatch) -> None:
     fake_uvicorn = types.SimpleNamespace(run=lambda *a, **k: None)
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
     monkeypatch.setattr("src.main.load_dotenv", lambda *a, **k: None)
     monkeypatch.setattr("src.main._start_parent_watchdog", lambda: None)
     runpy.run_module("src.main", run_name="__main__")
