@@ -39,17 +39,17 @@ logger = logging.getLogger(__name__)
 
 
 class RemoteStereoDepthEstimatorConfig(BaseModel):
-    server_url: str = "ws://69.157.137.231:14663/ws"
+    server_url: str = "ws://localhost:8000/ws"
     jpeg_quality: int = 90
-    resize_width: int = 0
-    resize_height: int = 0
+    resize_width: int = 512
+    resize_height: int = 512
     min_depth: float = 0.2
-    max_depth: float = 15.0
+    max_depth: float = 10.0
     # TSDF config (sent to server in INIT)
-    voxel_size: float = 0.02
-    max_integ_dist: float = 15.0
+    voxel_size: float = 0.05
+    max_integ_dist: float = 10.0
     trunc_dist_vox: float = 3.0
-    max_weight: float = 2.0
+    max_weight: float = 3.0
     weighting_mode: str = "constant"
     invalid_depth_decay: float = 0.9
     mesh_min_weight: float = 0.1
@@ -58,7 +58,7 @@ class RemoteStereoDepthEstimatorConfig(BaseModel):
     decay_threshold: float = 0.001
     render_max_steps: int = 100
     # Maintenance
-    decay_every: int = 0
+    decay_every: int = 100
     # Reconnection
     max_reconnect_delay: float = 10.0
 
@@ -126,24 +126,23 @@ class RemoteStereoDepthEstimator(
     def _build_init_config(self, cam_frame: StereoCameraParamsFrame) -> dict:
         """Build the INIT message config from camera params + component config."""
         K = cam_frame.intrinsics.astype(np.float32)
-        c = self.config
-        rw = c.resize_width if c.resize_width > 0 else cam_frame.width
-        rh = c.resize_height if c.resize_height > 0 else cam_frame.height
-        sx = rw / cam_frame.width
-        sy = rh / cam_frame.height
+        # Scale intrinsics to the inference resolution
+        sx = self.config.resize_width / cam_frame.width
+        sy = self.config.resize_height / cam_frame.height
         fx = float(K[0, 0] * sx)
         fy = float(K[1, 1] * sy)
         cx = float(K[0, 2] * sx)
         cy = float(K[1, 2] * sy)
 
+        c = self.config
         return {
             "fx": fx,
             "fy": fy,
             "cx": cx,
             "cy": cy,
             "baseline": float(cam_frame.baseline),
-            "width": rw,
-            "height": rh,
+            "width": c.resize_width,
+            "height": c.resize_height,
             "min_depth": c.min_depth,
             "max_depth": c.max_depth,
             "voxel_size": c.voxel_size,
@@ -170,14 +169,14 @@ class RemoteStereoDepthEstimator(
         )
         self._ws = ws
         ws.send(pack_init(self._build_init_config(cam_frame)))
-        raw_ack = ws.recv()
-        assert isinstance(raw_ack, bytes), "Expected binary message"
-        tag = msg_tag(raw_ack)
+        ack = ws.recv()
+        assert isinstance(ack, bytes)
+        tag = msg_tag(ack)
         if tag == MSG_ERROR:
-            raise RuntimeError(f"Server error on INIT: {unpack_error(raw_ack)}")
+            raise RuntimeError(f"Server error on INIT: {unpack_error(ack)}")
         if tag != MSG_INIT_ACK:
             raise RuntimeError(f"Unexpected response to INIT: 0x{tag:02x}")
-        info = unpack_init_ack(raw_ack)
+        info = unpack_init_ack(ack)
         logger.info(
             "Connected to %s — VRAM %.0f/%.0f MB",
             self.config.server_url,
@@ -230,13 +229,14 @@ class RemoteStereoDepthEstimator(
                     )
                     continue
 
-            # Resize to inference resolution (0 = full size)
+            # Resize to inference resolution
             rw, rh = self.config.resize_width, self.config.resize_height
-            left_rgb = stereo_frame.get("left", VideoDataFormat.RGB)
-            right_rgb = stereo_frame.get("right", VideoDataFormat.RGB)
-            if rw > 0 and rh > 0:
-                left_rgb = self._resize_for_inference(left_rgb, rw, rh)
-                right_rgb = self._resize_for_inference(right_rgb, rw, rh)
+            left_rgb = self._resize_for_inference(
+                stereo_frame.get("left", VideoDataFormat.RGB), rw, rh
+            )
+            right_rgb = self._resize_for_inference(
+                stereo_frame.get("right", VideoDataFormat.RGB), rw, rh
+            )
 
             # JPEG encode
             q = self.config.jpeg_quality
@@ -258,23 +258,23 @@ class RemoteStereoDepthEstimator(
 
             try:
                 ws.send(pack_frame(bytes(left_jpg), bytes(right_jpg), c2w))
-                raw_resp = ws.recv()
+                resp = ws.recv()
             except Exception as exc:
                 logger.warning("WebSocket error: %s — reconnecting", exc)
                 self._close_ws()
                 ws = None
                 continue
 
-            assert isinstance(raw_resp, bytes), "Expected binary message"
-            tag = msg_tag(raw_resp)
+            assert isinstance(resp, bytes)
+            tag = msg_tag(resp)
             if tag == MSG_ERROR:
-                logger.warning("Server error: %s", unpack_error(raw_resp))
+                logger.warning("Server error: %s", unpack_error(resp))
                 continue
             if tag != MSG_FRAME_RESULT:
                 logger.warning("Unexpected message 0x%02x", tag)
                 continue
 
-            result = unpack_frame_result(raw_resp)
+            result = unpack_frame_result(resp)
             frame_count += 1
 
             if result.vram_warning:
@@ -299,13 +299,16 @@ class RemoteStereoDepthEstimator(
                     np.frombuffer(result.right_jpeg, np.uint8),
                     cv2.IMREAD_COLOR,
                 )
-                if left_decoded is None or right_decoded is None:
-                    logger.warning("Failed to decode server stereo JPEGs — using local")
-                    left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
-                    right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)
-                else:
-                    left_out = left_decoded
-                    right_out = right_decoded
+                left_out = (
+                    left_decoded
+                    if left_decoded is not None
+                    else cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
+                )
+                right_out = (
+                    right_decoded
+                    if right_decoded is not None
+                    else cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)
+                )
             else:
                 left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
                 right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)
