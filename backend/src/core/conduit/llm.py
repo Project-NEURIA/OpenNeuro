@@ -132,61 +132,76 @@ class LLM(ThreadedComponent[LLMInputs, LLMOutputs]):
 
             tool_call_acc: dict[int, dict[str, str]] = {}
             full_text = ""
+            eos_sent = False
 
-            for chunk in stream:
-                if not isinstance(chunk, ModelResponseStream):
-                    continue
+            try:
+                for chunk in stream:
+                    if self.stop_event.is_set():
+                        print("[LLM] Stop requested, breaking stream")
+                        break
 
-                if inputs.interrupt is not None:
-                    irq = next(inputs.interrupt)
-                    if irq is not None:
-                        print(f"[LLM] Interrupt: {irq.reason}")
+                    if not isinstance(chunk, ModelResponseStream):
+                        continue
+
+                    if inputs.interrupt is not None:
+                        irq = next(inputs.interrupt)
+                        if irq is not None:
+                            print(f"[LLM] Interrupt: {irq.reason}")
+                            if full_text and outputs.text is not None:
+                                outputs.text.send(TextFrame.new(text=full_text))
+                            outputs.token.send(EOS.END)
+                            if outputs.eos is not None:
+                                outputs.eos.send(EOS.END)
+                            eos_sent = True
+                            break
+
+                    choice = chunk.choices[0] if chunk.choices else None
+                    if choice is None:
+                        continue
+
+                    delta = getattr(choice, "delta", None)
+                    if delta and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            acc = tool_call_acc.setdefault(
+                                tc.index, {"id": "", "name": "", "arguments": ""}
+                            )
+                            if tc.id:
+                                acc["id"] += tc.id
+                            if tc.function:
+                                if tc.function.name:
+                                    acc["name"] += tc.function.name
+                                if tc.function.arguments:
+                                    acc["arguments"] += tc.function.arguments
+
+                    if choice.finish_reason:
+                        if tool_call_acc and outputs.tool_calls is not None:
+                            for acc in tool_call_acc.values():
+                                outputs.tool_calls.send(
+                                    ToolCall.new(
+                                        call_id=acc["id"],
+                                        name=acc["name"],
+                                        arguments=acc["arguments"],
+                                    )
+                                )
                         if full_text and outputs.text is not None:
                             outputs.text.send(TextFrame.new(text=full_text))
                         outputs.token.send(EOS.END)
                         if outputs.eos is not None:
                             outputs.eos.send(EOS.END)
+                        eos_sent = True
                         break
 
-                choice = chunk.choices[0] if chunk.choices else None
-                if choice is None:
-                    continue
-
-                delta = getattr(choice, "delta", None)
-                if delta and delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        acc = tool_call_acc.setdefault(
-                            tc.index, {"id": "", "name": "", "arguments": ""}
-                        )
-                        if tc.id:
-                            acc["id"] += tc.id
-                        if tc.function:
-                            if tc.function.name:
-                                acc["name"] += tc.function.name
-                            if tc.function.arguments:
-                                acc["arguments"] += tc.function.arguments
-
-                if choice.finish_reason:
-                    if tool_call_acc and outputs.tool_calls is not None:
-                        for acc in tool_call_acc.values():
-                            outputs.tool_calls.send(
-                                ToolCall.new(
-                                    call_id=acc["id"],
-                                    name=acc["name"],
-                                    arguments=acc["arguments"],
-                                )
-                            )
+                    text = (delta.content or "") if delta else ""
+                    if text:
+                        full_text += text
+                        outputs.token.send(TextFrame.new(text=text))
+            finally:
+                if not eos_sent:
                     if full_text and outputs.text is not None:
                         outputs.text.send(TextFrame.new(text=full_text))
                     outputs.token.send(EOS.END)
                     if outputs.eos is not None:
                         outputs.eos.send(EOS.END)
-                    break
-
-                text = (delta.content or "") if delta else ""
-                if text:
-                    full_text += text
-                    outputs.token.send(TextFrame.new(text=text))
 
             print(f"[LLM] Generation done, text length: {len(full_text)}")
 
