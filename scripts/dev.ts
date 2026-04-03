@@ -1,4 +1,9 @@
-const backend = Bun.spawn(["uv", "run", "python", "-m", "src.main"], {
+const rocm = process.argv.includes("--rocm");
+const uvArgs = rocm
+  ? ["run", "--no-group", "cuda12", "--group", "rocm", "python", "-m", "src.main"]
+  : ["run", "python", "-m", "src.main"];
+
+const backend = Bun.spawn(["uv", ...uvArgs], {
   cwd: "./backend",
   stdout: "inherit",
   stderr: "inherit",
