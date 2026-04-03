@@ -5,7 +5,6 @@ import io
 from typing import NamedTuple
 
 from openai import OpenAI
-from openai.types.chat import ChatCompletionContentPartParam
 from PIL import Image
 from pydantic import BaseModel
 
@@ -52,7 +51,9 @@ class StreamingVLMOutputs(NamedTuple):
 
 
 class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
-    description = "Real-time vision module that captions video frames and tracks visible objects."
+    description = (
+        "Real-time vision module that captions video frames and tracks visible objects."
+    )
 
     tags = Tag(
         io={"conduit"}, functionality={"video", "llm"}, gpu={"cpu", "nvidia", "apple"}
@@ -72,9 +73,7 @@ class StreamingVLM(ThreadedComponent[StreamingVLMInputs, StreamingVLMOutputs]):
         return f"data:image/jpeg;base64,{b64}"
 
     def _call_caption(self, current_image_uri: str) -> str | None:
-        msgs: list[dict] = [
-            {"role": "system", "content": self.config.caption_prompt}
-        ]
+        msgs: list[dict] = [{"role": "system", "content": self.config.caption_prompt}]
 
         # History: oldest to newest, each is image + caption pair
         for entry in self._history:

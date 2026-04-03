@@ -197,7 +197,9 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             if inputs.vision is not None:
                 vision_frame = next(inputs.vision, None)
                 if vision_frame is not None:
-                    ts = datetime.fromtimestamp(vision_frame.pts / 1e9).strftime("%H:%M:%S")
+                    ts = datetime.fromtimestamp(vision_frame.pts / 1e9).strftime(
+                        "%H:%M:%S"
+                    )
                     msgs.append(
                         MessageFrame.new(
                             role="system",
@@ -212,7 +214,9 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
                     lines = []
                     for i in range(len(obj_frame.labels)):
                         x, y, z = obj_frame.positions[i]
-                        lines.append(f'  "{obj_frame.labels[i]}" at ({x:.2f}, {y:.2f}, {z:.2f})')
+                        lines.append(
+                            f'  "{obj_frame.labels[i]}" at ({x:.2f}, {y:.2f}, {z:.2f})'
+                        )
                     msgs.append(
                         MessageFrame.new(
                             role="system",
@@ -242,9 +246,7 @@ class AgentState[T](ThreadedComponent[AgentStateInputs[T], AgentStateOutputs]):
             # Post-prompt (always last)
             if self.config.post_prompt:
                 msgs.append(
-                    MessageFrame.new(
-                        role="system", content=self.config.post_prompt
-                    )
+                    MessageFrame.new(role="system", content=self.config.post_prompt)
                 )
 
             self._dump_messages(msgs)

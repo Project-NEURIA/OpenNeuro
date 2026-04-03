@@ -224,7 +224,9 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
 
             prompt_frame = next(inputs.prompts, None)
             if prompt_frame is not None:
-                new_prompts = [p.strip() for p in prompt_frame.text.split(",") if p.strip()]
+                new_prompts = [
+                    p.strip() for p in prompt_frame.text.split(",") if p.strip()
+                ]
                 self._set_phrases(new_prompts)
 
             rgb = frame.get(VideoDataFormat.RGB)

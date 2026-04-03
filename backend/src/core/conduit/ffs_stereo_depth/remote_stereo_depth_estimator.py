@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from typing import NamedTuple
 
@@ -26,8 +25,6 @@ from src.core.conduit.ffs_stereo_depth.depth_ws_protocol import (
     msg_tag,
     unpack_error,
     MSG_FRAME_RESULT,
-    MSG_DECAY_ACK,
-    MSG_CLEAR_ACK,
     MSG_ERROR,
     MSG_INIT_ACK,
 )
@@ -140,7 +137,10 @@ class RemoteStereoDepthEstimator(
         cy = float(K[1, 2] * sy)
 
         return {
-            "fx": fx, "fy": fy, "cx": cx, "cy": cy,
+            "fx": fx,
+            "fy": fy,
+            "cx": cx,
+            "cy": cy,
             "baseline": float(cam_frame.baseline),
             "width": rw,
             "height": rh,
@@ -160,27 +160,30 @@ class RemoteStereoDepthEstimator(
             "jpeg_quality": c.jpeg_quality,
         }
 
-    def _connect_and_init(
-        self, cam_frame: StereoCameraParamsFrame
-    ) -> ClientConnection:
+    def _connect_and_init(self, cam_frame: StereoCameraParamsFrame) -> ClientConnection:
         """Open WebSocket, send INIT, wait for INIT_ACK."""
-        ws = connect(self.config.server_url,
-                     max_size=16 * 1024 * 1024,
-                     ping_timeout=120,
-                     ping_interval=30)
+        ws = connect(
+            self.config.server_url,
+            max_size=16 * 1024 * 1024,
+            ping_timeout=120,
+            ping_interval=30,
+        )
         self._ws = ws
         ws.send(pack_init(self._build_init_config(cam_frame)))
-        ack = ws.recv()
-        tag = msg_tag(ack)
+        raw_ack = ws.recv()
+        assert isinstance(raw_ack, bytes), "Expected binary message"
+        tag = msg_tag(raw_ack)
         if tag == MSG_ERROR:
-            raise RuntimeError(f"Server error on INIT: {unpack_error(ack)}")
+            raise RuntimeError(f"Server error on INIT: {unpack_error(raw_ack)}")
         if tag != MSG_INIT_ACK:
             raise RuntimeError(f"Unexpected response to INIT: 0x{tag:02x}")
-        info = unpack_init_ack(ack)
-        logger.info("Connected to %s — VRAM %.0f/%.0f MB",
-                     self.config.server_url,
-                     info.get("vram_used_mb", 0),
-                     info.get("vram_total_mb", 0))
+        info = unpack_init_ack(raw_ack)
+        logger.info(
+            "Connected to %s — VRAM %.0f/%.0f MB",
+            self.config.server_url,
+            info.get("vram_used_mb", 0),
+            info.get("vram_total_mb", 0),
+        )
         return ws
 
     def run(
@@ -218,8 +221,9 @@ class RemoteStereoDepthEstimator(
                     ws = self._connect_and_init(cam_frame)
                     reconnect_delay = 1.0
                 except Exception as exc:
-                    logger.warning("Connection failed: %s (retry in %.0fs)",
-                                   exc, reconnect_delay)
+                    logger.warning(
+                        "Connection failed: %s (retry in %.0fs)", exc, reconnect_delay
+                    )
                     time.sleep(reconnect_delay)
                     reconnect_delay = min(
                         reconnect_delay * 2, self.config.max_reconnect_delay
@@ -254,22 +258,23 @@ class RemoteStereoDepthEstimator(
 
             try:
                 ws.send(pack_frame(bytes(left_jpg), bytes(right_jpg), c2w))
-                resp = ws.recv()
+                raw_resp = ws.recv()
             except Exception as exc:
                 logger.warning("WebSocket error: %s — reconnecting", exc)
                 self._close_ws()
                 ws = None
                 continue
 
-            tag = msg_tag(resp)
+            assert isinstance(raw_resp, bytes), "Expected binary message"
+            tag = msg_tag(raw_resp)
             if tag == MSG_ERROR:
-                logger.warning("Server error: %s", unpack_error(resp))
+                logger.warning("Server error: %s", unpack_error(raw_resp))
                 continue
             if tag != MSG_FRAME_RESULT:
                 logger.warning("Unexpected message 0x%02x", tag)
                 continue
 
-            result = unpack_frame_result(resp)
+            result = unpack_frame_result(raw_resp)
             frame_count += 1
 
             if result.vram_warning:
@@ -282,20 +287,25 @@ class RemoteStereoDepthEstimator(
 
             # Emit depth
             if result.d_map is not None:
-                outputs.depth.send(
-                    DepthFrame.new(data=result.d_map, is_metric=True)
-                )
+                outputs.depth.send(DepthFrame.new(data=result.d_map, is_metric=True))
 
             # Emit resized stereo (decode server JPEGs or use local resized)
             if result.left_jpeg is not None and result.right_jpeg is not None:
-                left_out = cv2.imdecode(
+                left_decoded = cv2.imdecode(
                     np.frombuffer(result.left_jpeg, np.uint8),
                     cv2.IMREAD_COLOR,
                 )
-                right_out = cv2.imdecode(
+                right_decoded = cv2.imdecode(
                     np.frombuffer(result.right_jpeg, np.uint8),
                     cv2.IMREAD_COLOR,
                 )
+                if left_decoded is None or right_decoded is None:
+                    logger.warning("Failed to decode server stereo JPEGs — using local")
+                    left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
+                    right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)
+                else:
+                    left_out = left_decoded
+                    right_out = right_decoded
             else:
                 left_out = cv2.cvtColor(left_rgb, cv2.COLOR_RGB2BGR)
                 right_out = cv2.cvtColor(right_rgb, cv2.COLOR_RGB2BGR)

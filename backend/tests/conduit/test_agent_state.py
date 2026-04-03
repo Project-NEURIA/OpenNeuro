@@ -40,33 +40,11 @@ class _FakeReceiver:
 
 def test_agent_state_helper_methods(capsys) -> None:
     state = AgentState(AgentStateConfig(system_prompt="system"))
-    assert state._build_visible_message() is None
 
-    first = ObjectLocationFrame.new(
-        labels=("cup",),
-        positions=np.array([[1.0, 2.0, 3.0]], dtype=np.float32),
-        depths=np.array([1.0], dtype=np.float32),
-        scores=np.array([0.9], dtype=np.float32),
-        boxes=np.array([[0.0, 0.0, 1.0, 1.0]], dtype=np.float32),
-        object_ids=np.array([1], dtype=np.int64),
-    )
-    state._diff_objects(first)
-    visible = state._build_visible_message()
-    assert visible is not None
-    assert "cup" in (visible.content or "")
-
-    second = ObjectLocationFrame.new(
-        labels=("book",),
-        positions=np.array([[4.0, 5.0, 6.0]], dtype=np.float32),
-        depths=np.array([2.0], dtype=np.float32),
-        scores=np.array([0.8], dtype=np.float32),
-        boxes=np.array([[1.0, 1.0, 2.0, 2.0]], dtype=np.float32),
-        object_ids=np.array([2], dtype=np.int64),
-    )
-    state._diff_objects(second)
-    assert any("last seen" in (msg.content or "") for msg in state._history)
+    # _heading_from_quat: identity quaternion => 0 degrees
     assert state._heading_from_quat(1.0, 0.0, 0.0, 0.0) == 0.0
 
+    # _print_message: tool call, tool result, empty content
     tool_call = ToolCall.new(call_id="call-1", name="lookup", arguments='{"q":"x"}')
     tool_msg = MessageFrame.new(
         role="assistant", content="tool", tool_calls=[tool_call]
@@ -98,7 +76,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
 
     monkeypatch.setattr(
         "src.core.conduit.agent_state.drain",
-        lambda *args: [(speech, feedback, vision, memory, tool_call)],
+        lambda *args: [(speech, feedback, memory, tool_call)],
     )
     projects_dir = Path("tests_runtime") / "agent_state"
     project_dir = projects_dir / "demo-project"
@@ -128,7 +106,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
         feedback=_FakeReceiver([]),
         tool_call=_FakeReceiver([]),
         tool_result=_FakeReceiver([tool_result, None]),
-        vision=_FakeReceiver([]),
+        vision=_FakeReceiver([vision]),
         pose=_FakeReceiver([pose_frame]),
         objects=_FakeReceiver([object_frame]),
         memory=_FakeReceiver([]),

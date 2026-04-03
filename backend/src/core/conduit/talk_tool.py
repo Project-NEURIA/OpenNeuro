@@ -67,6 +67,4 @@ class TalkTool(
             if text:
                 print(f"[Talk] {text}")
                 outputs.text.send(TextFrame.new(text=text))
-            outputs.tool_result.send(
-                ToolResult.new(call_id=call.call_id, content="")
-            )
+            outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))
