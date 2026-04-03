@@ -477,7 +477,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByText("open-project"));
     await waitFor(() => expect(screen.getByText("sidebar:2:OpenedProject")).toBeInTheDocument());
-    expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic");
+    await waitFor(() => expect(screen.getByTestId("canvas-nodes")).toHaveTextContent("n1:graph:Mic"));
   });
 
   it("builds fallback and composite graph nodes through app initialization", async () => {
