@@ -1,6 +1,7 @@
 type CoverageMode = "all" | "backend" | "frontend" | "badges";
 
-const mode = (process.argv[2] ?? "all") as CoverageMode;
+const rocm = process.argv.includes("--rocm");
+const mode = (process.argv.filter((a) => !a.startsWith("--"))[2] ?? "all") as CoverageMode;
 
 async function run(command: string[], cwd = ".") {
   const proc = Bun.spawn(command, {
@@ -23,7 +24,7 @@ async function updateBadges(target: "all" | "backend" | "frontend") {
       "--backend-xml",
       "backend/tests_runtime/coverage/coverage.xml",
       "--backend-svg",
-      "docs/backend-coverage.svg",
+      ".github/badges/backend-coverage.svg",
     );
   }
 
@@ -32,7 +33,7 @@ async function updateBadges(target: "all" | "backend" | "frontend") {
       "--frontend-lcov",
       "frontend/coverage/lcov.info",
       "--frontend-svg",
-      "docs/frontend-coverage.svg",
+      ".github/badges/frontend-coverage.svg",
     );
   }
 
@@ -46,7 +47,10 @@ async function main() {
   }
 
   if (mode === "all" || mode === "backend") {
-    await run(["uv", "run", "pytest"], "./backend");
+    const uvRun = rocm
+      ? ["uv", "run", "--no-group", "cuda12", "--group", "rocm", "pytest"]
+      : ["uv", "run", "pytest"];
+    await run(uvRun, "./backend");
   }
 
   if (mode === "all" || mode === "frontend") {

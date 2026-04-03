@@ -67,9 +67,9 @@ jobs:
         run: |
           python scripts/generate_coverage_badges.py \
             --backend-xml backend/tests_runtime/coverage/coverage.xml \
-            --backend-svg docs/backend-coverage.svg \
+            --backend-svg .github/badges/backend-coverage.svg \
             --frontend-lcov frontend/coverage/lcov.info \
-            --frontend-svg docs/frontend-coverage.svg \
+            --frontend-svg .github/badges/frontend-coverage.svg \
             --comment coverage-comment.md
 
       - name: Upload coverage artifacts
@@ -93,5 +93,5 @@ jobs:
         with:
           commit_message: "ci: update coverage badges"
           file_pattern: |
-            docs/backend-coverage.svg
-            docs/frontend-coverage.svg
+            .github/badges/backend-coverage.svg
+            .github/badges/frontend-coverage.svg
