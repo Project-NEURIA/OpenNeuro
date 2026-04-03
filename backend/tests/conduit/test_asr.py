@@ -187,5 +187,5 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
     assert run_asr._worker_thread is not None
     assert run_asr._worker_thread.started is True
     assert run_asr._worker_thread.joined is True
-    queued = run_asr._task_queue.get_nowait()
-    assert queued.id == frame.id
+    # The cleanup drain should have emptied the queue
+    assert run_asr._task_queue.empty()
