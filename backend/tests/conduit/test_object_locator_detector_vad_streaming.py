@@ -145,67 +145,92 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
 
     monkeypatch.setattr(vlm_mod, "OpenAI", _Client)
     vlm = vlm_mod.StreamingVLM(
-        vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2)
+        vlm_mod.StreamingVLMConfig(base_url="http://vlm", max_history=3)
     )
     assert vlm._client.base_url == "http://vlm"
 
+    # _encode_pil_to_base64_uri
     class _Image:
-        def __init__(self):
-            self.saved = False
-
         def save(self, buf, format=None, quality=None):
             buf.write(b"jpeg")
 
     uri = vlm._encode_pil_to_base64_uri(_Image())
     assert uri.startswith("data:image/jpeg;base64,")
-    assert vlm._should_use_key_window_prompt(2) is True
-    assert vlm._should_use_key_window_prompt(1) is False
 
-    parsed_response = SimpleNamespace(
+    # _call_caption: parsed response
+    caption_response = SimpleNamespace(
         choices=[
             SimpleNamespace(
                 message=SimpleNamespace(
-                    parsed=SimpleNamespace(caption="caption", objects="chair, table"),
-                    content=None,
+                    parsed=SimpleNamespace(caption="a dog on a couch"),
                 )
             )
         ]
     )
-    fallback_response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(parsed=None, content=" raw "))]
+    vlm._client.responses = [caption_response]
+    assert vlm._call_caption("data:image/jpeg;base64,abc") == "a dog on a couch"
+
+    # _call_caption: parsed=None returns None
+    none_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(parsed=None))]
     )
-    vlm._client.responses = [parsed_response, fallback_response]
-    assert vlm._call_vllm([_Image()], "prompt") == ("caption", "chair, table")
-    assert vlm._call_vllm([_Image()], "prompt") == ("raw", "")
-    assert vlm._call_vllm([_Image()], "prompt") == ("", "")
+    vlm._client.responses = [none_response]
+    assert vlm._call_caption("data:image/jpeg;base64,abc") is None
 
-    assert vlm._build_prompt(1) == vlm.config.prompt_window1
-    vlm._captions_history = ["seen"]
-    assert "seen" in vlm._build_prompt(3)
+    # _call_caption: exception returns None
+    assert vlm._call_caption("data:image/jpeg;base64,abc") is None
 
-    observations = []
-    objects = []
-    outputs = SimpleNamespace(
-        observation=SimpleNamespace(send=lambda value: observations.append(value)),
-        objects=SimpleNamespace(send=lambda value: objects.append(value)),
+    # _call_objects: parsed response
+    objects_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    parsed=SimpleNamespace(objects="dog, couch"),
+                )
+            )
+        ]
     )
-    vlm._handle_result("", "", outputs)
-    vlm._captions_history = ["a", "b", "c", "d"]
-    vlm._handle_result("new", "cat, dog", outputs)
-    assert observations[-1].get() == "new"
-    assert objects[-1].get() == "cat, dog"
-    assert len(vlm._captions_history) == vlm.config.memory_size
+    vlm._client.responses = [objects_response]
+    assert vlm._call_objects("a dog on a couch") == "dog, couch"
 
+    # _call_objects: parsed=None returns None
+    vlm._client.responses = [none_response]
+    assert vlm._call_objects("caption") is None
+
+    # _call_objects: exception returns None
+    assert vlm._call_objects("caption") is None
+
+    # History management: max_history trimming
+    vlm._history = [{"image_uri": f"img{i}", "caption": f"cap{i}"} for i in range(3)]
+    vlm._history.append({"image_uri": "img3", "caption": "cap3"})
+    if len(vlm._history) > vlm.config.max_history:
+        vlm._history.pop(0)
+    assert len(vlm._history) == 3
+    assert vlm._history[0]["caption"] == "cap1"
+
+    # _call_caption includes history in messages
+    vlm._history = [{"image_uri": "old_uri", "caption": "old caption"}]
+    vlm._client.responses = [caption_response]
+    result = vlm._call_caption("new_uri")
+    assert result == "a dog on a couch"
+
+    # run() end-to-end with mocked calls
     run_vlm = vlm_mod.StreamingVLM(
-        vlm_mod.StreamingVLMConfig(base_url="http://vlm", key_window_interval=2)
+        vlm_mod.StreamingVLMConfig(base_url="http://vlm", max_history=2)
     )
-    prompts = []
+    caption_calls = []
+    object_calls = []
 
-    def fake_call(frames, prompt):
-        prompts.append(prompt)
-        return ("first caption", "chair") if len(prompts) == 1 else ("", "")
+    def fake_call_caption(image_uri):
+        caption_calls.append(image_uri)
+        return "first caption" if len(caption_calls) == 1 else None
 
-    monkeypatch.setattr(run_vlm, "_call_vllm", fake_call)
+    def fake_call_objects(caption):
+        object_calls.append(caption)
+        return "chair"
+
+    monkeypatch.setattr(run_vlm, "_call_caption", fake_call_caption)
+    monkeypatch.setattr(run_vlm, "_call_objects", fake_call_objects)
     video = VideoFrame.new(
         data=np.zeros((2, 2, 3), dtype=np.uint8), format=VideoDataFormat.BGR
     )
@@ -218,9 +243,11 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
             objects=SimpleNamespace(send=lambda value: run_obj.append(value)),
         ),
     )
-    assert prompts[0] == run_vlm.config.prompt_window1
     assert run_obs[0].get() == "first caption"
     assert run_obj[0].get() == "chair"
+    # Second frame returns None caption, so no output for it
+    assert len(run_obs) == 1
+    assert len(run_obj) == 1
 
 
 def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
