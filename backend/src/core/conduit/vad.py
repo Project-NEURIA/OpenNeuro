@@ -88,13 +88,12 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
         self._feature_extractor = WhisperFeatureExtractor(chunk_length=8)
         print(f"[VAD] Smart Turn model loaded from {onnx_path}")
 
-    def _check_smart_turn(self) -> bool:
+    def _prepare_smart_turn_input(self) -> np.ndarray | None:
+        """Copy segment data under lock for Smart Turn inference. Returns None if unavailable."""
         if self._smart_turn_session is None or not self._current_segment:
-            return False
+            return None
 
         try:
-            # For smart turn check, we still need a 16kHz mono version of the current segment
-            # We can get it by sampling the frames in _current_segment
             segment_data = []
             for f in self._current_segment:
                 segment_data.append(
@@ -114,13 +113,22 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
                 pcm_16k = np.pad(
                     pcm_16k, (max_samples - len(pcm_16k), 0), mode="constant"
                 )
+            return pcm_16k
+        except Exception as e:
+            print(f"[VAD] Error preparing Smart Turn input: {e}")
+            return None
 
+    def _run_smart_turn_inference(self, pcm_16k: np.ndarray) -> bool:
+        """Run ONNX inference without holding the lock."""
+        if self._smart_turn_session is None:
+            return False
+        try:
             features = self._feature_extractor(
                 pcm_16k,
                 sampling_rate=16000,
                 return_tensors="np",
                 padding="max_length",
-                max_length=max_samples,
+                max_length=8 * 16000,
                 truncation=True,
                 do_normalize=True,
             )
@@ -128,6 +136,7 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
             input_features = features.input_features.squeeze(0).astype(np.float32)
             input_features = np.expand_dims(input_features, axis=0)
 
+            assert self._smart_turn_session is not None
             results = self._smart_turn_session.run(
                 None, {"input_features": input_features}
             )
@@ -140,6 +149,8 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
             return False
 
     def _process_audio_frame(self, frame: AudioFrame, outputs: VADOutputs) -> None:
+        smart_turn_input: np.ndarray | None = None
+
         with self._lock:
             # 1. Prepare data for VAD (16kHz mono)
             pcm_16k = frame.get(
@@ -171,11 +182,7 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
                         print(f"[VAD] Max silence reached: {silence_duration:.2f}s")
                         self._finalize_segment(outputs)
                     elif silence_duration >= self.config.silence_seconds:
-                        if self._check_smart_turn():
-                            print(
-                                f"[VAD] Smart Turn detected after silence: {silence_duration:.2f}s"
-                            )
-                            self._finalize_segment(outputs)
+                        smart_turn_input = self._prepare_smart_turn_input()
             else:
                 self._pre_buffer.append(frame)
                 # Keep pre-buffer within limits (seconds based)
@@ -188,6 +195,18 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
                 ):
                     f_removed = self._pre_buffer.pop(0)
                     total_ms -= f_removed.data.shape[1] / f_removed.sample_rate * 1000
+
+        # Run ONNX inference outside the lock
+        if smart_turn_input is not None:
+            if self._run_smart_turn_inference(smart_turn_input):
+                with self._lock:
+                    # Re-check state: segment may have been finalized by monitor thread
+                    if self._speaking and self._silence_start is not None:
+                        silence_duration = time.time() - self._silence_start
+                        print(
+                            f"[VAD] Smart Turn detected after silence: {silence_duration:.2f}s"
+                        )
+                        self._finalize_segment(outputs)
 
     def _handle_speech_start(self, outputs: VADOutputs) -> None:
         print("[VAD] Speech started")
@@ -240,6 +259,8 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
         """Background thread to finalize segments if the source is silent."""
         while not self.stop_event.is_set():
             time.sleep(0.1)
+            smart_turn_input: np.ndarray | None = None
+
             with self._lock:
                 if self._speaking and self._silence_start is not None:
                     silence_duration = time.time() - self._silence_start
@@ -249,7 +270,15 @@ class VAD(ThreadedComponent[VADInputs, VADOutputs]):
                         )
                         self._finalize_segment(outputs)
                     elif silence_duration >= self.config.silence_seconds:
-                        if self._check_smart_turn():
+                        smart_turn_input = self._prepare_smart_turn_input()
+
+            # Run ONNX inference outside the lock
+            if smart_turn_input is not None:
+                if self._run_smart_turn_inference(smart_turn_input):
+                    with self._lock:
+                        # Re-check state: segment may have been finalized already
+                        if self._speaking and self._silence_start is not None:
+                            silence_duration = time.time() - self._silence_start
                             print(
                                 f"[VAD] Monitor: Smart Turn detected after silence ({silence_duration:.2f}s)"
                             )

@@ -318,17 +318,21 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     )
     vad = vad_mod.VAD(cfg)
     assert vad._smart_turn_session is not None
-    assert vad._check_smart_turn() is False
+    assert vad._prepare_smart_turn_input() is None
     vad._current_segment = [_audio_frame(samples=1600)]
-    assert vad._check_smart_turn() is True
+    smart_input = vad._prepare_smart_turn_input()
+    assert smart_input is not None
+    assert vad._run_smart_turn_inference(smart_input) is True
     vad._smart_turn_session = _Session(str(onnx_path))
     vad._feature_extractor = _Extractor(8)
     vad._current_segment = [_audio_frame(samples=16000 * 9)]
-    assert vad._check_smart_turn() is True
+    smart_input = vad._prepare_smart_turn_input()
+    assert smart_input is not None
+    assert vad._run_smart_turn_inference(smart_input) is True
     vad._feature_extractor = lambda *args, **kwargs: (_ for _ in ()).throw(
         RuntimeError("bad")
     )
-    assert vad._check_smart_turn() is False
+    assert vad._run_smart_turn_inference(np.zeros(8 * 16000, dtype=np.float32)) is False
 
     outputs = SimpleNamespace(
         audio=SimpleNamespace(send=lambda value: sent_audio.append(value)),
@@ -379,7 +383,12 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
 
     proc_vad._speaking = True
     proc_vad._silence_start = 9.93
-    monkeypatch.setattr(proc_vad, "_check_smart_turn", lambda: True)
+    monkeypatch.setattr(
+        proc_vad,
+        "_prepare_smart_turn_input",
+        lambda: np.zeros(8 * 16000, dtype=np.float32),
+    )
+    monkeypatch.setattr(proc_vad, "_run_smart_turn_inference", lambda _pcm: True)
     monkeypatch.setattr(
         proc_vad, "_finalize_segment", lambda outputs: finalize_calls.append("turn")
     )
@@ -430,7 +439,12 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
     monitor_vad2._speaking = True
     monitor_vad2._silence_start = 9.92
     monkeypatch.setattr(vad_mod.time, "time", lambda: 10.05)
-    monkeypatch.setattr(monitor_vad2, "_check_smart_turn", lambda: True)
+    monkeypatch.setattr(
+        monitor_vad2,
+        "_prepare_smart_turn_input",
+        lambda: np.zeros(8 * 16000, dtype=np.float32),
+    )
+    monkeypatch.setattr(monitor_vad2, "_run_smart_turn_inference", lambda _pcm: True)
 
     def monitor_finalize2(outputs):
         monitor_calls.append("smart")
