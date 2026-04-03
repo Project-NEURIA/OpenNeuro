@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from typing import NamedTuple
 
@@ -26,8 +25,6 @@ from src.core.conduit.ffs_stereo_depth.depth_ws_protocol import (
     msg_tag,
     unpack_error,
     MSG_FRAME_RESULT,
-    MSG_DECAY_ACK,
-    MSG_CLEAR_ACK,
     MSG_ERROR,
     MSG_INIT_ACK,
 )

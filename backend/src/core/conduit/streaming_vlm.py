@@ -5,7 +5,6 @@ import io
 from typing import NamedTuple
 
 from openai import OpenAI
-from openai.types.chat import ChatCompletionContentPartParam
 from PIL import Image
 from pydantic import BaseModel
 
