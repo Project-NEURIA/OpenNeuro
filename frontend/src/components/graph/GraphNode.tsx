@@ -4,7 +4,10 @@ import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCount, formatBytes } from "@/lib/format";
 import { useUIVideoOutput } from "@/hooks/useUIVideoOutput";
+import { useUIVideoInput } from "@/hooks/useUIVideoInput";
 import { useUITextOutput } from "@/hooks/useUITextOutput";
+import { useUIAudioOutput } from "@/hooks/useUIAudioOutput";
+import { useUIAudioInput } from "@/hooks/useUIAudioInput";
 import { useUIOutput } from "@/hooks/useUIOutput";
 import { useUIInput } from "@/hooks/useUIInput";
 import { useUIChannel } from "@/contexts/UIChannelContext";
@@ -237,6 +240,62 @@ function UIGenericInputWidget({ nodeId, channel }: { nodeId: string; channel: st
   );
 }
 
+function UIAudioOutputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  useUIAudioOutput(nodeId, channel);
+  return (
+    <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 flex items-center justify-between">
+      <span className="text-[12px] font-mono text-foreground/80">Speaker (Browser)</span>
+      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+    </div>
+  );
+}
+
+function UIAudioInputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const { isRecording, startRecording, stopRecording } = useUIAudioInput(nodeId, channel);
+  return (
+    <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2 flex items-center justify-between gap-2">
+      <span className="text-[12px] font-mono text-foreground/80 truncate">Mic (Browser)</span>
+      <button
+        onClick={isRecording ? stopRecording : startRecording}
+        className={cn(
+          "rounded flex-shrink-0 px-2.5 py-1 text-[11px] font-mono transition-colors",
+          isRecording 
+            ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+            : "bg-white/[0.06] text-foreground/60 hover:bg-white/[0.1] border border-white/[0.08]"
+        )}
+      >
+        {isRecording ? "Stop" : "Start"}
+      </button>
+    </div>
+  );
+}
+
+function UIVideoInputWidget({ nodeId, channel }: { nodeId: string; channel: string }) {
+  const { isRecording, startRecording, stopRecording, videoRef } = useUIVideoInput(nodeId, channel);
+
+  return (
+    <div className="w-full rounded-lg bg-black/40 border border-white/[0.04] p-2 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-mono text-foreground/80 truncate">Camera (Browser)</span>
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          className={cn(
+            "rounded flex-shrink-0 px-2.5 py-1 text-[11px] font-mono transition-colors",
+            isRecording 
+              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+              : "bg-white/[0.06] text-foreground/60 hover:bg-white/[0.1] border border-white/[0.08]"
+          )}
+        >
+          {isRecording ? "Stop" : "Start"}
+        </button>
+      </div>
+      <div className={cn("relative w-full rounded overflow-hidden bg-black/60 border border-white/[0.04]", isRecording ? "block" : "hidden")}>
+        <video ref={videoRef} className="w-full h-auto object-contain transform -scale-x-100" muted playsInline />
+      </div>
+    </div>
+  );
+}
+
 function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: Record<string, string>; uiOutputs: Record<string, string> }) {
   const outputWidgets = Object.entries(uiOutputs).map(([channel, typeName]) => {
     if (typeName === "UIVideoSender") {
@@ -245,15 +304,22 @@ function UIWidgets({ nodeId, uiInputs, uiOutputs }: { nodeId: string; uiInputs: 
     if (typeName === "UITextSender") {
       return <UITextOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
     }
+    if (typeName === "UIAudioSender") {
+      return <UIAudioOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }
     // Fallback: render raw JSON for any custom UISender type
     return <UIGenericOutputWidget key={channel} nodeId={nodeId} channel={channel} />;
   });
 
   const inputWidgets = Object.entries(uiInputs).map(([channel, typeName]) => {
-    if (typeName === "UITextReceiver" || typeName === "UIKeystrokeReceiver") {
+    if (typeName === "UITextReceiver") {
       return <UITextInputWidget key={channel} nodeId={nodeId} channel={channel} />;
     }
-    // Fallback: render JSON text input for any custom UIReceiver type
+    if (typeName === "UIAudioReceiver") {
+      return <UIAudioInputWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }    if (typeName === "UIVideoReceiver") {
+      return <UIVideoInputWidget key={channel} nodeId={nodeId} channel={channel} />;
+    }    // Fallback: render JSON text input for any custom UIReceiver type
     return <UIGenericInputWidget key={channel} nodeId={nodeId} channel={channel} />;
   });
 

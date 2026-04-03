@@ -94,6 +94,7 @@ class _FakeWebSocket:
         self, manager: _FakeManager, messages: list[str] | None = None
     ) -> None:
         self.app = types.SimpleNamespace(state=types.SimpleNamespace(manager=manager))
+        self.client = ("127.0.0.1", 0)
         self._messages = iter(messages or [])
         self.accepted = False
         self.json_messages: list[object] = []
@@ -105,6 +106,12 @@ class _FakeWebSocket:
     async def receive_text(self) -> str:
         try:
             return next(self._messages)
+        except StopIteration as exc:
+            raise WebSocketDisconnect() from exc
+
+    async def receive(self) -> dict[str, str]:
+        try:
+            return {"text": next(self._messages)}
         except StopIteration as exc:
             raise WebSocketDisconnect() from exc
 
@@ -280,13 +287,13 @@ def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
             ],
         )
         cancelled = {"watcher": False, "task": False}
-        original_receive_text = ws.receive_text
+        original_receive = ws.receive
 
-        async def delayed_receive_text() -> str:
+        async def delayed_receive() -> dict[str, str]:
             await asyncio.sleep(0)
-            return await original_receive_text()
+            return await original_receive()
 
-        ws.receive_text = delayed_receive_text  # type: ignore[method-assign]
+        ws.receive = delayed_receive  # type: ignore[method-assign]
 
         async def fake_watch_ui_channels(ws, manager, stop_event, tasks):
             class _Task:

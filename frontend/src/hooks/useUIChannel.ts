@@ -5,6 +5,8 @@ export type UIOutputCallback = (payload: unknown) => void;
 export interface UIChannelManager {
   /** Send text input from frontend to a component's UIReceiver */
   sendUIInput: (nodeId: string, channel: string, payload: unknown) => void;
+  /** Send binary input from frontend to a component's UIReceiver */
+  sendUIBinary: (nodeId: string, channel: string, payload: ArrayBuffer | Uint8Array) => void;
   /** Subscribe to output from a component's UISender */
   subscribe: (
     nodeId: string,
@@ -23,19 +25,29 @@ export function useUIChannelManager(): UIChannelManager {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const url = `ws://localhost:8000/ui/ws`;
+    let isMounted = true;
+    let reconnectTimeout: number | undefined;
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${wsScheme}://${window.location.host}/ui/ws`;
 
     function connect() {
+      if (!isMounted) return;
+      
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.binaryType = "arraybuffer";
 
-      ws.onopen = () => setConnected(true);
+      ws.onopen = () => {
+        if (!isMounted) return;
+        setConnected(true);
+      };
+      
       ws.onclose = () => {
+        if (!isMounted) return;
         setConnected(false);
         // Reconnect after a short delay
-        setTimeout(connect, 1000);
+        reconnectTimeout = window.setTimeout(connect, 1000);
       };
 
       ws.onmessage = (event) => {
@@ -74,8 +86,15 @@ export function useUIChannelManager(): UIChannelManager {
     connect();
 
     return () => {
-      wsRef.current?.close();
-      wsRef.current = null;
+      isMounted = false;
+      if (reconnectTimeout !== undefined) {
+        window.clearTimeout(reconnectTimeout);
+      }
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, []);
 
@@ -91,6 +110,28 @@ export function useUIChannelManager(): UIChannelManager {
             payload,
           }),
         );
+      }
+    },
+    [],
+  );
+
+  const sendUIBinary = useCallback(
+    (nodeId: string, channel: string, payload: ArrayBuffer | Uint8Array) => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const header = JSON.stringify({ type: "ui_input", node_id: nodeId, channel });
+        const headerBytes = new TextEncoder().encode(header);
+        
+        const buffer = new Uint8Array(2 + headerBytes.length + payload.byteLength);
+        
+        // 2-byte header length (big-endian)
+        const view = new DataView(buffer.buffer);
+        view.setUint16(0, headerBytes.length, false);
+        
+        buffer.set(headerBytes, 2);
+        buffer.set(new Uint8Array(payload instanceof ArrayBuffer ? payload : payload.buffer), 2 + headerBytes.length);
+        
+        ws.send(buffer);
       }
     },
     [],
@@ -119,5 +160,5 @@ export function useUIChannelManager(): UIChannelManager {
     [],
   );
 
-  return { sendUIInput, subscribe, connected };
+  return { sendUIInput, sendUIBinary, subscribe, connected };
 }

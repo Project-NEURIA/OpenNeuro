@@ -177,8 +177,10 @@ async def _watch_ui_channels(
 
 @router.websocket("/ws")
 async def ui_ws(ws: WebSocket) -> None:
+    print("[ui_ws] Got connection request from:", ws.client)
     manager: GraphManager = ws.app.state.manager
     await ws.accept()
+    print("[ui_ws] Accepted connection!!!")
 
     stop_event = asyncio.Event()
     tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
@@ -187,29 +189,43 @@ async def ui_ws(ws: WebSocket) -> None:
 
     try:
         while True:
-            data = await ws.receive_text()
-            msg = json.loads(data)
-            if msg.get("type") == "ui_input":
-                node_id = msg["node_id"]
-                channel = msg["channel"]
-                payload = msg.get("payload", "")
-                sender = manager.ui_senders().get((node_id, channel))
-                if sender is not None:
-                    inner_type = _resolve_ui_input_type(manager, node_id, channel)
-                    if (
-                        inner_type is not None
-                        and issubclass(inner_type, BaseModel)
-                        and isinstance(payload, dict)
-                    ):
-                        sender.send(inner_type.model_validate(payload))
-                    elif (
-                        inner_type is not None
-                        and hasattr(inner_type, "new")
-                        and isinstance(payload, str)
-                    ):
-                        sender.send(inner_type.new(text=payload))
-                    else:
+            ws_msg = await ws.receive()
+            if "bytes" in ws_msg:
+                # Binary frame: 2-byte header length + JSON header + payload
+                buf = ws_msg["bytes"]
+                if len(buf) >= 2:
+                    header_len = struct.unpack(">H", buf[:2])[0]
+                    header = json.loads(buf[2 : 2 + header_len].decode("utf-8"))
+                    payload = buf[2 + header_len :]
+
+                    node_id = header.get("node_id")
+                    channel = header.get("channel")
+                    sender = manager.ui_senders().get((node_id, channel))
+                    if sender is not None:
                         sender.send(payload)
+            elif "text" in ws_msg:
+                msg = json.loads(ws_msg["text"])
+                if msg.get("type") == "ui_input":
+                    node_id = msg["node_id"]
+                    channel = msg["channel"]
+                    payload = msg.get("payload", "")
+                    sender = manager.ui_senders().get((node_id, channel))
+                    if sender is not None:
+                        inner_type = _resolve_ui_input_type(manager, node_id, channel)
+                        if (
+                            inner_type is not None
+                            and issubclass(inner_type, BaseModel)
+                            and isinstance(payload, dict)
+                        ):
+                            sender.send(inner_type.model_validate(payload))
+                        elif (
+                            inner_type is not None
+                            and hasattr(inner_type, "new")
+                            and isinstance(payload, str)
+                        ):
+                            sender.send(inner_type.new(text=payload))
+                        else:
+                            sender.send(payload)
     except WebSocketDisconnect:
         pass
     finally:

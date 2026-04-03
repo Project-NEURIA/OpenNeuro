@@ -42,8 +42,11 @@ describe("ProjectChooser", () => {
     await waitFor(() => expect(startProject).toHaveBeenCalledWith("Alpha"));
     expect(onOpen).toHaveBeenCalledWith("Alpha");
 
-    const betaCard = screen.getByText("Beta").closest("button.group") as HTMLButtonElement;
-    fireEvent.click(betaCard.querySelector("button.absolute") as HTMLButtonElement);
+    const betaLabel = screen.getByText("Beta");
+    const betaCard = betaLabel.closest("button") as HTMLElement;
+    const buttons = betaCard.querySelectorAll("button");
+    const deleteBtn = buttons[buttons.length - 1] as HTMLElement;
+    fireEvent.click(deleteBtn);
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("Beta"));
 
     fireEvent.click(screen.getByRole("button", { name: /new project/i }));
