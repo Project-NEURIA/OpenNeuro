@@ -8,6 +8,10 @@ from src.api.project import service
 from src.api.project.dto import (
     CurrentProjectResponse,
     ProjectCreateRequest,
+    ProjectExportRequest,
+    ProjectExportResponse,
+    ProjectImportRequest,
+    ProjectImportResponse,
     ProjectSummary,
 )
 from src.core.config import PROJECTS_DIR, AppConfig
@@ -56,3 +60,25 @@ def get_thumbnail(name: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="Thumbnail not found")
     return FileResponse(path, media_type="image/png")
+
+
+@router.post("/project/export")
+def export_project(req: ProjectExportRequest) -> ProjectExportResponse:
+    try:
+        project_dir, assets_copied = service.export_project(req.name)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ProjectExportResponse(project_dir=project_dir, assets_copied=assets_copied)
+
+
+@router.post("/project/import")
+def import_project(req: ProjectImportRequest) -> ProjectImportResponse:
+    try:
+        name = service.import_project(req.git_url)
+    except FileExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Clone failed: {e}")
+    return ProjectImportResponse(name=name)

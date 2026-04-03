@@ -202,6 +202,30 @@ export async function closeProject() {
   if (!res.ok) throw new Error(`Close project failed: ${res.status}`);
 }
 
+export async function exportProject(
+  name: string,
+): Promise<{ project_dir: string; assets_copied: string[] }> {
+  const res = await fetch("/project/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`Export project failed: ${res.status}`);
+  return res.json();
+}
+
+export async function importProject(
+  gitUrl: string,
+): Promise<{ name: string }> {
+  const res = await fetch("/project/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ git_url: gitUrl }),
+  });
+  if (!res.ok) throw new Error(`Import project failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchCurrentProject(): Promise<{
   current_project: string | null;
 }> {
