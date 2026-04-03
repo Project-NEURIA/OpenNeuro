@@ -140,7 +140,10 @@ class RemoteStereoDepthEstimator(
         cy = float(K[1, 2] * sy)
 
         return {
-            "fx": fx, "fy": fy, "cx": cx, "cy": cy,
+            "fx": fx,
+            "fy": fy,
+            "cx": cx,
+            "cy": cy,
             "baseline": float(cam_frame.baseline),
             "width": rw,
             "height": rh,
@@ -160,14 +163,14 @@ class RemoteStereoDepthEstimator(
             "jpeg_quality": c.jpeg_quality,
         }
 
-    def _connect_and_init(
-        self, cam_frame: StereoCameraParamsFrame
-    ) -> ClientConnection:
+    def _connect_and_init(self, cam_frame: StereoCameraParamsFrame) -> ClientConnection:
         """Open WebSocket, send INIT, wait for INIT_ACK."""
-        ws = connect(self.config.server_url,
-                     max_size=16 * 1024 * 1024,
-                     ping_timeout=120,
-                     ping_interval=30)
+        ws = connect(
+            self.config.server_url,
+            max_size=16 * 1024 * 1024,
+            ping_timeout=120,
+            ping_interval=30,
+        )
         self._ws = ws
         ws.send(pack_init(self._build_init_config(cam_frame)))
         ack = ws.recv()
@@ -177,10 +180,12 @@ class RemoteStereoDepthEstimator(
         if tag != MSG_INIT_ACK:
             raise RuntimeError(f"Unexpected response to INIT: 0x{tag:02x}")
         info = unpack_init_ack(ack)
-        logger.info("Connected to %s — VRAM %.0f/%.0f MB",
-                     self.config.server_url,
-                     info.get("vram_used_mb", 0),
-                     info.get("vram_total_mb", 0))
+        logger.info(
+            "Connected to %s — VRAM %.0f/%.0f MB",
+            self.config.server_url,
+            info.get("vram_used_mb", 0),
+            info.get("vram_total_mb", 0),
+        )
         return ws
 
     def run(
@@ -218,8 +223,9 @@ class RemoteStereoDepthEstimator(
                     ws = self._connect_and_init(cam_frame)
                     reconnect_delay = 1.0
                 except Exception as exc:
-                    logger.warning("Connection failed: %s (retry in %.0fs)",
-                                   exc, reconnect_delay)
+                    logger.warning(
+                        "Connection failed: %s (retry in %.0fs)", exc, reconnect_delay
+                    )
                     time.sleep(reconnect_delay)
                     reconnect_delay = min(
                         reconnect_delay * 2, self.config.max_reconnect_delay
@@ -282,9 +288,7 @@ class RemoteStereoDepthEstimator(
 
             # Emit depth
             if result.d_map is not None:
-                outputs.depth.send(
-                    DepthFrame.new(data=result.d_map, is_metric=True)
-                )
+                outputs.depth.send(DepthFrame.new(data=result.d_map, is_metric=True))
 
             # Emit resized stereo (decode server JPEGs or use local resized)
             if result.left_jpeg is not None and result.right_jpeg is not None:

@@ -57,7 +57,5 @@ class StopTool(
             if call.name != "stop":
                 continue
             print("[Stop] Agent stopping loop")
-            outputs.tool_result.send(
-                ToolResult.new(call_id=call.call_id, content="")
-            )
+            outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))
             outputs.stop.send(TextFrame.new(text="stop"))
