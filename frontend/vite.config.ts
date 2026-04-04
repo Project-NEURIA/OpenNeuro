@@ -3,7 +3,6 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import mkcert from "vite-plugin-mkcert";
 import path from "path";
 import fs from "fs";
 import { randomUUID } from "crypto";
@@ -64,8 +63,8 @@ function uploadPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss(), uploadPlugin(), ...(mode !== "test" ? [mkcert()] : [])],
+export default defineConfig({
+  plugins: [react(), tailwindcss(), uploadPlugin()],
   test: {
     environment: "jsdom",
     setupFiles: "./tests/setup.ts",
@@ -95,44 +94,5 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     host: true,
-    hmr: {
-      clientPort: 5173,
-    },
-    proxy: {
-      "/graph": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/metrics": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/component": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/projects": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/project": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/env": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/logs": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/ui/ws": {
-        target: "ws://127.0.0.1:8000",
-        ws: true,
-        changeOrigin: true,
-        secure: false,
-      },
-    },
   },
-}));
+});

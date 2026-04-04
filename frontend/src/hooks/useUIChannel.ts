@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { WS_BASE } from "@/lib/api";
 
 export type UIOutputCallback = (payload: unknown) => void;
 
@@ -27,8 +28,7 @@ export function useUIChannelManager(): UIChannelManager {
   useEffect(() => {
     let isMounted = true;
     let reconnectTimeout: number | undefined;
-    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const url = `${wsScheme}://${window.location.host}/ui/ws`;
+    const url = `${WS_BASE}/ui/ws`;
 
     function connect() {
       if (!isMounted) return;

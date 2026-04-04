@@ -320,7 +320,7 @@ Many components wrap ML models that run either locally (GPU/CPU) or via cloud AP
 
 ## Building a New Component
 
-Create a Python file in `backend/src/core/source/`, `conduit/`, or `sink/`. The component is auto-discovered — no registration needed.
+Create a Python file in the appropriate domain directory under `backend/src/lib/` (e.g., `audio/`, `llm/`, `vision/`, `motion/`, `misc/`). The component is auto-discovered — no registration needed.
 
 ```python
 from typing import NamedTuple
@@ -408,9 +408,12 @@ OpenNeuro/
         channel.py                 # Channel / Sender / Receiver
         frames.py                  # Frame types (AudioFrame, VideoFrame, ...)
         graph.py                   # GraphManager (orchestrates everything)
-        source/                    # Source components
-        conduit/                   # Conduit components
-        sink/                      # Sink components
+      lib/
+        audio/                     # Audio components (ASR, TTS, VAD, ...)
+        llm/                       # LLM & agent components (LLM, AgentState, tools, ...)
+        vision/                    # Vision components (depth, detection, segmentation, ...)
+        motion/                    # Motion components (DartControl, pose rendering, ...)
+        misc/                      # Utility components (Passthrough, Buffer, Throttle, ...)
       api/                         # REST/SSE/WS endpoints
     tests/                         # pytest tests
   frontend/
