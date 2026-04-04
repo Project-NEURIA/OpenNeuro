@@ -294,13 +294,23 @@ class GraphManager:
 
         return dict(sender_plan), receiver_plan
 
-    def run(self) -> None:
-        """Stop all running components, then start each with fresh handles."""
+    def run(
+        self,
+        receiver_overrides: dict[ReceiverKey, Receiver[Any] | None] | None = None,
+        sender_overrides: dict[SenderKey, Sender[Any] | None] | None = None,
+    ) -> None:
+        """Stop all running components, then start each with fresh handles.
+
+        Optional overrides let callers (e.g. CompositeComponent) inject
+        pre-built handles for specific slots.
+        """
         self.stop()
         self._ui_senders.clear()
         self._ui_receivers.clear()
 
         sender_plan, receiver_plan = self._reconcile()
+        _recv_over = receiver_overrides or {}
+        _send_over = sender_overrides or {}
 
         start_queue: list[tuple[str, Component[Any, Any], Any, Any]] = []
         for node_id, node in self._graph.nodes.items():
@@ -318,18 +328,23 @@ class GraphManager:
             stop_event = comp.stop_event if isinstance(comp, ThreadedComponent) else threading.Event()
 
             # Create fresh handles from plan, store on node.
-            # Pre-existing handles (e.g. from composite boundary wiring) are kept.
+            # Overrides take priority over the plan.
             for slot in input_slots:
-                if (node_id, slot) in receiver_plan:
+                if (node_id, slot) in _recv_over:
+                    node.receivers[slot] = _recv_over[(node_id, slot)]
+                elif (node_id, slot) in receiver_plan:
                     node.receivers[slot] = Receiver(receiver_plan[(node_id, slot)], stop_event)
                 else:
                     node.receivers[slot] = None
 
             for slot in output_slots:
-                if (node_id, slot) in sender_plan:
+                if (node_id, slot) in _send_over:
+                    node.senders[slot] = _send_over[(node_id, slot)] or Sender()
+                elif (node_id, slot) in sender_plan:
                     node.senders[slot] = Sender(*sender_plan[(node_id, slot)])
                 else:
-                    node.senders[slot] = None
+                    # Unconnected output: no-op sender (sends are discarded)
+                    node.senders[slot] = Sender()
 
             # Wire UI input channels (frontend -> component)
             for slot, slot_type in ui_input_slots.items():
@@ -346,7 +361,7 @@ class GraphManager:
                 self._ui_receivers[(node_id, slot)] = Receiver(ch, threading.Event())
 
             built_inputs = self._build_tuple(input_type, dict(node.receivers))
-            built_outputs = self._build_tuple(output_type, {k: v for k, v in node.senders.items() if v is not None})
+            built_outputs = self._build_tuple(output_type, dict(node.senders))
 
             start_queue.append((node_id, comp, built_inputs, built_outputs))
 
@@ -395,8 +410,6 @@ class GraphManager:
             for sender in node.senders.values():
                 if sender is not None:
                     sender._stopped = True
-            node.senders = {}
-            node.receivers = {}
         for sender in self._ui_senders.values():
             sender._stopped = True
         for comp in self._components.values():

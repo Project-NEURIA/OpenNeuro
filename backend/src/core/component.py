@@ -524,27 +524,20 @@ class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sende
             return
         self._status = Status.SETUP
 
-        from src.core.graph import GraphManager
+        from src.core.graph import GraphManager, ReceiverKey, SenderKey
 
         self._inner_manager = GraphManager(self._sub_graph)
 
-        for ext_name, recv in zip(self._ext_inputs, inputs):
-            if recv is None:
-                continue
-            node_id, slot = self._ext_inputs[ext_name]
-            inner_node = self._inner_manager.graph.nodes.get(node_id)
-            if inner_node is not None:
-                inner_node.receivers[slot] = recv
+        recv_overrides: dict[ReceiverKey, Receiver[Any] | None] = {
+            self._ext_inputs[ext_name]: recv
+            for ext_name, recv in zip(self._ext_inputs, inputs)
+        }
+        send_overrides: dict[SenderKey, Sender[Any] | None] = {
+            self._ext_outputs[ext_name]: send
+            for ext_name, send in zip(self._ext_outputs, outputs)
+        }
 
-        for ext_name, send in zip(self._ext_outputs, outputs):
-            if send is None:
-                continue
-            node_id, slot = self._ext_outputs[ext_name]
-            inner_node = self._inner_manager.graph.nodes.get(node_id)
-            if inner_node is not None:
-                inner_node.senders[slot] = send
-
-        self._inner_manager.run()
+        self._inner_manager.run(recv_overrides, send_overrides)
         self._status = Status.RUNNING
 
     def stop(self) -> None:

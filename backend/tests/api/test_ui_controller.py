@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import struct
+import threading
 import types
 
 from fastapi import WebSocketDisconnect
@@ -64,7 +65,7 @@ class _FakeManager:
         self._component = _FakeComponent()
         self._ui_version = 0
         self._ui_changed = asyncio.Event()
-        self._receiver = Receiver(Channel())
+        self._receiver = Receiver(Channel(), threading.Event())
         self._ui_receivers = {("node", "video"): self._receiver}
         self.sent_payloads: list[object] = []
         self._ui_senders = {
@@ -162,7 +163,7 @@ def test_read_ui_output_variants() -> None:
         stop_event = asyncio.Event()
         channel = Channel()
         sender = Sender(channel)
-        receiver = Receiver(channel)
+        receiver = Receiver(channel, threading.Event())
         ws = _FakeWebSocket(_FakeManager())
 
         if failing:

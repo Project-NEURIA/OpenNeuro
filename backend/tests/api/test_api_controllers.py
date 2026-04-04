@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import types
 
 import pytest
@@ -29,7 +30,7 @@ class _Manager:
         node = Node(id_="n1", type="A", init_args={}, x=1, y=2)
         self.graph = Graph(nodes={"n1": node}, edges=[])
         self._sender = Sender(Channel())
-        self._receiver = Receiver(Channel())
+        self._receiver = Receiver(Channel(), threading.Event())
 
     def component(self, _node_id: str):
         return types.SimpleNamespace(status=types.SimpleNamespace(value="running"))

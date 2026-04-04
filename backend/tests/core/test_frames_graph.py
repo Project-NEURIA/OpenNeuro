@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 import types
 from pathlib import Path
 from typing import NamedTuple
@@ -185,19 +186,18 @@ def test_composite_component_additional_paths(monkeypatch) -> None:
     )
     comp = CompositeComponent("Wrap", sub_graph)
     assert comp.type_ == "Wrap"
-    assert comp.get_input_types()["n1.maybe"] == Receiver[TextFrame] | None
-    assert "n1.out" not in comp.get_output_types()
+    assert comp.get_input_types()["maybe"] == Receiver[TextFrame] | None
+    assert "out" not in comp.get_output_types()
 
     startable = CompositeComponent(
         "WrapStart",
         Graph(nodes={"n1": Node(id_="n1", type="Known", init_args={})}, edges=[]),
     )
 
-    recv = Receiver(Channel())
+    recv = Receiver(Channel(), threading.Event())
     send = Sender(Channel())
-    named_inputs = {"n1.plain": recv, "n1.maybe": recv}
-    named_outputs = {"n1.out": send}
-    startable.start(named_inputs, named_outputs)
+    # Pass as tuple — order matches get_input_types() / get_output_types()
+    startable.start((recv, recv), (send,))
     assert startable.status == Status.RUNNING
     assert startable._inner_manager is not None
     assert startable._inner_manager.receiver_handles()[("n1", "plain")] is recv
@@ -211,10 +211,10 @@ def test_composite_component_additional_paths(monkeypatch) -> None:
     )
     comp2.start((recv, recv), (send,))
     assert comp2._inner_manager is not None
-    assert ("n1", "plain") not in comp2._inner_manager.receiver_handles()
-    assert ("n1", "maybe") not in comp2._inner_manager.receiver_handles()
+    # After run(), inner manager creates fresh handles — outer ones are on the node
+    assert ("n1", "plain") in comp2._inner_manager.receiver_handles()
+    assert ("n1", "maybe") in comp2._inner_manager.receiver_handles()
     assert ("n1", "out") in comp2._inner_manager.sender_handles()
-    assert comp2._inner_manager.sender_handles()[("n1", "out")] is not send
 
     comp2._status = Status.RUNNING
     current_manager = comp2._inner_manager
@@ -303,7 +303,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
 
     ui_node = Node(id_="ui", type="Known", init_args={})
     gm6 = GraphManager(Graph(nodes={"ui": ui_node}, edges=[]))
-    gm6._sender_handles.clear()
+    gm6._channel_map.clear()
     gm6.run()
     assert ("ui", "ui_text") in gm6.ui_senders()
     assert ("ui", "ui_text") in gm6.ui_receivers()
@@ -313,7 +313,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     assert registered and registered[0]["node_id"] == "ui"
 
     assert GraphManager._build_tuple(None, {"x": 1}) == ()
-    tuple_out = GraphManager._build_tuple(tuple[int, str], {"2": "b", "1": 1})
+    tuple_out = GraphManager._build_tuple(tuple[int, str], {"1": 1, "2": "b"})
     assert tuple_out == (1, "b")
 
 

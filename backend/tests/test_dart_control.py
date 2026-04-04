@@ -110,20 +110,16 @@ def test_manual_start_uses_wired_receivers(monkeypatch) -> None:
 
     goal_channel = Channel[GoalFrame]()
     goal_sender = Sender(goal_channel)
-    goal_receiver = Receiver(goal_channel)
+    goal_receiver = Receiver(goal_channel, component.stop_event)
 
     instruction_channel = Channel[TextFrame]()
     instruction_sender = Sender(instruction_channel)
-    instruction_receiver = Receiver(instruction_channel)
+    instruction_receiver = Receiver(instruction_channel, component.stop_event)
 
     motion_channel = Channel()
     motion_sender = Sender(motion_channel)
-    motion_receiver = Receiver(motion_channel)
-
-    goal_receiver._wire(component.stop_event)
-    instruction_receiver._wire(component.stop_event)
     motion_stop_event = threading.Event()
-    motion_receiver._wire(motion_stop_event)
+    motion_receiver = Receiver(motion_channel, motion_stop_event)
 
     component.start(
         DartControlInputs(goal=goal_receiver, instruction=instruction_receiver),

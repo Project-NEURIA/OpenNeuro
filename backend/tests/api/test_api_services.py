@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import types
 
 import pytest
@@ -33,7 +34,7 @@ class FakeManager:
         self._reset_called = False
         channel = Channel()
         self._sender = Sender(channel)
-        self._receiver = Receiver(channel)
+        self._receiver = Receiver(channel, threading.Event())
 
     def get_node(self, node_id: str):
         return self.graph.nodes.get(node_id)
@@ -224,9 +225,7 @@ def test_logs_controller(monkeypatch) -> None:
 def test_metrics_collector_collect() -> None:
     manager = FakeManager()
     frame = TextFrame.new(text="hello")
-    stop_event = types.SimpleNamespace(is_set=lambda: False)
     manager._receiver.blocking = False
-    manager._receiver._wire(stop_event)
     manager._sender.send(frame)
     next(manager._receiver)
 
@@ -235,7 +234,6 @@ def test_metrics_collector_collect() -> None:
     second = collector.collect(manager)
     assert "a" in first.nodes
     assert second.nodes["a"].senders["out"].msg_count_delta == 0
-    manager._receiver._unwire()
 
 
 def test_project_service(monkeypatch, tmp_path) -> None:

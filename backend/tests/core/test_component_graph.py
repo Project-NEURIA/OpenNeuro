@@ -144,8 +144,8 @@ def test_composite_component_start_stop(monkeypatch) -> None:
     n1 = Node(id_="a", type="DemoThread", init_args={})
     sub = Graph(nodes={"a": n1}, edges=[])
     comp = CompositeComponent("C", sub)
-    assert "a.1" in comp.get_input_types()
-    assert "a.1" in comp.get_output_types()
+    assert "1" in comp.get_input_types()
+    assert "1" in comp.get_output_types()
     comp.start((), ())
     assert comp.status == Status.RUNNING
     comp.stop()
