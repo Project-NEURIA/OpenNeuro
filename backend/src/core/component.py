@@ -395,8 +395,13 @@ class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
 # ---------------------------------------------------------------------------
 
 
-class CompositeComponent(Component[Any, Any]):
-    """A composite morphism: its interface is derived from unmatched ports in the subgraph."""
+class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sender[Any] | None, ...]]):
+    """A composite component wrapping a subgraph.
+
+    Its interface is derived from unmatched ports in the subgraph.
+    start() receives tuples whose element order matches
+    get_input_types() / get_output_types() key order.
+    """
 
     _registerable = False
 
@@ -429,20 +434,60 @@ class CompositeComponent(Component[Any, Any]):
             connected_outputs.add((edge.source_node, edge.source_slot))
 
         classes = PrimitiveComponent.registered_subclasses()
-        ext_inputs: dict[str, tuple[str, str]] = {}
-        ext_outputs: dict[str, tuple[str, str]] = {}
+
+        # Collect unconnected (boundary) slots: (node_id, slot, component_type)
+        raw_inputs: list[tuple[str, str, str]] = []
+        raw_outputs: list[tuple[str, str, str]] = []
         for node_id, node in self._sub_graph.nodes.items():
             cls = classes.get(node.type)
             if cls is None:
-                # Node is a CompositeComponent — nested composites not yet supported
                 continue
             for slot in cls._class_input_types():
                 if (node_id, slot) not in connected_inputs:
-                    ext_inputs[f"{node_id}.{slot}"] = (node_id, slot)
+                    raw_inputs.append((node_id, slot, node.type))
             for slot in cls._class_output_types():
                 if (node_id, slot) not in connected_outputs:
-                    ext_outputs[f"{node_id}.{slot}"] = (node_id, slot)
+                    raw_outputs.append((node_id, slot, node.type))
+
+        ext_inputs = self._disambiguate(raw_inputs)
+        ext_outputs = self._disambiguate(raw_outputs)
         return ext_inputs, ext_outputs
+
+    @staticmethod
+    def _disambiguate(
+        slots: list[tuple[str, str, str]],
+    ) -> dict[str, tuple[str, str]]:
+        """Assign unique external names to boundary slots.
+
+        Uses the slot name alone if unique, otherwise prefixes with the
+        component type. If still ambiguous, appends a numeric suffix.
+        """
+        from collections import Counter
+
+        # Count how many times each slot name appears
+        slot_counts = Counter(slot for _, slot, _ in slots)
+
+        # For duplicates, try "Type.slot"
+        names: list[str] = []
+        for _, slot, comp_type in slots:
+            if slot_counts[slot] == 1:
+                names.append(slot)
+            else:
+                names.append(f"{comp_type}.{slot}")
+
+        # If still duplicates, append numbers
+        final_counts: dict[str, int] = Counter(names)
+        seen: dict[str, int] = {}
+        result: dict[str, tuple[str, str]] = {}
+        for i, name in enumerate(names):
+            node_id, slot, _ = slots[i]
+            if final_counts[name] > 1:
+                idx = seen.get(name, 0) + 1
+                seen[name] = idx
+                result[f"{name}.{idx}"] = (node_id, slot)
+            else:
+                result[name] = (node_id, slot)
+        return result
 
     def get_input_types(self) -> dict[str, type]:
         classes = PrimitiveComponent.registered_subclasses()
@@ -474,7 +519,7 @@ class CompositeComponent(Component[Any, Any]):
     def get_ui_output_types(self) -> dict[str, type]:
         return {}
 
-    def start(self, inputs: Any, outputs: Any) -> None:
+    def start(self, inputs: tuple[Receiver[Any] | None, ...], outputs: tuple[Sender[Any] | None, ...]) -> None:
         if self.status == Status.RUNNING:
             return
         self._status = Status.SETUP
@@ -483,15 +528,21 @@ class CompositeComponent(Component[Any, Any]):
 
         self._inner_manager = GraphManager(self._sub_graph)
 
-        for ext_name, (node_id, slot) in self._ext_inputs.items():
-            outer_receiver = inputs.get(ext_name) if isinstance(inputs, dict) else None
-            if outer_receiver is not None:
-                self._inner_manager._receiver_handles[(node_id, slot)] = outer_receiver
+        for ext_name, recv in zip(self._ext_inputs, inputs):
+            if recv is None:
+                continue
+            node_id, slot = self._ext_inputs[ext_name]
+            inner_node = self._inner_manager.graph.nodes.get(node_id)
+            if inner_node is not None:
+                inner_node.receivers[slot] = recv
 
-        for ext_name, (node_id, slot) in self._ext_outputs.items():
-            outer_sender = outputs.get(ext_name) if isinstance(outputs, dict) else None
-            if outer_sender is not None:
-                self._inner_manager._sender_handles[(node_id, slot)] = outer_sender
+        for ext_name, send in zip(self._ext_outputs, outputs):
+            if send is None:
+                continue
+            node_id, slot = self._ext_outputs[ext_name]
+            inner_node = self._inner_manager.graph.nodes.get(node_id)
+            if inner_node is not None:
+                inner_node.senders[slot] = send
 
         self._inner_manager.run()
         self._status = Status.RUNNING

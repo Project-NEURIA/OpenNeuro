@@ -288,7 +288,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     assert "a" not in gm4.graph.nodes
     assert gm4.graph.edges == []
     assert gm4.components()["b"].stop_event.is_set() is True
-    assert gm4.components()["c"].stop_event.is_set() is True
+    assert gm4.components()["c"].stop_event.is_set() is False  # upstream, not stopped
 
     composite_node = Node(
         id_="wrap",
