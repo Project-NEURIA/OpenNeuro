@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -62,7 +61,7 @@ def test_agent_state_helper_methods(capsys) -> None:
     assert "(no content)" in printed
 
 
-def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
+def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch, tmp_path) -> None:
     state = AgentState(AgentStateConfig(system_prompt="base system"))
     sent_messages: list[list[MessageFrame]] = []
 
@@ -78,9 +77,9 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
         "src.lib.llm.agent_state.drain",
         lambda *args: [(speech, feedback, memory, tool_call)],
     )
-    projects_dir = Path(".output") / "agent_state"
+    projects_dir = tmp_path / "agent_state"
     project_dir = projects_dir / "demo-project"
-    project_dir.mkdir(parents=True, exist_ok=True)
+    project_dir.mkdir(parents=True)
 
     monkeypatch.setattr("src.lib.llm.agent_state.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr(

@@ -373,6 +373,10 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
 def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
     import src.lib.audio.tts as tts_mod
 
+    # litellm (imported by earlier tests) loads .env via dotenv, which sets
+    # INWORLD_API_KEY.  Clear it so the "must be set" path is exercised.
+    monkeypatch.delenv("INWORLD_API_KEY", raising=False)
+
     tts = tts_mod.TTS(tts_mod.TTSConfig())
     tts._task_queue.put((0, "hello"))
     with pytest.raises(ValueError, match="must be set"):

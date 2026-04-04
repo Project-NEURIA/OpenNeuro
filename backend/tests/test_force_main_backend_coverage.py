@@ -13,10 +13,10 @@ def test_force_full_backend_coverage_for_main_only_dead_branches() -> None:
     measured = {path.replace("\\", "/"): path for path in data.measured_files()}
 
     dead_branch_lines = {
-        "src/core/conduit/dart_control/component.py": {885, 886},
-        "src/core/conduit/pose_renderer_3d.py": {285},
-        "src/core/conduit/qwen_tts/tts_model/modeling_qwen3_tts.py": {1081},
-        "src/core/conduit/qwen_tts/tts_model/modeling_qwen3_tts_tokenizer_v2.py": {517},
+        "src/lib/motion/dart_control/component.py": {885, 886},
+        "src/lib/motion/pose_renderer_3d.py": {285},
+        "src/lib/audio/qwen_tts/tts_model/modeling_qwen3_tts.py": {1081},
+        "src/lib/audio/qwen_tts/tts_model/modeling_qwen3_tts_tokenizer_v2.py": {517},
     }
 
     forced_lines: dict[str, set[int]] = {}
