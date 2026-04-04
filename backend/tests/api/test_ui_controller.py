@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import json
-import struct
 import threading
 import types
 
 from fastapi import WebSocketDisconnect
 from pydantic import BaseModel
 
-from src.api.ui import controller as ui_controller
+from src.api.ui.bridge import (
+    UIChannelBridge,
+    encode_binary,
+    encode_json,
+    decode_binary,
+    decode_json,
+    deserialize_payload,
+)
 from src.core.channel import (
-    Channel,
-    Receiver,
-    Sender,
     UIReceiver,
     UISender,
     UITextReceiver,
@@ -26,15 +29,22 @@ class _Payload(BaseModel):
     value: int
 
 
-class _PayloadSender(UISender[_Payload]):
-    pass
-
-
 class _PayloadReceiver(UIReceiver[_Payload]):
     pass
 
 
+class _MissingSender(UISender):
+    pass
+
+
+class _MissingReceiver(UIReceiver):
+    pass
+
+
 class _FakeComponent:
+    def __init__(self) -> None:
+        self.stop_event = threading.Event()
+
     def get_ui_output_types(self):
         return {
             "video": UIVideoSender,
@@ -52,49 +62,17 @@ class _FakeComponent:
         }
 
 
-class _MissingSender(UISender):
-    pass
-
-
-class _MissingReceiver(UIReceiver):
-    pass
-
-
 class _FakeManager:
     def __init__(self) -> None:
         self._component = _FakeComponent()
-        self._ui_version = 0
-        self._ui_changed = asyncio.Event()
-        self._receiver = Receiver(Channel(), threading.Event())
-        self._ui_receivers = {("node", "video"): self._receiver}
-        self.sent_payloads: list[object] = []
-        self._ui_senders = {
-            ("node", "payload_in"): types.SimpleNamespace(
-                send=lambda value: self.sent_payloads.append(value)
-            ),
-            ("node", "text_in"): types.SimpleNamespace(
-                send=lambda value: self.sent_payloads.append(value)
-            ),
-            ("node", "raw_in"): types.SimpleNamespace(
-                send=lambda value: self.sent_payloads.append(value)
-            ),
-        }
 
     def components(self):
         return {"node": self._component}
 
-    def ui_receivers(self):
-        return self._ui_receivers
-
-    def ui_senders(self):
-        return self._ui_senders
-
 
 class _FakeWebSocket:
-    def __init__(
-        self, manager: _FakeManager, messages: list[str] | None = None
-    ) -> None:
-        self.app = types.SimpleNamespace(state=types.SimpleNamespace(manager=manager))
+    def __init__(self, messages: list[str | bytes] | None = None) -> None:
+        self.app = types.SimpleNamespace(state=types.SimpleNamespace())
         self.client = ("127.0.0.1", 0)
         self._messages = iter(messages or [])
         self.accepted = False
@@ -104,15 +82,12 @@ class _FakeWebSocket:
     async def accept(self) -> None:
         self.accepted = True
 
-    async def receive_text(self) -> str:
+    async def receive(self) -> dict[str, str | bytes]:
         try:
-            return next(self._messages)
-        except StopIteration as exc:
-            raise WebSocketDisconnect() from exc
-
-    async def receive(self) -> dict[str, str]:
-        try:
-            return {"text": next(self._messages)}
+            msg = next(self._messages)
+            if isinstance(msg, bytes):
+                return {"bytes": msg}
+            return {"text": msg}
         except StopIteration as exc:
             raise WebSocketDisconnect() from exc
 
@@ -123,201 +98,128 @@ class _FakeWebSocket:
         self.byte_messages.append(payload)
 
 
-def test_ui_type_resolution_helpers() -> None:
+def test_wire_format_encode_decode() -> None:
+    # Binary round-trip
+    encoded = encode_binary("n1", "video", b"\x00\x01")
+    key, payload = decode_binary(encoded)
+    assert key == ("n1", "video")
+    assert payload == b"\x00\x01"
+
+    # Binary too short
+    assert decode_binary(b"\x00")[0] is None
+
+    # JSON round-trip
+    envelope = encode_json("n1", "text", "hello")
+    assert envelope == {
+        "type": "ui_output", "node_id": "n1", "channel": "text", "payload": "hello"
+    }
+
+    # JSON with BaseModel
+    env_model = encode_json("n1", "data", _Payload(value=5))
+    assert env_model["payload"] == {"value": 5}
+
+    # JSON with TextFrame
+    env_text = encode_json("n1", "data", TextFrame.new(text="hi"))
+    assert env_text["payload"] == "hi"
+
+    # decode_json
+    result = decode_json(json.dumps({"type": "ui_input", "node_id": "n1", "channel": "c", "payload": "x"}))
+    assert result == (("n1", "c"), "x")
+    assert decode_json(json.dumps({"type": "ignored"})) is None
+
+    # deserialize_payload
+    assert deserialize_payload({"value": 3}, _Payload) == _Payload(value=3)
+    assert isinstance(deserialize_payload("hi", TextFrame), TextFrame)
+    assert deserialize_payload(42, None) == 42
+
+
+def test_type_resolution() -> None:
+    bridge = UIChannelBridge()
     manager = _FakeManager()
-    manager._component.get_ui_output_types = lambda: {
-        "video": UIVideoSender,
-        "payload": UISender[_Payload],
-        "missing": _MissingSender,
-    }
-    manager._component.get_ui_input_types = lambda: {
-        "payload_in": UIReceiver[_Payload],
-        "text_in": UITextReceiver,
-        "missing_args": _MissingReceiver,
-    }
+    bridge._manager = manager
 
-    assert (
-        ui_controller._resolve_ui_output_type(manager, "missing-node", "video") is None
-    )
-    assert (
-        ui_controller._resolve_ui_output_type(manager, "node", "missing-slot") is None
-    )
-    assert ui_controller._resolve_ui_output_type(manager, "node", "video") is bytes
-    assert ui_controller._resolve_ui_output_type(manager, "node", "payload") is _Payload
-    assert ui_controller._resolve_ui_output_type(manager, "node", "missing") is None
+    assert bridge._resolve_ui_output_type("missing-node", "video") is None
+    assert bridge._resolve_ui_output_type("node", "missing-slot") is None
+    assert bridge._resolve_ui_output_type("node", "video") is bytes
+    assert bridge._resolve_ui_output_type("node", "payload") is _Payload
 
-    assert (
-        ui_controller._resolve_ui_input_type(manager, "missing-node", "payload_in")
-        is None
-    )
-    assert ui_controller._resolve_ui_input_type(manager, "node", "missing-slot") is None
-    assert (
-        ui_controller._resolve_ui_input_type(manager, "node", "payload_in") is _Payload
-    )
-    assert ui_controller._resolve_ui_input_type(manager, "node", "text_in") is TextFrame
-    assert ui_controller._resolve_ui_input_type(manager, "node", "missing_args") is None
+    assert bridge._resolve_ui_input_type("missing-node", "payload_in") is None
+    assert bridge._resolve_ui_input_type("node", "missing-slot") is None
+    assert bridge._resolve_ui_input_type("node", "payload_in") is _Payload
+    assert bridge._resolve_ui_input_type("node", "text_in") is TextFrame
+    assert bridge._resolve_ui_input_type("node", "missing_args") is None
 
 
-def test_read_ui_output_variants() -> None:
-    async def run_case(item: object, inner_type: type | None, failing: bool = False):
-        stop_event = asyncio.Event()
-        channel = Channel()
-        sender = Sender(channel)
-        receiver = Receiver(channel, threading.Event())
-        ws = _FakeWebSocket(_FakeManager())
+def test_bridge_wire() -> None:
+    bridge = UIChannelBridge()
+    manager = _FakeManager()
+    recv_overrides, send_overrides = bridge.wire(manager)
 
-        if failing:
+    # UI input slots should have receiver overrides + server senders
+    assert ("node", "payload_in") in recv_overrides
+    assert ("node", "text_in") in recv_overrides
+    assert ("node", "payload_in") in bridge._ui_senders
+    assert ("node", "text_in") in bridge._ui_senders
 
-            async def send_json(_payload: object) -> None:
-                raise RuntimeError("boom")
-
-            ws.send_json = send_json  # type: ignore[method-assign]
-
-        task = asyncio.create_task(
-            ui_controller._read_ui_output(
-                ws, "node", "slot", receiver, inner_type, stop_event
-            )
-        )
-        await asyncio.sleep(0)
-        sender.send(item)
-        sender.send(None)
-        await task
-        return ws, channel
-
-    async def run_all() -> None:
-        ws_bytes, _ = await run_case(b"\x00\x01", bytes)
-        header_len = struct.unpack(">H", ws_bytes.byte_messages[0][:2])[0]
-        header = json.loads(ws_bytes.byte_messages[0][2 : 2 + header_len].decode())
-        assert header == {"type": "ui_output", "node_id": "node", "channel": "slot"}
-        assert ws_bytes.byte_messages[0][2 + header_len :] == b"\x00\x01"
-
-        ws_model, _ = await run_case(_Payload(value=7), _Payload)
-        assert ws_model.json_messages[0] == {
-            "type": "ui_output",
-            "node_id": "node",
-            "channel": "slot",
-            "payload": {"value": 7},
-        }
-
-        ws_legacy, _ = await run_case(TextFrame.new(text="hello"), TextFrame)
-        assert ws_legacy.json_messages[0]["payload"] == "hello"
-
-        ws_plain, _ = await run_case(5, int)
-        assert ws_plain.json_messages[0]["payload"] == 5
-
-        ws_fail, channel = await run_case(9, int, failing=True)
-        assert ws_fail.json_messages == []
-        assert channel._cursors == {}
-
-    asyncio.run(run_all())
+    # UI output slots should have sender overrides + server receivers
+    assert ("node", "video") in send_overrides
+    assert ("node", "payload") in send_overrides
+    assert ("node", "video") in bridge._ui_receivers
+    assert ("node", "payload") in bridge._ui_receivers
 
 
-def test_watch_ui_channels_and_ui_ws(monkeypatch) -> None:
-    async def run_watch_ui_channels() -> None:
+def test_bridge_recv_msgs() -> None:
+    async def run() -> None:
+        bridge = UIChannelBridge()
         manager = _FakeManager()
-        ws = _FakeWebSocket(manager)
-        stop_event = asyncio.Event()
-        tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
-        calls: list[tuple[str, str, type | None]] = []
+        bridge.wire(manager)
 
-        async def fake_read_ui_output(
-            ws, node_id, slot, receiver, inner_type, stop_event
-        ):
-            calls.append((node_id, slot, inner_type))
-            await stop_event.wait()
+        sent: list[object] = []
+        for sender in bridge._ui_senders.values():
+            original_send = sender.send
+            sender.send = lambda item, _orig=original_send: (sent.append(item), _orig(item))  # type: ignore[method-assign]
 
-        monkeypatch.setattr(ui_controller, "_read_ui_output", fake_read_ui_output)
-
-        watcher = asyncio.create_task(
-            ui_controller._watch_ui_channels(ws, manager, stop_event, tasks)
-        )
-        await asyncio.sleep(0.01)
-        assert calls == [("node", "video", bytes)]
-        assert ("node", "video") in tasks
-
-        old_event = manager._ui_changed
-        manager._ui_version = 1
-        manager._ui_changed = asyncio.Event()
-        old_event.set()
-        await asyncio.sleep(0.01)
-        assert calls[-1] == ("node", "video", bytes)
-        assert ("node", "video") in tasks
-
-        stop_event.set()
-        watcher.cancel()
-        await asyncio.gather(watcher, return_exceptions=True)
-
-    async def run_ui_ws() -> None:
-        manager = _FakeManager()
         ws = _FakeWebSocket(
-            manager,
             messages=[
-                json.dumps(
-                    {
-                        "type": "ui_input",
-                        "node_id": "node",
-                        "channel": "payload_in",
-                        "payload": {"value": 5},
-                    }
-                ),
-                json.dumps(
-                    {
-                        "type": "ui_input",
-                        "node_id": "node",
-                        "channel": "text_in",
-                        "payload": "hello",
-                    }
-                ),
-                json.dumps(
-                    {
-                        "type": "ui_input",
-                        "node_id": "node",
-                        "channel": "raw_in",
-                        "payload": 3,
-                    }
-                ),
-                json.dumps(
-                    {
-                        "type": "ui_input",
-                        "node_id": "node",
-                        "channel": "missing",
-                        "payload": "skip",
-                    }
-                ),
+                json.dumps({
+                    "type": "ui_input", "node_id": "node",
+                    "channel": "text_in", "payload": "hello",
+                }),
+                json.dumps({
+                    "type": "ui_input", "node_id": "node",
+                    "channel": "payload_in", "payload": {"value": 5},
+                }),
                 json.dumps({"type": "ignored"}),
             ],
         )
-        cancelled = {"watcher": False, "task": False}
-        original_receive = ws.receive
+        bridge._ws = ws
+        # _recv_msgs raises WebSocketDisconnect when messages run out
+        try:
+            await bridge._recv_msgs(ws)  # type: ignore[arg-type]
+        except WebSocketDisconnect:
+            pass
 
-        async def delayed_receive() -> dict[str, str]:
-            await asyncio.sleep(0)
-            return await original_receive()
+        assert any(isinstance(s, TextFrame) and s.text == "hello" for s in sent)
+        assert any(isinstance(s, _Payload) and s.value == 5 for s in sent)
 
-        ws.receive = delayed_receive  # type: ignore[method-assign]
+    asyncio.run(run())
 
-        async def fake_watch_ui_channels(ws, manager, stop_event, tasks):
-            class _Task:
-                def cancel(self) -> None:
-                    cancelled["task"] = True
 
-                def __await__(self):
-                    return stop_event.wait().__await__()
+def test_encode_output_formats() -> None:
+    # bytes → encode_binary
+    binary = encode_binary("n1", "video", b"\xff")
+    key, payload = decode_binary(binary)
+    assert key == ("n1", "video")
+    assert payload == b"\xff"
 
-            tasks[("node", "payload")] = _Task()
-            await stop_event.wait()
+    # BaseModel → encode_json
+    env = encode_json("n1", "data", _Payload(value=9))
+    assert env["payload"] == {"value": 9}
 
-        monkeypatch.setattr(ui_controller, "_watch_ui_channels", fake_watch_ui_channels)
+    # TextFrame → encode_json
+    env2 = encode_json("n1", "text", TextFrame.new(text="hi"))
+    assert env2["payload"] == "hi"
 
-        await ui_controller.ui_ws(ws)
-
-        assert ws.accepted is True
-        assert isinstance(manager.sent_payloads[0], _Payload)
-        assert manager.sent_payloads[0].value == 5
-        assert isinstance(manager.sent_payloads[1], TextFrame)
-        assert manager.sent_payloads[1].get() == "hello"
-        assert manager.sent_payloads[2] == 3
-        assert cancelled["task"] is True
-
-    asyncio.run(run_watch_ui_channels())
-    asyncio.run(run_ui_ws())
+    # plain → encode_json
+    env3 = encode_json("n1", "num", 42)
+    assert env3["payload"] == 42

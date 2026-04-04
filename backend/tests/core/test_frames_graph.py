@@ -254,10 +254,11 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     calls: list[str] = []
     gm2.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
     gm2.run = lambda: calls.append("run")  # type: ignore[method-assign]
-    updated = gm2.update_primitive_node_init_args("running", {})
+    updated, was_running = gm2.update_primitive_node_init_args("running", {})
     assert updated is running_node
-    assert calls == ["stop", "run"]
-    assert gm2.update_primitive_node_init_args("missing", {}) is None
+    assert was_running is True
+    assert calls == ["stop"]
+    assert gm2.update_primitive_node_init_args("missing", {}) == (None, False)
 
     gm3 = GraphManager(
         Graph(
@@ -270,7 +271,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
         "registered_subclasses",
         classmethod(lambda cls: {"Known": _CompositeInner}),
     )
-    assert gm3.update_primitive_node_init_args("running", {}) is None
+    assert gm3.update_primitive_node_init_args("running", {}) == (None, False)
 
     nodes = {
         "a": Node(id_="a", type="Known", init_args={}),
@@ -301,12 +302,16 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     gm5 = GraphManager(Graph(nodes={"wrap": composite_node}, edges=[]))
     assert isinstance(gm5.component("wrap"), CompositeComponent)
 
+    from src.api.ui.bridge import UIChannelBridge
+
     ui_node = Node(id_="ui", type="Known", init_args={})
     gm6 = GraphManager(Graph(nodes={"ui": ui_node}, edges=[]))
     gm6._channel_map.clear()
-    gm6.run()
-    assert ("ui", "ui_text") in gm6.ui_senders()
-    assert ("ui", "ui_text") in gm6.ui_receivers()
+    bridge = UIChannelBridge()
+    recv_over, send_over = bridge.wire(gm6)
+    gm6.run(recv_over, send_over)
+    assert ("ui", "ui_text") in bridge._ui_senders
+    assert ("ui", "ui_text") in bridge._ui_receivers
     inner = gm6.component("ui")
     assert isinstance(inner, _CompositeInner)
     assert inner.started_inputs is not None and inner.started_inputs.maybe is None

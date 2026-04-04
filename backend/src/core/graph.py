@@ -321,6 +321,8 @@ class GraphManager:
 
             input_slots = comp.get_input_types()
             output_slots = comp.get_output_types()
+            ui_input_slots = comp.get_ui_input_types()
+            ui_output_slots = comp.get_ui_output_types()
 
             stop_event = comp.stop_event if isinstance(comp, ThreadedComponent) else threading.Event()
 
@@ -340,7 +342,19 @@ class GraphManager:
                 elif (node_id, slot) in sender_plan:
                     node.senders[slot] = Sender(*sender_plan[(node_id, slot)])
                 else:
-                    # Unconnected output: no-op sender (sends are discarded)
+                    node.senders[slot] = Sender()
+
+            # UI slots: use overrides if provided, otherwise dummy handles
+            for slot in ui_input_slots:
+                if (node_id, slot) in _recv_over:
+                    node.receivers[slot] = _recv_over[(node_id, slot)]
+                else:
+                    node.receivers[slot] = None
+
+            for slot in ui_output_slots:
+                if (node_id, slot) in _send_over:
+                    node.senders[slot] = _send_over[(node_id, slot)] or Sender()
+                else:
                     node.senders[slot] = Sender()
 
             built_inputs = self._build_tuple(input_type, dict(node.receivers))

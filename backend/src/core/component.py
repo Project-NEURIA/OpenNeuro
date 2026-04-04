@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from src.core.channel import Receiver, Sender
 from src.core.channel import UIReceiver, UISender
 from src.core.log_capture import get_log_store
+from src.core.utils import ReceiverKey, SenderKey
 
 if TYPE_CHECKING:
     from src.core.graph import Graph, GraphManager
@@ -426,9 +427,9 @@ class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sende
 
     def _compute_boundary(
         self,
-    ) -> tuple[dict[str, tuple[str, str]], dict[str, tuple[str, str]]]:
-        connected_inputs: set[tuple[str, str]] = set()
-        connected_outputs: set[tuple[str, str]] = set()
+    ) -> tuple[dict[str, ReceiverKey], dict[str, SenderKey]]:
+        connected_inputs: set[ReceiverKey] = set()
+        connected_outputs: set[SenderKey] = set()
         for edge in self._sub_graph.edges:
             connected_inputs.add((edge.target_node, edge.target_slot))
             connected_outputs.add((edge.source_node, edge.source_slot))
@@ -525,7 +526,6 @@ class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sende
         self._status = Status.SETUP
 
         from src.core.graph import GraphManager
-        from src.core.utils import ReceiverKey, SenderKey
 
         self._inner_manager = GraphManager(self._sub_graph)
 

@@ -136,18 +136,23 @@ class TestAddAndDeleteEdge:
             target_slot="data",
         )
         gm.add_edge(edge)
+        gm.run()
 
-        # After adding: receiver handle exists for the target slot
+        # After run: receiver handle exists for the target slot
         assert (id_b, "data") in gm.receiver_handles()
         # Sender handle for source slot should be wired to at least one channel
         sender = gm.sender_handles().get((id_a, "data"))
         assert sender is not None
         assert len(sender._channels) >= 1
 
+        gm.stop()
         gm.delete_edge(edge)
+        gm.run()
 
-        # After deleting: receiver handle should be gone
-        assert (id_b, "data") not in gm.receiver_handles()
+        # After deleting and re-running: sender has no channels (unconnected)
+        sender = gm.sender_handles().get((id_a, "data"))
+        assert sender is not None
+        assert len(sender._channels) == 0
 
 
 class TestDeleteNodeRemovesEdges:
@@ -418,5 +423,6 @@ class TestUpdateNonexistentNode:
 
     def test_update_nonexistent_node_init_args(self):
         gm = GraphManager(_empty_graph())
-        result = gm.update_primitive_node_init_args("ghost", {"key": "value"})
-        assert result is None
+        node, was_running = gm.update_primitive_node_init_args("ghost", {"key": "value"})
+        assert node is None
+        assert was_running is False

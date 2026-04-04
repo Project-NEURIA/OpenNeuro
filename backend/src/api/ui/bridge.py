@@ -81,7 +81,7 @@ class UIChannelBridge:
         self._manager: GraphManager | None = None
         self._ws: WebSocket | None = None
         self._stop_event: asyncio.Event = asyncio.Event()
-        self._send_tasks: dict[tuple[str, str], asyncio.Task[None]] = {}
+        self._send_tasks: dict[SenderKey, asyncio.Task[None]] = {}
 
     def wire(
         self, manager: GraphManager

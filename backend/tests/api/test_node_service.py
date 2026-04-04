@@ -67,9 +67,9 @@ class _FakeManager:
     def update_primitive_node_init_args(self, node_id, init_args):
         n = self.graph.nodes.get(node_id)
         if n is None:
-            return None
+            return None, False
         n.init_args = init_args
-        return n
+        return n, False
 
     def components(self):
         return self._components
@@ -88,7 +88,8 @@ def test_node_service_basic_crud() -> None:
     assert updated.x == 9
     node_service.delete_node(m, "n2")
     assert "n2" not in m.graph.nodes
-    out = node_service.update_primitive_node_init_args(m, "n1", {"k": 1})
+    from src.api.ui.bridge import UIChannelBridge
+    out = node_service.update_primitive_node_init_args(m, UIChannelBridge(), "n1", {"k": 1})
     assert out.init_args == {"k": 1}
 
 
