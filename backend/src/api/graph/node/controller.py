@@ -86,7 +86,9 @@ def update_primitive_node_init_args(
     manager: GraphManager = Depends(get_manager),
     ui_bridge: UIChannelBridge = Depends(get_ui_bridge),
 ) -> NodeResponse:
-    node = service.update_primitive_node_init_args(manager, ui_bridge, node_id, req.init_args)
+    node = service.update_primitive_node_init_args(
+        manager, ui_bridge, node_id, req.init_args
+    )
     if node is None:
         raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
     return _node_response(node_id, node, manager)

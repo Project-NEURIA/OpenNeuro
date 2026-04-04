@@ -89,7 +89,10 @@ def test_node_service_basic_crud() -> None:
     node_service.delete_node(m, "n2")
     assert "n2" not in m.graph.nodes
     from src.api.ui.bridge import UIChannelBridge
-    out = node_service.update_primitive_node_init_args(m, UIChannelBridge(), "n1", {"k": 1})
+
+    out = node_service.update_primitive_node_init_args(
+        m, UIChannelBridge(), "n1", {"k": 1}
+    )
     assert out.init_args == {"k": 1}
 
 

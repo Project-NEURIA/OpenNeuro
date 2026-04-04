@@ -423,6 +423,8 @@ class TestUpdateNonexistentNode:
 
     def test_update_nonexistent_node_init_args(self):
         gm = GraphManager(_empty_graph())
-        node, was_running = gm.update_primitive_node_init_args("ghost", {"key": "value"})
+        node, was_running = gm.update_primitive_node_init_args(
+            "ghost", {"key": "value"}
+        )
         assert node is None
         assert was_running is False

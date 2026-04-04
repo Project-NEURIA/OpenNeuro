@@ -27,9 +27,12 @@ from src.core.utils import ReceiverKey, SenderKey
 
 # -- Wire format: encode/decode pairs --
 
+
 def encode_binary(node_id: str, slot: str, payload: bytes) -> bytes:
     """Pack a binary UI message: 2-byte header len + JSON header + payload."""
-    header = json.dumps({"type": "ui_output", "node_id": node_id, "channel": slot}).encode()
+    header = json.dumps(
+        {"type": "ui_output", "node_id": node_id, "channel": slot}
+    ).encode()
     return struct.pack(">H", len(header)) + header + payload
 
 
@@ -52,7 +55,12 @@ def encode_json(node_id: str, slot: str, item: Any) -> dict[str, Any]:
         payload = item.text
     else:
         payload = item
-    return {"type": "ui_output", "node_id": node_id, "channel": slot, "payload": payload}
+    return {
+        "type": "ui_output",
+        "node_id": node_id,
+        "channel": slot,
+        "payload": payload,
+    }
 
 
 def decode_json(text: str) -> tuple[SenderKey, Any] | None:
@@ -65,14 +73,23 @@ def decode_json(text: str) -> tuple[SenderKey, Any] | None:
 
 def deserialize_payload(payload: Any, inner_type: type | None) -> Any:
     """Convert a raw JSON payload to the expected type."""
-    if inner_type is not None and issubclass(inner_type, BaseModel) and isinstance(payload, dict):
+    if (
+        inner_type is not None
+        and issubclass(inner_type, BaseModel)
+        and isinstance(payload, dict)
+    ):
         return inner_type.model_validate(payload)
-    if inner_type is not None and hasattr(inner_type, "new") and isinstance(payload, str):
+    if (
+        inner_type is not None
+        and hasattr(inner_type, "new")
+        and isinstance(payload, str)
+    ):
         return inner_type.new(text=payload)
     return payload
 
 
 # -- Bridge --
+
 
 class UIChannelBridge:
     def __init__(self) -> None:
@@ -99,9 +116,7 @@ class UIChannelBridge:
 
         for node_id, comp in manager.components().items():
             stop_event = (
-                comp.stop_event
-                if hasattr(comp, "stop_event")
-                else threading.Event()
+                comp.stop_event if hasattr(comp, "stop_event") else threading.Event()
             )
 
             for slot, slot_type in comp.get_ui_input_types().items():
@@ -150,8 +165,12 @@ class UIChannelBridge:
             )
 
     async def _send_msg_task(
-        self, ws: WebSocket, node_id: str, slot: str,
-        receiver: Receiver[Any], inner_type: type | None,
+        self,
+        ws: WebSocket,
+        node_id: str,
+        slot: str,
+        receiver: Receiver[Any],
+        inner_type: type | None,
     ) -> None:
         try:
             while not self._stop_event.is_set():

@@ -111,7 +111,10 @@ def test_wire_format_encode_decode() -> None:
     # JSON round-trip
     envelope = encode_json("n1", "text", "hello")
     assert envelope == {
-        "type": "ui_output", "node_id": "n1", "channel": "text", "payload": "hello"
+        "type": "ui_output",
+        "node_id": "n1",
+        "channel": "text",
+        "payload": "hello",
     }
 
     # JSON with BaseModel
@@ -123,7 +126,11 @@ def test_wire_format_encode_decode() -> None:
     assert env_text["payload"] == "hi"
 
     # decode_json
-    result = decode_json(json.dumps({"type": "ui_input", "node_id": "n1", "channel": "c", "payload": "x"}))
+    result = decode_json(
+        json.dumps(
+            {"type": "ui_input", "node_id": "n1", "channel": "c", "payload": "x"}
+        )
+    )
     assert result == (("n1", "c"), "x")
     assert decode_json(json.dumps({"type": "ignored"})) is None
 
@@ -177,18 +184,29 @@ def test_bridge_recv_msgs() -> None:
         sent: list[object] = []
         for sender in bridge._ui_senders.values():
             original_send = sender.send
-            sender.send = lambda item, _orig=original_send: (sent.append(item), _orig(item))  # type: ignore[method-assign]
+            sender.send = lambda item, _orig=original_send: (
+                sent.append(item),
+                _orig(item),
+            )  # type: ignore[method-assign]
 
         ws = _FakeWebSocket(
             messages=[
-                json.dumps({
-                    "type": "ui_input", "node_id": "node",
-                    "channel": "text_in", "payload": "hello",
-                }),
-                json.dumps({
-                    "type": "ui_input", "node_id": "node",
-                    "channel": "payload_in", "payload": {"value": 5},
-                }),
+                json.dumps(
+                    {
+                        "type": "ui_input",
+                        "node_id": "node",
+                        "channel": "text_in",
+                        "payload": "hello",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "ui_input",
+                        "node_id": "node",
+                        "channel": "payload_in",
+                        "payload": {"value": 5},
+                    }
+                ),
                 json.dumps({"type": "ignored"}),
             ],
         )

@@ -196,12 +196,15 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
 
     called = {}
     monkeypatch.setattr(
-        run_controller.service, "start_all", lambda m, b: called.setdefault("start", True)
+        run_controller.service,
+        "start_all",
+        lambda m, b: called.setdefault("start", True),
     )
     monkeypatch.setattr(
         run_controller.service, "stop_all", lambda m: called.setdefault("stop", True)
     )
     from src.api.ui.bridge import UIChannelBridge
+
     bridge = UIChannelBridge()
     run_controller.start_all(manager, bridge)
     run_controller.stop_all(manager)

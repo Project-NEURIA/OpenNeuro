@@ -64,8 +64,10 @@ class FakeManager:
         _no_ui = lambda: {}  # noqa: E731
         return {
             "a": types.SimpleNamespace(
-                type_="A", status=types.SimpleNamespace(value="running"),
-                get_ui_input_types=_no_ui, get_ui_output_types=_no_ui
+                type_="A",
+                status=types.SimpleNamespace(value="running"),
+                get_ui_input_types=_no_ui,
+                get_ui_output_types=_no_ui,
             )
         }
 
@@ -202,6 +204,7 @@ def test_edge_run_save_services(tmp_path, monkeypatch) -> None:
         edge_service.delete_edge(manager, "a", "out", "b", "in")
 
     from src.api.ui.bridge import UIChannelBridge
+
     bridge = UIChannelBridge()
     run_service.start_all(manager, bridge)
     run_service.stop_all(manager)

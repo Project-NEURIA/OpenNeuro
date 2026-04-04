@@ -30,7 +30,9 @@ class Node(BaseModel):
     y: float = 0.0
     sub_graph: Graph | None = None
     senders: dict[str, Sender[Any] | None] = Field(default_factory=dict, exclude=True)
-    receivers: dict[str, Receiver[Any] | None] = Field(default_factory=dict, exclude=True)
+    receivers: dict[str, Receiver[Any] | None] = Field(
+        default_factory=dict, exclude=True
+    )
 
 
 class Edge(BaseModel):
@@ -58,7 +60,9 @@ class GraphManager:
 
     # --- node CRUD ---
 
-    def add_primitive_node(self, type_: str, init_args: dict[str, Any]) -> tuple[str, Node]:
+    def add_primitive_node(
+        self, type_: str, init_args: dict[str, Any]
+    ) -> tuple[str, Node]:
         classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(type_)
         if cls is None:
@@ -324,7 +328,11 @@ class GraphManager:
             ui_input_slots = comp.get_ui_input_types()
             ui_output_slots = comp.get_ui_output_types()
 
-            stop_event = comp.stop_event if isinstance(comp, ThreadedComponent) else threading.Event()
+            stop_event = (
+                comp.stop_event
+                if isinstance(comp, ThreadedComponent)
+                else threading.Event()
+            )
 
             # Create fresh handles from plan, store on node.
             # Overrides take priority over the plan.
@@ -332,7 +340,9 @@ class GraphManager:
                 if (node_id, slot) in _recv_over:
                     node.receivers[slot] = _recv_over[(node_id, slot)]
                 elif (node_id, slot) in receiver_plan:
-                    node.receivers[slot] = Receiver(receiver_plan[(node_id, slot)], stop_event)
+                    node.receivers[slot] = Receiver(
+                        receiver_plan[(node_id, slot)], stop_event
+                    )
                 else:
                     node.receivers[slot] = None
 

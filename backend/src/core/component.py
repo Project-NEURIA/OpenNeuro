@@ -396,7 +396,9 @@ class EmitOnStart[E: tuple[Sender[Any] | None, ...]](ABC):
 # ---------------------------------------------------------------------------
 
 
-class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sender[Any] | None, ...]]):
+class CompositeComponent(
+    Component[tuple[Receiver[Any] | None, ...], tuple[Sender[Any] | None, ...]]
+):
     """A composite component wrapping a subgraph.
 
     Its interface is derived from unmatched ports in the subgraph.
@@ -520,7 +522,11 @@ class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sende
     def get_ui_output_types(self) -> dict[str, type]:
         return {}
 
-    def start(self, inputs: tuple[Receiver[Any] | None, ...], outputs: tuple[Sender[Any] | None, ...]) -> None:
+    def start(
+        self,
+        inputs: tuple[Receiver[Any] | None, ...],
+        outputs: tuple[Sender[Any] | None, ...],
+    ) -> None:
         if self.status == Status.RUNNING:
             return
         self._status = Status.SETUP
