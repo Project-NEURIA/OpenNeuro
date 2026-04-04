@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import types
 
-from src.core.conduit.think_tool import ThinkTool, ThinkToolInputs, ThinkToolOutputs
-from src.core.conduit.throttle import (
+from src.lib.llm.think_tool import ThinkTool, ThinkToolInputs, ThinkToolOutputs
+from src.lib.misc.throttle import (
     Throttle,
     ThrottleConfig,
     ThrottleInputs,
@@ -71,7 +71,7 @@ def test_throttle_forwards_newest_items(monkeypatch) -> None:
     throttle = Throttle[int](ThrottleConfig(interval=0.25))
 
     monkeypatch.setattr(
-        "src.core.conduit.throttle.time.sleep", lambda value: sleeps.append(value)
+        "src.lib.misc.throttle.time.sleep", lambda value: sleeps.append(value)
     )
 
     recv = _FakeRecv([1, 2, None])

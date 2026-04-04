@@ -34,9 +34,9 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
         def send_message(self, address, args):
             sent.append((address, args))
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox.SimpleUDPClient", _UDP)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.SimpleUDPClient", _UDP)
 
-    import src.core.sink.osc_chatbox as osc_chatbox
+    import src.lib.misc.osc_chatbox as osc_chatbox
 
     client = osc_chatbox._OscClient("127.0.0.1", 9000)
     client.send_message("/chatbox/input", ["x", True, False])
@@ -59,19 +59,19 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     def empty_sleep(_seconds: float) -> None:
         empty_box.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", empty_sleep)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", empty_sleep)
     empty_box._text_flush_monitor()
 
     flushed = []
     flush_box = osc_chatbox.OSCChatbox(osc_chatbox.OSCChatboxConfig(text_flush_ms=1))
     flush_box._text_buffer = "idle text"
     flush_box._last_text_time = 0.0
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.monotonic", lambda: 1.0)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.monotonic", lambda: 1.0)
 
     def fake_sleep(_seconds: float) -> None:
         flush_box.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", fake_sleep)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", fake_sleep)
     monkeypatch.setattr(flush_box, "_enqueue_text", lambda text: flushed.append(text))
     flush_box._text_flush_monitor()
     assert flushed == ["idle text"]
@@ -82,13 +82,13 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     continue_box._text_buffer = "busy"
     continue_box._last_text_time = 0.95
     continue_calls = {"count": 0}
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.monotonic", lambda: 1.0)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.monotonic", lambda: 1.0)
 
     def continue_sleep(_seconds: float) -> None:
         continue_calls["count"] += 1
         continue_box.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", continue_sleep)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", continue_sleep)
     continue_box._text_flush_monitor()
     assert continue_box._text_buffer == "busy"
 
@@ -97,7 +97,7 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
     )
     sleeps = []
     monkeypatch.setattr(
-        "src.core.sink.osc_chatbox.time.sleep", lambda seconds: sleeps.append(seconds)
+        "src.lib.misc.osc_chatbox.time.sleep", lambda seconds: sleeps.append(seconds)
     )
 
     def fake_send(text: str, *, reset: bool = False) -> None:
@@ -120,7 +120,7 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
         sleep_calls["count"] += 1
         idle_box.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", idle_sleep)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", idle_sleep)
     idle_box.run(osc_chatbox.OSCChatboxInputs(), ())
     assert sleep_calls["count"] == 1
 
@@ -136,8 +136,8 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         def send_message(self, address, value):
             sent.append((address, value))
 
-    monkeypatch.setattr("src.core.sink.osc_face.SimpleUDPClient", _UDP)
-    import src.core.sink.osc_face as osc_face
+    monkeypatch.setattr("src.lib.motion.osc_face.SimpleUDPClient", _UDP)
+    import src.lib.motion.osc_face as osc_face
 
     cases = [
         ("expression: happy", "happy", True),
@@ -200,7 +200,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         )
     )
     monkeypatch.setattr(
-        "src.core.sink.osc_face.requests.post",
+        "src.lib.motion.osc_face.requests.post",
         lambda *args, **kwargs: _Response(
             500, json.dumps({"expression": "happy"}), "oops"
         ),
@@ -215,13 +215,13 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         )
     )
     monkeypatch.setattr(
-        "src.core.sink.osc_face.requests.post",
+        "src.lib.motion.osc_face.requests.post",
         lambda *args, **kwargs: _Response(200, json.dumps({"expression": "unknown"})),
     )
     assert invalid_face._select_expression_llm("x")[1].startswith("LLM invalid output:")
 
     monkeypatch.setattr(
-        "src.core.sink.osc_face.requests.post",
+        "src.lib.motion.osc_face.requests.post",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     assert invalid_face._select_expression_llm("x")[1].startswith("LLM error:")
@@ -235,7 +235,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         )
     )
     monkeypatch.setattr(
-        "src.core.sink.osc_face.requests.post",
+        "src.lib.motion.osc_face.requests.post",
         lambda *args, **kwargs: _Response(200, json.dumps({"expression": "cute"})),
     )
     assert valid_face._select_expression_llm("x") == (
@@ -289,7 +289,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     )
     sleeps = []
     monkeypatch.setattr(
-        "src.core.sink.osc_face.time.sleep", lambda seconds: sleeps.append(seconds)
+        "src.lib.motion.osc_face.time.sleep", lambda seconds: sleeps.append(seconds)
     )
     sender_face._send_params({"JawOpen": 0.5})
     assert sent[-1][0].endswith("/FT/JawOpen")
@@ -322,7 +322,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     )
     monotonic_values = iter([1.0, 2.0])
     monkeypatch.setattr(
-        "src.core.sink.osc_face.time.monotonic", lambda: next(monotonic_values)
+        "src.lib.motion.osc_face.time.monotonic", lambda: next(monotonic_values)
     )
     text_face._text_loop(
         _FakeRecv(
@@ -347,7 +347,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     def empty_face_sleep(_seconds: float) -> None:
         empty_face.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", empty_face_sleep)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.sleep", empty_face_sleep)
     empty_face._text_flush_monitor()
 
     flush_face = osc_face.OSCFace(
@@ -356,12 +356,12 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     flush_face._text_buffer = "later"
     flush_face._last_text_time = 0.0
     flushed_idle = []
-    monkeypatch.setattr("src.core.sink.osc_face.time.monotonic", lambda: 1.0)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.monotonic", lambda: 1.0)
 
     def stop_sleep(_seconds: float) -> None:
         flush_face.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", stop_sleep)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.sleep", stop_sleep)
     monkeypatch.setattr(
         flush_face, "_enqueue_text", lambda text: flushed_idle.append(text)
     )
@@ -373,12 +373,12 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     )
     continue_face._text_buffer = "busy"
     continue_face._last_text_time = 0.95
-    monkeypatch.setattr("src.core.sink.osc_face.time.monotonic", lambda: 1.0)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.monotonic", lambda: 1.0)
 
     def continue_face_sleep(_seconds: float) -> None:
         continue_face.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", continue_face_sleep)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.sleep", continue_face_sleep)
     continue_face._text_flush_monitor()
     assert continue_face._text_buffer == "busy"
 
@@ -421,7 +421,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     worker_face._expr_event.set()
     sleep_values = []
     monkeypatch.setattr(
-        "src.core.sink.osc_face.time.sleep",
+        "src.lib.motion.osc_face.time.sleep",
         lambda seconds: sleep_values.append(seconds),
     )
     worker_face._expression_worker()
@@ -446,7 +446,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         if seconds == 0.1:
             run_face.stop_event.set()
 
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", run_sleep)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.sleep", run_sleep)
     run_face.run(osc_face.OSCFaceInputs(), ())
     config_output = capsys.readouterr().out
     assert "[OSCFace CONFIG]" in config_output
@@ -477,8 +477,8 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         def join(self) -> None:
             self.joined = True
 
-    monkeypatch.setattr("src.core.sink.osc_face.threading.Thread", _FakeThread)
-    monkeypatch.setattr("src.core.sink.osc_face.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("src.lib.motion.osc_face.threading.Thread", _FakeThread)
+    monkeypatch.setattr("src.lib.motion.osc_face.time.sleep", lambda seconds: None)
     threaded_face.run(
         osc_face.OSCFaceInputs(text=_FakeRecv([None]), interrupt=_FakeRecv([None])),
         (),

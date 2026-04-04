@@ -25,7 +25,7 @@ class _FakeRecv:
 
 
 def test_pose_renderer_3d_paths(monkeypatch) -> None:
-    import src.core.conduit.pose_renderer_3d as pose3d_mod
+    import src.lib.motion.pose_renderer_3d as pose3d_mod
 
     q = pose3d_mod._quat_multiply((1.0, 0.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0))
     assert q == (0.0, 1.0, 0.0, 0.0)

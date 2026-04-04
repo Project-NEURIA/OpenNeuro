@@ -68,12 +68,12 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["src.core.conduit.qwen_tts.tts_model.*"]
+module = ["src.lib.audio.qwen_tts.tts_model.*"]
 ignore_errors = true
 
 
 [tool.ruff]
-extend-exclude = ["src/core/conduit/qwen_tts/tts_model"]
+extend-exclude = ["src/lib/audio/qwen_tts/tts_model"]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"

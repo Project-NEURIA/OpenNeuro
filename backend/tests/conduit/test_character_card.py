@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.conduit.character_card import (
+from src.lib.llm.character_card import (
     CharacterCard,
     CharacterCardConfig,
     CharacterCardOutputs,

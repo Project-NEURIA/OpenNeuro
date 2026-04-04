@@ -87,8 +87,8 @@ def _tiny_qwen_config(cfg_mod):
 def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts as mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts as mod
 
     monkeypatch.setitem(
         mod.ROPE_INIT_FUNCTIONS,
@@ -242,8 +242,8 @@ def test_qwen_tts_modeling_low_level_paths(monkeypatch) -> None:
 def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts as mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts as mod
 
     monkeypatch.setitem(
         mod.ROPE_INIT_FUNCTIONS,
@@ -508,8 +508,8 @@ def test_qwen_tts_modeling_submodels(monkeypatch) -> None:
 def test_qwen_tts_modeling_full_model_paths(monkeypatch, tmp_path: Path) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts as mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts as mod
 
     monkeypatch.setitem(
         mod.ROPE_INIT_FUNCTIONS,
@@ -651,8 +651,8 @@ def test_qwen_tts_modeling_full_model_paths(monkeypatch, tmp_path: Path) -> None
 def test_qwen_tts_modeling_remaining_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts as mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts as mod
 
     monkeypatch.setitem(
         mod.ROPE_INIT_FUNCTIONS,

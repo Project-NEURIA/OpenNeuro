@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import torch
 
 from src.core.channel import Channel, Receiver, Sender
-from src.core.conduit.dart_control.component import (
+from src.lib.motion.dart_control.component import (
     BonePose,
     DartControl,
     DartControlConfig,
@@ -100,11 +100,11 @@ def test_manual_start_uses_wired_receivers(monkeypatch) -> None:
         ],
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.ThreadPoolExecutor",
+        "src.lib.motion.dart_control.component.ThreadPoolExecutor",
         lambda *args, **kwargs: executor,
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available",
+        "src.lib.motion.dart_control.component.torch.cuda.is_available",
         lambda: False,
     )
 

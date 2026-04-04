@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import torch
 
-from src.core.conduit.dart_control.component import (
+from src.lib.motion.dart_control.component import (
     BodyPoseFrame,
     BonePose,
     DartControl,
@@ -56,7 +56,7 @@ def test_prepare_frames_floor_clamps(monkeypatch) -> None:
     component = DartControl(DartControlConfig(device="cpu", batch_size=1))
 
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component._features_to_body_pose",
+        "src.lib.motion.dart_control.component._features_to_body_pose",
         lambda _frame: {
             "left_foot": BonePose(pos_x=1.0, pos_y=-0.5, pos_z=2.0, rot_w=1.0),
             "right_foot": BonePose(pos_x=2.0, pos_y=0.25, pos_z=3.0, rot_w=1.0),
@@ -104,11 +104,11 @@ def test_run_uses_newest_receivers_and_emits_motion(monkeypatch) -> None:
         ],
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.ThreadPoolExecutor",
+        "src.lib.motion.dart_control.component.ThreadPoolExecutor",
         lambda *args, **kwargs: executor,
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available",
+        "src.lib.motion.dart_control.component.torch.cuda.is_available",
         lambda: False,
     )
     monkeypatch.setattr(component.stop_event, "wait", lambda timeout=None: None)

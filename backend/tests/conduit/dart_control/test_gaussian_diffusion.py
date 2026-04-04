@@ -8,7 +8,7 @@ import pytest
 import torch
 from torch import nn
 
-from src.core.conduit.dart_control.diffusion.gaussian_diffusion import (
+from src.lib.motion.dart_control.diffusion.gaussian_diffusion import (
     GaussianDiffusion,
     LossType,
     ModelMeanType,

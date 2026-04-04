@@ -43,7 +43,7 @@ def _audio_frame(
 
 
 def test_object_locator_paths(monkeypatch) -> None:
-    import src.core.conduit.object_locator as loc_mod
+    import src.lib.vision.object_locator as loc_mod
 
     def resize_mask(img, size, interpolation=None):
         fill = 1 if np.asarray(img).sum() > 0 else 0
@@ -127,7 +127,7 @@ def test_object_locator_paths(monkeypatch) -> None:
 
 
 def test_streaming_vlm_paths(monkeypatch) -> None:
-    import src.core.conduit.streaming_vlm as vlm_mod
+    import src.lib.vision.streaming_vlm as vlm_mod
 
     class _Client:
         def __init__(self, base_url, api_key=None):
@@ -251,7 +251,7 @@ def test_streaming_vlm_paths(monkeypatch) -> None:
 
 
 def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
-    import src.core.conduit.vad as vad_mod
+    import src.lib.audio.vad as vad_mod
 
     class _Iterator:
         def __init__(self, model):
@@ -487,7 +487,7 @@ def test_vad_paths(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_object_detector_paths(monkeypatch) -> None:
-    import src.core.conduit.object_detector as det_mod
+    import src.lib.vision.object_detector as det_mod
 
     monkeypatch.setattr(
         det_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")

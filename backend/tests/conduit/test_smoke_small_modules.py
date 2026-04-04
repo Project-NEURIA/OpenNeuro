@@ -6,28 +6,28 @@ import types
 
 import numpy as np
 
-from src.core.conduit.buffer import Buffer, BufferInputs, BufferOutputs
-from src.core.conduit.do_nothing_tool import (
+from src.lib.misc.buffer import Buffer, BufferInputs, BufferOutputs
+from src.lib.llm.do_nothing_tool import (
     DoNothingTool,
     DoNothingToolInputs,
     DoNothingToolOutputs,
 )
-from src.core.conduit.messages_to_text import (
+from src.lib.llm.messages_to_text import (
     MessagesToText,
     MessagesToTextInputs,
     MessagesToTextOutputs,
 )
-from src.core.conduit.movement_tool import (
+from src.lib.llm.movement_tool import (
     MovementTool,
     MovementToolInputs,
     MovementToolOutputs,
 )
-from src.core.conduit.passthrough import (
+from src.lib.misc.passthrough import (
     Passthrough,
     PassthroughInputs,
     PassthroughOutputs,
 )
-from src.core.conduit.stereo_camera_params_adapter import (
+from src.lib.vision.stereo_camera_params_adapter import (
     StereoCameraParamsAdapter,
     StereoCameraParamsAdapterInputs,
     StereoCameraParamsAdapterOutputs,
@@ -219,18 +219,18 @@ def test_heavy_module_import_smoke(monkeypatch, tmp_path) -> None:
     (qwen_voice_dir / "a.txt").write_text("hello", encoding="utf-8")
 
     module_names = [
-        "src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts",
-        "src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2",
-        "src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts",
-        "src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2",
-        "src.core.conduit.qwen_tts.tts_model.processing_qwen3_tts",
-        "src.core.conduit.qwen_tts.tts_model.qwen3_tts_tokenizer",
-        "src.core.conduit.qwen_tts.tts_model",
-        "src.core.conduit.qwen_tts.model",
-        "src.core.conduit.qwen_tts.component",
-        "src.core.sink.openvr_movement",
-        "src.core.sink.osc_chatbox",
-        "src.core.sink.osc_face",
+        "src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts",
+        "src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2",
+        "src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts",
+        "src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2",
+        "src.lib.audio.qwen_tts.tts_model.processing_qwen3_tts",
+        "src.lib.audio.qwen_tts.tts_model.qwen3_tts_tokenizer",
+        "src.lib.audio.qwen_tts.tts_model",
+        "src.lib.audio.qwen_tts.model",
+        "src.lib.audio.qwen_tts.component",
+        "src.lib.motion.openvr_movement",
+        "src.lib.misc.osc_chatbox",
+        "src.lib.motion.osc_face",
     ]
 
     imported = []

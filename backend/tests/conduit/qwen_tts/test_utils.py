@@ -22,9 +22,9 @@ def _ensure_transformers_patch(monkeypatch) -> None:
 def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as tok_cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.processing_qwen3_tts as proc_mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as tok_cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.processing_qwen3_tts as proc_mod
 
     rope_calls = []
     layer_calls = []
@@ -161,7 +161,7 @@ def test_qwen_tts_configs_and_processor(monkeypatch) -> None:
 def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod
+    import src.lib.audio.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod
 
     register_calls = []
     monkeypatch.setattr(
@@ -411,8 +411,8 @@ def test_qwen3_tts_tokenizer_paths(monkeypatch) -> None:
 def test_qwen_tts_config_and_tokenizer_remaining_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.qwen3_tts_tokenizer as tok_mod
 
     talker_cfg = cfg_mod.Qwen3TTSTalkerConfig(rope_scaling={"type": "default"})
     assert talker_cfg.rope_scaling["rope_type"] == "default"

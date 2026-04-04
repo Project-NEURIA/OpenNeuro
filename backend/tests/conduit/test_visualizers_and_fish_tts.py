@@ -34,11 +34,11 @@ class _FakeRecv:
 
 
 def test_fish_tts_and_visualizers(monkeypatch) -> None:
-    import src.core.conduit.tts_fish as fish_mod
-    import src.core.conduit.depth_estimation_visualizer as depth_mod
-    import src.core.conduit.object_detection_visualizer as det_mod
-    import src.core.conduit.object_locator_visualizer as loc_mod
-    import src.core.conduit.object_segmentation_visualizer as seg_mod
+    import src.lib.audio.tts_fish as fish_mod
+    import src.lib.vision.depth_estimation_visualizer as depth_mod
+    import src.lib.vision.object_detection_visualizer as det_mod
+    import src.lib.vision.object_locator_visualizer as loc_mod
+    import src.lib.vision.object_segmentation_visualizer as seg_mod
 
     class _FishClient:
         def __init__(self, api_key, base_url):

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from src.core.conduit.agent_state import (
+from src.lib.llm.agent_state import (
     AgentState,
     AgentStateConfig,
     AgentStateInputs,
@@ -75,16 +75,16 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
     tool_result = ToolResult.new(call_id="tool-1", content="tool output")
 
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.drain",
+        "src.lib.llm.agent_state.drain",
         lambda *args: [(speech, feedback, memory, tool_call)],
     )
     projects_dir = Path("tests_runtime") / "agent_state"
     project_dir = projects_dir / "demo-project"
     project_dir.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr("src.core.conduit.agent_state.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("src.lib.llm.agent_state.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.AppConfig.load_config",
+        "src.lib.llm.agent_state.AppConfig.load_config",
         lambda: SimpleNamespace(current_project="demo-project"),
     )
     object_frame = ObjectLocationFrame.new(
@@ -143,7 +143,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
 
 def test_agent_state_dump_messages_without_current_project(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.AppConfig.load_config",
+        "src.lib.llm.agent_state.AppConfig.load_config",
         lambda: SimpleNamespace(current_project=None),
     )
 

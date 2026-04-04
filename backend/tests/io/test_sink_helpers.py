@@ -45,7 +45,7 @@ def test_openvr_movement_helpers_and_run(monkeypatch) -> None:
     monkeypatch.setitem(
         sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Pose=_Pose)
     )
-    mod = importlib.reload(importlib.import_module("src.core.sink.openvr_movement"))
+    mod = importlib.reload(importlib.import_module("src.lib.motion.openvr_movement"))
 
     assert mod._to_ovd_pose(None) is None
     converted = mod._to_ovd_pose(
@@ -83,14 +83,14 @@ def test_osc_chatbox_paths(monkeypatch) -> None:
         def close(self):
             sent.append(("close", []))
 
-    monkeypatch.setattr("src.core.sink.osc_chatbox._OscClient", _Client)
-    monkeypatch.setattr("src.core.sink.osc_chatbox.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox._OscClient", _Client)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", lambda _s: None)
     monotonic = iter([0.0, 1.0, 2.0, 3.0])
     monkeypatch.setattr(
-        "src.core.sink.osc_chatbox.time.monotonic", lambda: next(monotonic, 3.0)
+        "src.lib.misc.osc_chatbox.time.monotonic", lambda: next(monotonic, 3.0)
     )
 
-    from src.core.sink.osc_chatbox import OSCChatbox, OSCChatboxConfig, OSCChatboxInputs
+    from src.lib.misc.osc_chatbox import OSCChatbox, OSCChatboxConfig, OSCChatboxInputs
 
     box = OSCChatbox(OSCChatboxConfig(max_chars=5, text_flush_ms=1, clear_on_last=True))
     assert box._split_text("") == []
@@ -167,8 +167,8 @@ def test_osc_face_helper_functions(monkeypatch) -> None:
         def send_message(self, address, value):
             self.sent.append((address, value))
 
-    monkeypatch.setattr("src.core.sink.osc_face.SimpleUDPClient", _UDP)
-    import src.core.sink.osc_face as osc_face
+    monkeypatch.setattr("src.lib.motion.osc_face.SimpleUDPClient", _UDP)
+    import src.lib.motion.osc_face as osc_face
 
     monkeypatch.setenv("BOOL_TRUE", " yes ")
     assert osc_face._env_bool("BOOL_TRUE", False) is True

@@ -59,18 +59,10 @@ def _import_mod(name: str, filepath: str):
 
 
 def _load_modules():
-    vad_mod = _import_mod(
-        "src.core.conduit.vad", str(BACKEND / "src/core/conduit/vad.py")
-    )
-    asr_mod = _import_mod(
-        "src.core.conduit.asr", str(BACKEND / "src/core/conduit/asr.py")
-    )
-    llm_mod = _import_mod(
-        "src.core.conduit.llm", str(BACKEND / "src/core/conduit/llm.py")
-    )
-    tts_mod = _import_mod(
-        "src.core.conduit.tts", str(BACKEND / "src/core/conduit/tts.py")
-    )
+    vad_mod = _import_mod("src.lib.audio.vad", str(BACKEND / "src/lib/audio/vad.py"))
+    asr_mod = _import_mod("src.lib.audio.asr", str(BACKEND / "src/lib/audio/asr.py"))
+    llm_mod = _import_mod("src.lib.llm.llm", str(BACKEND / "src/lib/llm/llm.py"))
+    tts_mod = _import_mod("src.lib.audio.tts", str(BACKEND / "src/lib/audio/tts.py"))
     return vad_mod, asr_mod, llm_mod, tts_mod
 
 
