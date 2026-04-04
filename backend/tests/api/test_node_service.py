@@ -35,10 +35,10 @@ class _FakeManager:
         self._components = {"n1": _FakeComp(), "n2": _FakeComp()}
         self.reconciled = 0
 
-    def add_node(self, node_type, init_args):
-        if node_type != "A":
+    def add_primitive_node(self, type_, init_args):
+        if type_ != "A":
             raise ValueError("bad")
-        n = Node(id_="n3", type=node_type, init_args=init_args)
+        n = Node(id_="n3", type=type_, init_args=init_args)
         self.graph.nodes["n3"] = n
         self._components["n3"] = _FakeComp()
         return "n3", n
@@ -64,7 +64,7 @@ class _FakeManager:
         self.graph.nodes.pop(node_id, None)
         self._components.pop(node_id, None)
 
-    def update_node_init_args(self, node_id, init_args):
+    def update_primitive_node_init_args(self, node_id, init_args):
         n = self.graph.nodes.get(node_id)
         if n is None:
             return None
@@ -88,7 +88,7 @@ def test_node_service_basic_crud() -> None:
     assert updated.x == 9
     node_service.delete_node(m, "n2")
     assert "n2" not in m.graph.nodes
-    out = node_service.update_node_init_args(m, "n1", {"k": 1})
+    out = node_service.update_primitive_node_init_args(m, "n1", {"k": 1})
     assert out.init_args == {"k": 1}
 
 

@@ -17,14 +17,14 @@ def get_node(manager: GraphManager, node_id: str) -> Node | None:
 
 
 def create_node(
-    manager: GraphManager, node_type: str, init_args: dict[str, Any]
+    manager: GraphManager, type_: str, init_args: dict[str, Any]
 ) -> tuple[str, Node]:
     try:
-        return manager.add_node(node_type, init_args)
+        return manager.add_primitive_node(type_, init_args)
     except ValueError:
         pass
     # Fallback: try loading as a project
-    return create_from_project(manager, node_type)
+    return create_from_project(manager, type_)
 
 
 def update_node(
@@ -37,12 +37,12 @@ def delete_node(manager: GraphManager, node_id: str) -> None:
     manager.delete_node(node_id)
 
 
-def update_node_init_args(
+def update_primitive_node_init_args(
     manager: GraphManager,
     node_id: str,
     init_args: dict[str, Any],
 ) -> Node | None:
-    return manager.update_node_init_args(node_id, init_args)
+    return manager.update_primitive_node_init_args(node_id, init_args)
 
 
 def create_subgraph(

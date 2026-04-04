@@ -63,13 +63,13 @@ class GraphManager:
 
     # --- node CRUD ---
 
-    def add_node(self, node_type: str, init_args: dict[str, Any]) -> tuple[str, Node]:
+    def add_primitive_node(self, type_: str, init_args: dict[str, Any]) -> tuple[str, Node]:
         classes = PrimitiveComponent.registered_subclasses()
-        cls = classes.get(node_type)
+        cls = classes.get(type_)
         if cls is None:
-            raise ValueError(f"Unknown node type: {node_type}")
+            raise ValueError(f"Unknown node type: {type_}")
         comp = cls.from_args(init_args)
-        node = Node(type=node_type, init_args=init_args)
+        node = Node(type=type_, init_args=init_args)
         self._graph.nodes[node.id_] = node
         self._components[node.id_] = comp
         return node.id_, node
@@ -107,7 +107,7 @@ class GraphManager:
         node.y = y
         return node
 
-    def update_node_init_args(
+    def update_primitive_node_init_args(
         self, node_id: str, init_args: dict[str, Any]
     ) -> Node | None:
         node = self._graph.nodes.get(node_id)
@@ -142,13 +142,11 @@ class GraphManager:
         if comp is not None:
             comp.stop()
 
-        # Collect connected components that need stopping
+        # Collect downstream components that need stopping
         affected: set[str] = set()
         for edge in self._graph.edges:
             if edge.source_node == node_id:
                 affected.add(edge.target_node)
-            if edge.target_node == node_id:
-                affected.add(edge.source_node)
 
         self._graph.edges = [
             e

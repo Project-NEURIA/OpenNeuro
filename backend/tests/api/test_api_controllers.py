@@ -126,17 +126,17 @@ def test_node_controller_paths(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(
-        node_controller.service, "update_node_init_args", lambda *a, **k: None
+        node_controller.service, "update_primitive_node_init_args", lambda *a, **k: None
     )
     with pytest.raises(HTTPException):
-        node_controller.update_node_init_args(
+        node_controller.update_primitive_node_init_args(
             "n1", NodeInitArgsUpdateRequest(init_args={}), manager
         )
     monkeypatch.setattr(
-        node_controller.service, "update_node_init_args", lambda *a, **k: node
+        node_controller.service, "update_primitive_node_init_args", lambda *a, **k: node
     )
     assert (
-        node_controller.update_node_init_args(
+        node_controller.update_primitive_node_init_args(
             "n1", NodeInitArgsUpdateRequest(init_args={}), manager
         ).id
         == "n1"

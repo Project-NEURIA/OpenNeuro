@@ -444,25 +444,24 @@ function AppInner({
     // Wrap node changes — detect removals and call backend
     const onNodesChange: OnNodesChange = useCallback(
         (changes) => {
-            const removals = changes.filter((c) => c.type === "remove");
             onNodesChangeRaw(changes);
 
-            for (const r of removals) {
+            for (const r of changes) {
                 if (r.type === "remove") {
                     if (r.id.startsWith("configuring-")) continue;
 
-                    setEdges((currentEdges) => {
-                        for (const e of currentEdges) {
-                            if (e.source === r.id || e.target === r.id) {
-                                deleteEdgeFromReactFlow(e);
-                            }
-                        }
-                        return currentEdges.filter(
-                            (e) => e.source !== r.id && e.target !== r.id,
-                        );
-                    });
                     apiDeleteNode(r.id)
-                        .then(() => {
+                        .then(() => apiFetchEdges())
+                        .then((backendEdges) => {
+                            setEdges((current) =>
+                                current.filter((e) =>
+                                    backendEdges.some(
+                                        (be) =>
+                                            be.source_node === e.source &&
+                                            be.target_node === e.target,
+                                    ),
+                                ),
+                            );
                             runTypeCheck();
                             triggerSave();
                         })
@@ -473,28 +472,28 @@ function AppInner({
         [onNodesChangeRaw, setEdges, triggerSave, runTypeCheck],
     );
 
-    // Wrap edge changes — detect removals and call backend
+    // Wrap edge changes — detect removals and call backend.
+    // Let ReactFlow update local edge state. Backend edge deletion is
+    // handled by onEdgesDelete (user-initiated) or delete_node (node removal).
     const onEdgesChange: OnEdgesChange = useCallback(
         (changes) => {
-            const hasRemovals = changes.some((c) => c.type === "remove");
-            setEdges((currentEdges) => {
-                for (const c of changes) {
-                    if (c.type === "remove") {
-                        const edge = currentEdges.find((e) => e.id === c.id);
-                        if (edge) {
-                            deleteEdgeFromReactFlow(edge);
-                        }
-                    }
-                }
-                return currentEdges;
-            });
             onEdgesChangeRaw(changes);
-            if (hasRemovals) {
+            if (changes.some((c) => c.type === "remove")) {
                 runTypeCheck();
                 triggerSave();
             }
         },
-        [onEdgesChangeRaw, setEdges, triggerSave, runTypeCheck],
+        [onEdgesChangeRaw, triggerSave, runTypeCheck],
+    );
+
+    // User explicitly deletes edges (backspace/delete key on selected edges)
+    const onEdgesDelete = useCallback(
+        (edges: Edge[]) => {
+            for (const edge of edges) {
+                deleteEdgeFromReactFlow(edge);
+            }
+        },
+        [],
     );
 
     // Handle new edge connections
@@ -730,6 +729,7 @@ function AppInner({
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
+                onEdgesDelete={onEdgesDelete}
                 onConnect={onConnect}
                 onDrop={onDrop}
                 onDragOver={onDragOver}

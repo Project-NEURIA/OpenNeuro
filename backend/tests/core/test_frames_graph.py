@@ -241,9 +241,9 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
 
     gm = GraphManager(Graph(nodes={}, edges=[]))
     with pytest.raises(ValueError):
-        gm.add_node("Missing", {})
+        gm.add_primitive_node("Missing", {})
 
-    added_id, _ = gm.add_node("OutputOnly", {})
+    added_id, _ = gm.add_primitive_node("OutputOnly", {})
     assert gm.component(added_id).type_ == "_OutputOnlyComp"
 
     running_node = Node(id_="running", type="Known", init_args={})
@@ -254,10 +254,10 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
     calls: list[str] = []
     gm2.stop = lambda: calls.append("stop")  # type: ignore[method-assign]
     gm2.run = lambda: calls.append("run")  # type: ignore[method-assign]
-    updated = gm2.update_node_init_args("running", {})
+    updated = gm2.update_primitive_node_init_args("running", {})
     assert updated is running_node
     assert calls == ["stop", "run"]
-    assert gm2.update_node_init_args("missing", {}) is None
+    assert gm2.update_primitive_node_init_args("missing", {}) is None
 
     gm3 = GraphManager(
         Graph(
@@ -270,7 +270,7 @@ def test_graph_manager_additional_paths(monkeypatch) -> None:
         "registered_subclasses",
         classmethod(lambda cls: {"Known": _CompositeInner}),
     )
-    assert gm3.update_node_init_args("running", {}) is None
+    assert gm3.update_primitive_node_init_args("running", {}) is None
 
     nodes = {
         "a": Node(id_="a", type="Known", init_args={}),
