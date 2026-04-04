@@ -56,7 +56,7 @@ class _SyncThread:
 
 
 def test_monocular_depth_estimator_paths(monkeypatch) -> None:
-    import src.core.conduit.monocular_depth_estimator as mono_mod
+    import src.lib.vision.monocular_depth_estimator as mono_mod
 
     monkeypatch.setattr(
         mono_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")
@@ -191,7 +191,7 @@ def test_monocular_depth_estimator_paths(monkeypatch) -> None:
 
 
 def test_pose_renderer_paths() -> None:
-    import src.core.conduit.pose_renderer as pose_mod
+    import src.lib.motion.pose_renderer as pose_mod
 
     assert pose_mod._project(BonePose(pos_x=1.0, pos_y=1.0), 100, 80) == (200, -90)
 
@@ -231,7 +231,7 @@ def test_pose_renderer_paths() -> None:
 
 
 def test_stereo_to_mono_paths() -> None:
-    import src.core.conduit.ffs_stereo_depth.stereo_to_mono as mono_mod
+    import src.lib.vision.ffs_stereo_depth.stereo_to_mono as mono_mod
 
     left = np.zeros((2, 2, 3), dtype=np.uint8)
     right = np.ones((2, 2, 3), dtype=np.uint8)
@@ -266,7 +266,7 @@ def test_stereo_to_mono_paths() -> None:
 
 def test_stereo_depth_estimator_paths(monkeypatch) -> None:
     import cv2
-    import src.core.conduit.ffs_stereo_depth.stereo_depth_estimator as stereo_mod
+    import src.lib.vision.ffs_stereo_depth.stereo_depth_estimator as stereo_mod
 
     monkeypatch.setattr(
         stereo_mod, "auto_device", lambda device: SimpleNamespace(type="cpu")
@@ -461,7 +461,7 @@ def test_stereo_depth_estimator_paths(monkeypatch) -> None:
 
 
 def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
-    import src.core.conduit.yolo.object_segmenter as seg_mod
+    import src.lib.vision.yolo.object_segmenter as seg_mod
 
     monkeypatch.setattr(seg_mod, "auto_device", lambda device: "cpu")
     monkeypatch.setattr(
@@ -727,7 +727,7 @@ def test_object_segmenter_paths(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_discord_paths(monkeypatch) -> None:
-    import src.core.conduit.discord as discord_mod
+    import src.lib.misc.discord as discord_mod
 
     discord_mod._discord_bot = None
     discord_mod._discord_loop = None

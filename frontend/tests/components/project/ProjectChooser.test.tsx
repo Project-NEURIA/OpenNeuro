@@ -32,7 +32,7 @@ describe("ProjectChooser", () => {
     );
     expect(screen.getByRole("img", { name: "Alpha" })).toHaveAttribute(
       "src",
-      "/projects/Alpha/thumbnail",
+      `${api.API_BASE}/projects/Alpha/thumbnail`,
     );
 
     fireEvent.click(screen.getAllByRole("button")[0]!);

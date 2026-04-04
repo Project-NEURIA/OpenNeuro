@@ -226,7 +226,7 @@ async def ui_ws(ws: WebSocket) -> None:
                             sender.send(inner_type.new(text=payload))
                         else:
                             sender.send(payload)
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         pass
     finally:
         stop_event.set()

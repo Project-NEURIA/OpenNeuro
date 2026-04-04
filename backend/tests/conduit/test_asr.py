@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from src.core.conduit.asr import ASR, ASRConfig, ASRInputs, ASROutputs
+from src.lib.audio.asr import ASR, ASRConfig, ASRInputs, ASROutputs
 from src.core.frames import AudioFrame, TextFrame
 
 
@@ -63,11 +63,11 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
 
     bad_path = tmp_path / "broken.wav"
     monkeypatch.setattr(
-        "src.core.conduit.asr.tempfile.NamedTemporaryFile",
+        "src.lib.audio.asr.tempfile.NamedTemporaryFile",
         lambda suffix, delete: _TempFile(bad_path),
     )
     monkeypatch.setattr(
-        "src.core.conduit.asr.wave.open",
+        "src.lib.audio.asr.wave.open",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("wave failed")),
     )
     with pytest.raises(RuntimeError, match="wave failed"):
@@ -104,7 +104,7 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
         asr, "_prepare_audio_for_transcription", lambda frame: str(transcribe_path)
     )
     monkeypatch.setattr(
-        "src.core.conduit.asr.requests.post",
+        "src.lib.audio.asr.requests.post",
         lambda *args, **kwargs: _Response(200, {"text": " hello world "}),
     )
     result = asr._transcribe_audio(_audio_frame())
@@ -114,7 +114,7 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
 
     transcribe_path.write_bytes(b"wav")
     monkeypatch.setattr(
-        "src.core.conduit.asr.requests.post",
+        "src.lib.audio.asr.requests.post",
         lambda *args, **kwargs: _Response(200, {"text": "   "}),
     )
     assert asr._transcribe_audio(_audio_frame()) is None
@@ -177,7 +177,7 @@ def test_asr_prepare_debug_transcribe_worker_and_run(
             self.joined = True
             self.timeout = timeout
 
-    monkeypatch.setattr("src.core.conduit.asr.threading.Thread", _FakeThread)
+    monkeypatch.setattr("src.lib.audio.asr.threading.Thread", _FakeThread)
     run_asr = ASR(ASRConfig())
     frame = _audio_frame()
     run_asr.run(

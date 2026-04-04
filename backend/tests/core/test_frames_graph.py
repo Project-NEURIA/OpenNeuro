@@ -41,7 +41,7 @@ from src.core.frames import (
     VideoFrame,
 )
 from src.core.graph import Edge, Graph, GraphManager, Node
-from src.core.sink.do_nothing import DoNothingInputs
+from src.lib.misc.do_nothing import DoNothingInputs
 
 
 class _ScalarModel(BaseModel):

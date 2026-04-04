@@ -21,8 +21,8 @@ def _ensure_transformers_patch(monkeypatch) -> None:
 def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
 
     monkeypatch.setitem(
         tokv2_mod.ROPE_INIT_FUNCTIONS,
@@ -354,8 +354,8 @@ def test_qwen_tts_modeling_tokenizer_v2_paths(monkeypatch) -> None:
 def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
+    import src.lib.audio.qwen_tts.tts_model.configuration_qwen3_tts_tokenizer_v2 as cfg_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
 
     monkeypatch.setitem(
         tokv2_mod.ROPE_INIT_FUNCTIONS,
@@ -397,7 +397,7 @@ def test_qwen_tts_modeling_tokenizer_v2_remaining_paths(monkeypatch) -> None:
 def test_qwen_tts_modeling_tokenizer_v2_check_model_inputs_decorator(
     monkeypatch,
 ) -> None:
-    import src.core.conduit.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
+    import src.lib.audio.qwen_tts.tts_model.modeling_qwen3_tts_tokenizer_v2 as tokv2_mod
 
     def _sample_func():
         return "ok"

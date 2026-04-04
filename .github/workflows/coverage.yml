@@ -66,7 +66,7 @@ jobs:
       - name: Generate coverage badges and PR summary
         run: |
           python scripts/generate_coverage_badges.py \
-            --backend-xml backend/tests_runtime/coverage/coverage.xml \
+            --backend-xml backend/.output/coverage.xml \
             --backend-svg .github/badges/backend-coverage.svg \
             --frontend-lcov frontend/coverage/lcov.info \
             --frontend-svg .github/badges/frontend-coverage.svg \
@@ -77,7 +77,7 @@ jobs:
         with:
           name: coverage-reports
           path: |
-            backend/tests_runtime/coverage/coverage.xml
+            backend/.output/coverage.xml
             frontend/coverage/lcov.info
             coverage-comment.md
 

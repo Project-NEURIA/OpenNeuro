@@ -56,7 +56,7 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.model as model_mod
+    import src.lib.audio.qwen_tts.model as model_mod
     import src.core.utils as utils_mod
 
     class _Processor:
@@ -386,8 +386,8 @@ def test_qwen_tts_model_and_streaming_paths(monkeypatch, tmp_path: Path) -> None
 def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
     _ensure_transformers_patch(monkeypatch)
 
-    import src.core.conduit.qwen_tts.component as comp_mod
-    import src.core.conduit.qwen_tts.model as qwen_model_mod
+    import src.lib.audio.qwen_tts.component as comp_mod
+    import src.lib.audio.qwen_tts.model as qwen_model_mod
 
     class _FakeFilter:
         def feed(self, text, force=False):
@@ -542,7 +542,7 @@ def test_qwen_tts_component_paths(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
-    import src.core.conduit.qwen_tts.component as comp_mod
+    import src.lib.audio.qwen_tts.component as comp_mod
 
     class _FakeFilter:
         def feed(self, text, force=False):
@@ -666,7 +666,7 @@ def test_qwen_tts_component_remaining_branches(monkeypatch) -> None:
 
 
 def test_qwen_tts_package_missing_attr() -> None:
-    import src.core.conduit.qwen_tts as qwen_pkg
+    import src.lib.audio.qwen_tts as qwen_pkg
 
     with pytest.raises(AttributeError):
         _ = qwen_pkg.missing_attr

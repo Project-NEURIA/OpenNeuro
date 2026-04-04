@@ -30,18 +30,8 @@ backend/.ruff_cache/
 backend/.uv-cache/
 backend/pytest_temp_workspace/
 backend/pytest-cache-files-*/
-backend/tests_runtime/*
-!backend/tests_runtime/.gitkeep
-!backend/tests_runtime/coverage/
-!backend/tests_runtime/coverage/.gitkeep
-!backend/tests_runtime/pytest/
-!backend/tests_runtime/pytest/.gitkeep
-backend/tests_runtime/coverage/*
-!backend/tests_runtime/coverage/.gitkeep
-backend/tests_runtime/pytest/*
-!backend/tests_runtime/pytest/.gitkeep
-backend/tests_runtime/agent_state/
-backend/tests_runtime/tmp/
+backend/.output/
+backend/cache/
 frontend/coverage/
 frontend/node_modules/.vite-temp/
 

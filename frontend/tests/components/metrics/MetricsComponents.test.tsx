@@ -21,7 +21,7 @@ const componentMap: Record<string, ComponentInfo> = {
   },
   SinkNode: {
     type_: "SinkNode",
-    tags: { io: ["sink"], functionality: ["video"], gpu: ["cpu"] },
+    tags: { io: ["sink"], functionality: ["vision"], gpu: ["cpu"] },
     init: {},
     inputs: {},
     outputs: {},
@@ -244,7 +244,7 @@ describe("metrics components", () => {
             ...componentMap,
             SinkNode: {
               ...componentMap.SinkNode!,
-              tags: { io: ["weird" as never], functionality: ["video"], gpu: ["cpu"] },
+              tags: { io: ["weird" as never], functionality: ["vision"], gpu: ["cpu"] },
             },
           }}
           onClose={() => {}}

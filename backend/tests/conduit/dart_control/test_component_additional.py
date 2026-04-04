@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import torch
 
-import src.core.conduit.dart_control.component as dart_mod
-from src.core.conduit.dart_control.component import (
+import src.lib.motion.dart_control.component as dart_mod
+from src.lib.motion.dart_control.component import (
     BonePose,
     DartControl,
     DartControlConfig,
@@ -424,7 +424,7 @@ def test_component_run_additional_branches(monkeypatch) -> None:
         dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+        "src.lib.motion.dart_control.component.torch.cuda.is_available", lambda: False
     )
 
     sent = []
@@ -500,7 +500,7 @@ def test_component_run_goal_and_heading_completion(monkeypatch) -> None:
         dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+        "src.lib.motion.dart_control.component.torch.cuda.is_available", lambda: False
     )
 
     sent: list[object] = []
@@ -559,7 +559,7 @@ def test_component_run_heading_completion_and_stop_before_send(monkeypatch) -> N
         dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+        "src.lib.motion.dart_control.component.torch.cuda.is_available", lambda: False
     )
 
     sends: list[object] = []
@@ -611,7 +611,7 @@ def test_component_run_position_only_goal_completion(monkeypatch) -> None:
         dart_mod, "ThreadPoolExecutor", lambda *args, **kwargs: executor
     )
     monkeypatch.setattr(
-        "src.core.conduit.dart_control.component.torch.cuda.is_available", lambda: False
+        "src.lib.motion.dart_control.component.torch.cuda.is_available", lambda: False
     )
 
     sends: list[object] = []

@@ -8,7 +8,7 @@ from torch import nn
 
 
 def test_dart_control_operators_paths() -> None:
-    import src.core.conduit.dart_control.models.operators as ops_mod
+    import src.lib.motion.dart_control.models.operators as ops_mod
 
     linear = nn.Linear(2, 2)
     cloned = ops_mod._get_clone(linear)
@@ -104,7 +104,7 @@ def test_dart_control_operators_paths() -> None:
 
 
 def test_dart_control_denoiser_paths() -> None:
-    import src.core.conduit.dart_control.models.denoiser as den_mod
+    import src.lib.motion.dart_control.models.denoiser as den_mod
 
     seq_pos = den_mod.PositionalEncoding(4, dropout=0.0, max_len=8)
     t_embed = den_mod.TimestepEmbedder(4, seq_pos)
@@ -181,7 +181,7 @@ def test_dart_control_denoiser_paths() -> None:
 
 
 def test_dart_control_vae_paths() -> None:
-    import src.core.conduit.dart_control.models.vae as vae_mod
+    import src.lib.motion.dart_control.models.vae as vae_mod
 
     with pytest.raises(ValueError):
         vae_mod.AutoMldVae(

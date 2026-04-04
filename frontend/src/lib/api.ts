@@ -1,5 +1,8 @@
 import type { ComponentInfo } from "./types";
 
+export const API_BASE = "http://localhost:8000";
+export const WS_BASE = "ws://localhost:8000";
+
 export interface ComponentLogEntry {
   seq: number;
   timestamp: number;
@@ -20,37 +23,37 @@ export interface EdgeData {
 }
 
 export async function fetchComponents(): Promise<ComponentInfo[]> {
-  const res = await fetch("/component");
+  const res = await fetch(`${API_BASE}/component`);
   if (!res.ok) throw new Error(`Fetch components failed: ${res.status}`);
   return res.json();
 }
 
 export async function fetchIsType(name: string): Promise<boolean> {
-  const res = await fetch(`/component/is-type?name=${encodeURIComponent(name)}`);
+  const res = await fetch(`${API_BASE}/component/is-type?name=${encodeURIComponent(name)}`);
   if (!res.ok) throw new Error(`is-type failed: ${res.status}`);
   return res.json();
 }
 
 export async function fetchIsSubtype(sub: string, sup: string): Promise<boolean> {
-  const res = await fetch(`/component/is-subtype?sub=${encodeURIComponent(sub)}&sup=${encodeURIComponent(sup)}`);
+  const res = await fetch(`${API_BASE}/component/is-subtype?sub=${encodeURIComponent(sub)}&sup=${encodeURIComponent(sup)}`);
   if (!res.ok) throw new Error(`is-subtype failed: ${res.status}`);
   return res.json();
 }
 
 export async function fetchNodes(): Promise<NodeResponse[]> {
-  const res = await fetch("/graph/nodes");
+  const res = await fetch(`${API_BASE}/graph/nodes`);
   if (!res.ok) throw new Error(`Fetch nodes failed: ${res.status}`);
   return res.json();
 }
 
 export async function fetchEdges(): Promise<EdgeData[]> {
-  const res = await fetch("/graph/edges");
+  const res = await fetch(`${API_BASE}/graph/edges`);
   if (!res.ok) throw new Error(`Fetch edges failed: ${res.status}`);
   return res.json();
 }
 
 export async function createNode(type: string, init_args?: Record<string, unknown>): Promise<NodeResponse> {
-  const res = await fetch("/graph/nodes", {
+  const res = await fetch(`${API_BASE}/graph/nodes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type, init_args }),
@@ -60,7 +63,7 @@ export async function createNode(type: string, init_args?: Record<string, unknow
 }
 
 export async function updateNode(id: string, data: { x?: number; y?: number }) {
-  const res = await fetch(`/graph/nodes/${id}`, {
+  const res = await fetch(`${API_BASE}/graph/nodes/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -69,7 +72,7 @@ export async function updateNode(id: string, data: { x?: number; y?: number }) {
 }
 
 export async function updateNodeInitArgs(id: string, initArgs: Record<string, unknown>) {
-  const res = await fetch(`/graph/nodes/${id}/init-args`, {
+  const res = await fetch(`${API_BASE}/graph/nodes/${id}/init-args`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ init_args: initArgs }),
@@ -86,7 +89,7 @@ export async function updateNodeInitArgs(id: string, initArgs: Record<string, un
 }
 
 export async function deleteNode(id: string) {
-  const res = await fetch(`/graph/nodes/${id}`, { method: "DELETE" });
+  const res = await fetch(`${API_BASE}/graph/nodes/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Delete node failed: ${res.status}`);
 }
 
@@ -96,7 +99,7 @@ export async function createEdge(
   target_node: string,
   target_slot: string,
 ) {
-  const res = await fetch("/graph/edges", {
+  const res = await fetch(`${API_BASE}/graph/edges`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source_node, source_slot, target_node, target_slot }),
@@ -111,7 +114,7 @@ export async function deleteEdge(
   target_node: string,
   target_slot: string,
 ) {
-  const res = await fetch("/graph/edges", {
+  const res = await fetch(`${API_BASE}/graph/edges`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source_node, source_slot, target_node, target_slot }),
@@ -133,7 +136,7 @@ export interface NodeResponse {
 }
 
 export async function createSubgraph(nodeIds: string[], name: string = "Subgraph"): Promise<NodeResponse> {
-  const res = await fetch("/graph/subgraph", {
+  const res = await fetch(`${API_BASE}/graph/subgraph`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ node_ids: nodeIds, name }),
@@ -143,18 +146,18 @@ export async function createSubgraph(nodeIds: string[], name: string = "Subgraph
 }
 
 export async function ungroupNode(nodeId: string): Promise<NodeResponse[]> {
-  const res = await fetch(`/graph/ungroup/${nodeId}`, { method: "POST" });
+  const res = await fetch(`${API_BASE}/graph/ungroup/${nodeId}`, { method: "POST" });
   if (!res.ok) throw new Error(`Ungroup failed: ${res.status}`);
   return res.json();
 }
 
 export async function startAll() {
-  const res = await fetch("/graph/start", { method: "POST" });
+  const res = await fetch(`${API_BASE}/graph/start`, { method: "POST" });
   if (!res.ok) throw new Error(`Start failed: ${res.status}`);
 }
 
 export async function stopAll() {
-  const res = await fetch("/graph/stop", { method: "POST" });
+  const res = await fetch(`${API_BASE}/graph/stop`, { method: "POST" });
   if (!res.ok) throw new Error(`Stop failed: ${res.status}`);
 }
 
@@ -166,13 +169,13 @@ export interface ProjectSummary {
 }
 
 export async function fetchProjects(): Promise<ProjectSummary[]> {
-  const res = await fetch("/projects");
+  const res = await fetch(`${API_BASE}/projects`);
   if (!res.ok) throw new Error(`Fetch projects failed: ${res.status}`);
   return res.json();
 }
 
 export async function createProject(name: string) {
-  const res = await fetch("/projects", {
+  const res = await fetch(`${API_BASE}/projects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -181,7 +184,7 @@ export async function createProject(name: string) {
 }
 
 export async function deleteProject(name: string) {
-  const res = await fetch(`/projects/${encodeURIComponent(name)}`, {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Delete project failed: ${res.status}`);
@@ -190,7 +193,7 @@ export async function deleteProject(name: string) {
 export async function startProject(
   name: string,
 ): Promise<{ current_project: string | null }> {
-  const res = await fetch(`/projects/${encodeURIComponent(name)}/start`, {
+  const res = await fetch(`${API_BASE}/projects/${encodeURIComponent(name)}/start`, {
     method: "POST",
   });
   if (!res.ok) throw new Error(`Start project failed: ${res.status}`);
@@ -198,14 +201,14 @@ export async function startProject(
 }
 
 export async function closeProject() {
-  const res = await fetch("/project/close", { method: "POST" });
+  const res = await fetch(`${API_BASE}/project/close`, { method: "POST" });
   if (!res.ok) throw new Error(`Close project failed: ${res.status}`);
 }
 
 export async function exportProject(
   name: string,
 ): Promise<{ project_dir: string; assets_copied: string[] }> {
-  const res = await fetch("/project/export", {
+  const res = await fetch(`${API_BASE}/project/export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -217,7 +220,7 @@ export async function exportProject(
 export async function importProject(
   gitUrl: string,
 ): Promise<{ name: string }> {
-  const res = await fetch("/project/import", {
+  const res = await fetch(`${API_BASE}/project/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ git_url: gitUrl }),
@@ -229,31 +232,31 @@ export async function importProject(
 export async function fetchCurrentProject(): Promise<{
   current_project: string | null;
 }> {
-  const res = await fetch("/project/current");
+  const res = await fetch(`${API_BASE}/project/current`);
   if (!res.ok) throw new Error(`Fetch current project failed: ${res.status}`);
   return res.json();
 }
 
 export function projectThumbnailUrl(name: string): string {
-  return `/projects/${encodeURIComponent(name)}/thumbnail`;
+  return `${API_BASE}/projects/${encodeURIComponent(name)}/thumbnail`;
 }
 
 export async function saveGraph() {
-  const res = await fetch("/graph/save", { method: "POST" });
+  const res = await fetch(`${API_BASE}/graph/save`, { method: "POST" });
   if (!res.ok) throw new Error(`Save graph failed: ${res.status}`);
 }
 
 // --- Env API ---
 
 export async function fetchEnv(): Promise<string> {
-  const res = await fetch("/env");
+  const res = await fetch(`${API_BASE}/env`);
   if (!res.ok) throw new Error(`Fetch env failed: ${res.status}`);
   const data = await res.json();
   return data.content;
 }
 
 export async function putEnv(content: string): Promise<void> {
-  const res = await fetch("/env", {
+  const res = await fetch(`${API_BASE}/env`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
@@ -273,7 +276,7 @@ export async function fetchOptions(
   values?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(
-    `/component/${encodeURIComponent(componentName)}/options`,
+    `${API_BASE}/component/${encodeURIComponent(componentName)}/options`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -290,7 +293,7 @@ export async function fetchComponentLogs(
   limit = 400,
 ): Promise<ComponentLogsResponse> {
   const res = await fetch(
-    `/logs/${encodeURIComponent(nodeId)}?after=${after}&limit=${limit}`,
+    `${API_BASE}/logs/${encodeURIComponent(nodeId)}?after=${after}&limit=${limit}`,
   );
   const contentType = res.headers.get("content-type") ?? "";
   if (!res.ok) {

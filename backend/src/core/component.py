@@ -18,9 +18,7 @@ if TYPE_CHECKING:
 
 
 IOTag = Literal["source", "conduit", "sink"]
-FunctionalityTag = Literal[
-    "audio", "video", "llm", "image", "movement", "misc", "other"
-]
+FunctionalityTag = Literal["audio", "vision", "llm", "motion", "misc", "other"]
 GPUTag = Literal["cpu", "nvidia", "apple", "intel", "amd"]
 
 
@@ -291,7 +289,7 @@ class PrimitiveComponent[
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[PrimitiveComponent[Any, Any]]]:
         """Returns all concrete subclasses as {name: class}, walking from PrimitiveComponent."""
-        from src.core import source, sink, conduit  # noqa: F401
+        from src.lib import audio, vision, llm, motion, misc  # noqa: F401
 
         result: dict[str, type[PrimitiveComponent[Any, Any]]] = {}
 

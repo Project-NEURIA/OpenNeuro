@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useSSE } from "./useSSE";
+import { API_BASE } from "@/lib/api";
 import type { ComponentInfo, MetricsSnapshot, NodeMetrics, SlotType } from "@/lib/types";
 
 export interface GraphNodeData extends Record<string, unknown> {
@@ -21,7 +22,7 @@ export interface GraphNodeData extends Record<string, unknown> {
 
 export function useGraphData(components: ComponentInfo[]) {
   const { data: metrics, connected } =
-    useSSE<MetricsSnapshot>("/metrics");
+    useSSE<MetricsSnapshot>(`${API_BASE}/metrics`);
 
   const componentMap = useMemo(() => {
     const map: Record<string, ComponentInfo> = {};

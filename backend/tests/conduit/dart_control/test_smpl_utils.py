@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import torch
 
-import src.core.conduit.dart_control.smpl_utils as smpl_utils
+import src.lib.motion.dart_control.smpl_utils as smpl_utils
 
 
 class _FakeBodyModel:

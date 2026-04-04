@@ -8,40 +8,40 @@ import types
 import numpy as np
 
 from src.core.frames import TextFrame, VideoFrame, VideoDataFormat, AudioFrame
-from src.core.sink.do_nothing import DoNothing, DoNothingInputs
-from src.core.sink.text_display import (
+from src.lib.misc.do_nothing import DoNothing, DoNothingInputs
+from src.lib.misc.text_display import (
     TextDisplay,
     TextDisplayInputs,
     TextDisplayOutputs,
 )
-from src.core.sink.video_stream import (
+from src.lib.vision.video_stream import (
     VideoStream,
     VideoStreamInputs,
     VideoStreamOutputs,
 )
-from src.core.sink.speaker import Speaker, SpeakerConfig, SpeakerInputs
-from src.core.source.prompt_repeater import (
+from src.lib.audio.speaker import Speaker, SpeakerConfig, SpeakerInputs
+from src.lib.misc.prompt_repeater import (
     PromptRepeater,
     PromptRepeaterConfig,
     PromptRepeaterOutputs,
 )
-from src.core.source.pulse import Pulse, PulseConfig, PulseOutputs
-from src.core.source.dummy_poses import (
+from src.lib.misc.pulse import Pulse, PulseConfig, PulseOutputs
+from src.lib.motion.dummy_poses import (
     DummyPosesInput,
     DummyPosesConfig,
     DummyPosesOutputs,
 )
-from src.core.source.text_input import TextInput, TextInputInputs, TextInputOutputs
-from src.core.source.video_source import (
+from src.lib.misc.text_input import TextInput, TextInputInputs, TextInputOutputs
+from src.lib.vision.video_source import (
     VideoSource,
     VideoSourceConfig,
     VideoSourceOutputs,
 )
-from src.core.source.video_player import VideoPlayer, VideoPlayerConfig
-from src.core.source.camera import Camera
-from src.core.source.mic import Mic, MicConfig, MicOutputs
-from src.core.source.openvr_player import OpenVRPlayer, OpenVRPlayerConfig
-from src.core.source.vrchat import VRChatVideo, VRChatVideoOutputs
+from src.lib.vision.video_player import VideoPlayer, VideoPlayerConfig
+from src.lib.vision.camera import Camera
+from src.lib.audio.mic import Mic, MicConfig, MicOutputs
+from src.lib.motion.openvr_player import OpenVRPlayer, OpenVRPlayerConfig
+from src.lib.motion.vrchat import VRChatVideo, VRChatVideoOutputs
 
 
 class _FakeRecv:
@@ -114,7 +114,7 @@ def test_video_stream_and_speaker(monkeypatch) -> None:
             writes.append(arr)
 
     fake_sd = types.SimpleNamespace(OutputStream=lambda **kwargs: _Out())
-    monkeypatch.setattr("src.core.sink.speaker.sd", fake_sd)
+    monkeypatch.setattr("src.lib.audio.speaker.sd", fake_sd)
     sp = Speaker(SpeakerConfig(sample_rate=16000, channels=1))
     af = AudioFrame.new(
         data=np.zeros((1, 8), dtype=np.float32), sample_rate=16000, channels=1
@@ -199,9 +199,9 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
             (size[1], size[0], 3), dtype=np.uint8
         ),
     )
-    monkeypatch.setattr("src.core.source.video_source.cv2", fake_cv2)
-    monkeypatch.setattr("src.core.source.camera.cv2", fake_cv2)
-    monkeypatch.setattr("src.core.source.video_player.cv2", fake_cv2)
+    monkeypatch.setattr("src.lib.vision.video_source.cv2", fake_cv2)
+    monkeypatch.setattr("src.lib.vision.camera.cv2", fake_cv2)
+    monkeypatch.setattr("src.lib.vision.video_player.cv2", fake_cv2)
 
     class _VS(VideoSource):
         def __init__(self, config):
@@ -216,9 +216,9 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
     )
     ticks = iter([0.0, 2.0, 2.0, 2.0, 2.0])
     monkeypatch.setattr(
-        "src.core.source.video_source.time.monotonic", lambda: next(ticks, 2.0)
+        "src.lib.vision.video_source.time.monotonic", lambda: next(ticks, 2.0)
     )
-    monkeypatch.setattr("src.core.source.video_source.time.sleep", lambda _s: None)
+    monkeypatch.setattr("src.lib.vision.video_source.time.sleep", lambda _s: None)
     src.run(
         (),
         VideoSourceOutputs(video=types.SimpleNamespace(send=lambda f: sent.append(f))),
@@ -269,7 +269,7 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
             return np.zeros((n, 1), dtype=np.int16), None
 
     fake_sd = types.SimpleNamespace(InputStream=lambda **kwargs: _In())
-    monkeypatch.setattr("src.core.source.mic.sd", fake_sd)
+    monkeypatch.setattr("src.lib.audio.mic.sd", fake_sd)
     mic = Mic(MicConfig(sample_rate=8000, channels=1, frame_ms=10))
     mout = []
     mic.run((), MicOutputs(audio=types.SimpleNamespace(send=lambda f: mout.append(f))))
@@ -280,7 +280,7 @@ def test_video_source_camera_player_and_mic(monkeypatch) -> None:
             return False
 
     monkeypatch.setattr(
-        "src.core.source.video_source.cv2",
+        "src.lib.vision.video_source.cv2",
         types.SimpleNamespace(
             VideoCapture=lambda src: _BadCap(),
             CAP_PROP_FPS=1,
@@ -350,8 +350,8 @@ def test_openvr_vrchat_and_package_init(monkeypatch) -> None:
         def play(self, **kwargs):
             calls.append("play")
 
-    monkeypatch.setattr("src.core.source.openvr_player.Client", _Client)
-    monkeypatch.setattr("src.core.source.openvr_player.Player", _Player)
+    monkeypatch.setattr("src.lib.motion.openvr_player.Client", _Client)
+    monkeypatch.setattr("src.lib.motion.openvr_player.Player", _Player)
     monkeypatch.setitem(
         sys.modules, "ovd_client", types.SimpleNamespace(Client=_Client, Player=_Player)
     )
@@ -371,10 +371,10 @@ def test_openvr_vrchat_and_package_init(monkeypatch) -> None:
     )
     assert out_v and out_c
 
-    source_pkg = importlib.import_module("src.core.source")
-    sink_pkg = importlib.import_module("src.core.sink")
-    assert hasattr(source_pkg, "Camera")
-    assert hasattr(sink_pkg, "Speaker")
+    vision_pkg = importlib.import_module("src.lib.vision")
+    audio_pkg = importlib.import_module("src.lib.audio")
+    assert hasattr(vision_pkg, "Camera")
+    assert hasattr(audio_pkg, "Speaker")
 
 
 def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) -> None:
@@ -411,7 +411,7 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
             (size[1], size[0], 3), dtype=np.uint8
         ),
     )
-    monkeypatch.setattr("src.core.source.video_source.cv2", fake_cv2)
+    monkeypatch.setattr("src.lib.vision.video_source.cv2", fake_cv2)
 
     class _VS(VideoSource):
         def __init__(self, config):
@@ -424,11 +424,11 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
     monotonic_values = iter([0.0, 0.2, 0.0, 0.0])
     sleeps = []
     monkeypatch.setattr(
-        "src.core.source.video_source.time.monotonic",
+        "src.lib.vision.video_source.time.monotonic",
         lambda: next(monotonic_values, 0.0),
     )
     monkeypatch.setattr(
-        "src.core.source.video_source.time.sleep", lambda value: sleeps.append(value)
+        "src.lib.vision.video_source.time.sleep", lambda value: sleeps.append(value)
     )
     sent = []
     src.run(
@@ -484,7 +484,7 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
     )
     monotonic_values = iter([0.0, 1.0])
     monkeypatch.setattr(
-        "src.core.source.vrchat.time.monotonic", lambda: next(monotonic_values, 1.0)
+        "src.lib.motion.vrchat.time.monotonic", lambda: next(monotonic_values, 1.0)
     )
     out_v = []
     out_c = []
@@ -524,7 +524,7 @@ def test_camera_get_options_import_fallback(monkeypatch) -> None:
 
     caps = {_i: _Cap(_i == 1) for _i in range(4)}
     monkeypatch.setattr(
-        "src.core.source.camera.cv2",
+        "src.lib.vision.camera.cv2",
         types.SimpleNamespace(VideoCapture=lambda idx: caps[idx]),
     )
 

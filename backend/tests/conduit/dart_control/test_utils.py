@@ -10,10 +10,10 @@ from torch import nn
 
 
 def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
-    import src.core.conduit.dart_control.diffusion.losses as losses_mod
-    import src.core.conduit.dart_control.diffusion.nn as nn_mod
-    import src.core.conduit.dart_control.diffusion.respace as respace_mod
-    from src.core.conduit.dart_control.diffusion.gaussian_diffusion import (
+    import src.lib.motion.dart_control.diffusion.losses as losses_mod
+    import src.lib.motion.dart_control.diffusion.nn as nn_mod
+    import src.lib.motion.dart_control.diffusion.respace as respace_mod
+    from src.lib.motion.dart_control.diffusion.gaussian_diffusion import (
         LossType,
         ModelMeanType,
         ModelVarType,
@@ -164,7 +164,7 @@ def test_diffusion_losses_nn_and_respace(monkeypatch) -> None:
 
 
 def test_rotation_conversions() -> None:
-    import src.core.conduit.dart_control.rotation_conversions as rot_mod
+    import src.lib.motion.dart_control.rotation_conversions as rot_mod
 
     quat = torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float32)
     matrix = rot_mod.quaternion_to_matrix(quat)
@@ -266,8 +266,8 @@ def test_rotation_conversions() -> None:
 
 
 def test_policy_and_inference_more(monkeypatch, tmp_path: Path) -> None:
-    import src.core.conduit.dart_control.inference as inf_mod
-    import src.core.conduit.dart_control.policy as policy_mod
+    import src.lib.motion.dart_control.inference as inf_mod
+    import src.lib.motion.dart_control.policy as policy_mod
 
     for act in ["tanh", "relu", "sigmoid", "gelu", "lrelu"]:
         mlp = policy_mod.MLP(4, h_dims=[4], activation=act)

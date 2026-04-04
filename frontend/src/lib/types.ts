@@ -1,5 +1,5 @@
 export type IOTag = "source" | "conduit" | "sink";
-export type FunctionalityTag = "audio" | "video" | "llm" | "image" | "movement" | "misc" | "other";
+export type FunctionalityTag = "audio" | "vision" | "llm" | "motion" | "misc" | "other";
 export type GPUTag = "cpu" | "nvidia" | "apple" | "intel" | "amd";
 
 export interface Tag {

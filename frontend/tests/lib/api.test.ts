@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  API_BASE,
   closeProject,
   createEdge,
   createNode,
@@ -72,9 +73,9 @@ describe("api", () => {
     await expect(fetchIsSubtype("Dog", "Animal")).resolves.toBe(false);
     await expect(fetchIsSubtype("Dog", "Animal")).rejects.toThrow("is-subtype failed: 404");
 
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/component");
-    expect(fetchMock).toHaveBeenNthCalledWith(3, "/component/is-type?name=Dog");
-    expect(fetchMock).toHaveBeenNthCalledWith(5, "/component/is-subtype?sub=Dog&sup=Animal");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, `${API_BASE}/component`);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, `${API_BASE}/component/is-type?name=Dog`);
+    expect(fetchMock).toHaveBeenNthCalledWith(5, `${API_BASE}/component/is-subtype?sub=Dog&sup=Animal`);
   });
 
   it("covers graph endpoints", async () => {
@@ -134,7 +135,7 @@ describe("api", () => {
     await expect(saveGraph()).resolves.toBeUndefined();
     await expect(saveGraph()).rejects.toThrow("Save graph failed: 500");
 
-    expect(fetchMock).toHaveBeenCalledWith("/graph/save", { method: "POST" });
+    expect(fetchMock).toHaveBeenCalledWith(`${API_BASE}/graph/save`, { method: "POST" });
   });
 
   it("covers project and env endpoints", async () => {
@@ -180,7 +181,7 @@ describe("api", () => {
     });
     await expect(fetchOptions("Comp")).rejects.toThrow("Fetch config options failed: 500");
 
-    expect(projectThumbnailUrl("Alpha One")).toBe("/projects/Alpha%20One/thumbnail");
+    expect(projectThumbnailUrl("Alpha One")).toBe(`${API_BASE}/projects/Alpha%20One/thumbnail`);
   });
 
   it("covers component logs happy path and content-type failures", async () => {
@@ -225,7 +226,7 @@ describe("api", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/logs/node%201?after=2&limit=10",
+      `${API_BASE}/logs/node%201?after=2&limit=10`,
     );
   });
 });

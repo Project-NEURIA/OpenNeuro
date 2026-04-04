@@ -49,9 +49,9 @@ def _import_mod(name, filename):
 
 
 backend = Path(__file__).resolve().parent.parent
-vad_mod = _import_mod("src.core.conduit.vad", str(backend / "src/core/conduit/vad.py"))
-asr_mod = _import_mod("src.core.conduit.asr", str(backend / "src/core/conduit/asr.py"))
-llm_mod = _import_mod("src.core.conduit.llm", str(backend / "src/core/conduit/llm.py"))
+vad_mod = _import_mod("src.lib.audio.vad", str(backend / "src/lib/audio/vad.py"))
+asr_mod = _import_mod("src.lib.audio.asr", str(backend / "src/lib/audio/asr.py"))
+llm_mod = _import_mod("src.lib.llm.llm", str(backend / "src/lib/llm/llm.py"))
 
 VAD, VADConfig = vad_mod.VAD, vad_mod.VADConfig
 ASR, ASRConfig = asr_mod.ASR, asr_mod.ASRConfig

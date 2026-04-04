@@ -22,7 +22,7 @@ async function updateBadges(target: "all" | "backend" | "frontend") {
   if (target === "all" || target === "backend") {
     command.push(
       "--backend-xml",
-      "backend/tests_runtime/coverage/coverage.xml",
+      "backend/.output/coverage.xml",
       "--backend-svg",
       ".github/badges/backend-coverage.svg",
     );

@@ -42,7 +42,7 @@ def _audio_frame() -> AudioFrame:
 
 
 def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.core.conduit.llm as llm_mod
+    import src.lib.llm.llm as llm_mod
 
     class _Function:
         def __init__(self, name: str | None = None, arguments: str | None = None):
@@ -179,7 +179,7 @@ def test_llm_run_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.core.conduit.llm as llm_mod
+    import src.lib.llm.llm as llm_mod
 
     calls = []
 
@@ -213,7 +213,7 @@ def test_llm_setup_warmup_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    import src.core.conduit.memory as memory_mod
+    import src.lib.llm.memory as memory_mod
 
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
     monkeypatch.setenv("VECTOR_KEY", "vector-key")
@@ -371,7 +371,11 @@ def test_mem0_helpers_and_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None
 
 
 def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.core.conduit.tts as tts_mod
+    import src.lib.audio.tts as tts_mod
+
+    # litellm (imported by earlier tests) loads .env via dotenv, which sets
+    # INWORLD_API_KEY.  Clear it so the "must be set" path is exercised.
+    monkeypatch.delenv("INWORLD_API_KEY", raising=False)
 
     tts = tts_mod.TTS(tts_mod.TTSConfig())
     tts._task_queue.put((0, "hello"))
@@ -536,7 +540,7 @@ def test_tts_worker_and_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_sts_stop_run_and_send_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     import websockets.exceptions
-    import src.core.conduit.sts as sts_mod
+    import src.lib.audio.sts as sts_mod
 
     class _Closed(Exception):
         pass

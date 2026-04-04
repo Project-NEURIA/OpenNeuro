@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 
-from src.core.conduit.agent_state import (
+from src.lib.llm.agent_state import (
     AgentState,
     AgentStateConfig,
     AgentStateInputs,
@@ -62,7 +61,7 @@ def test_agent_state_helper_methods(capsys) -> None:
     assert "(no content)" in printed
 
 
-def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
+def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch, tmp_path) -> None:
     state = AgentState(AgentStateConfig(system_prompt="base system"))
     sent_messages: list[list[MessageFrame]] = []
 
@@ -75,16 +74,16 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
     tool_result = ToolResult.new(call_id="tool-1", content="tool output")
 
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.drain",
+        "src.lib.llm.agent_state.drain",
         lambda *args: [(speech, feedback, memory, tool_call)],
     )
-    projects_dir = Path("tests_runtime") / "agent_state"
+    projects_dir = tmp_path / "agent_state"
     project_dir = projects_dir / "demo-project"
-    project_dir.mkdir(parents=True, exist_ok=True)
+    project_dir.mkdir(parents=True)
 
-    monkeypatch.setattr("src.core.conduit.agent_state.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("src.lib.llm.agent_state.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.AppConfig.load_config",
+        "src.lib.llm.agent_state.AppConfig.load_config",
         lambda: SimpleNamespace(current_project="demo-project"),
     )
     object_frame = ObjectLocationFrame.new(
@@ -143,7 +142,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
 
 def test_agent_state_dump_messages_without_current_project(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.conduit.agent_state.AppConfig.load_config",
+        "src.lib.llm.agent_state.AppConfig.load_config",
         lambda: SimpleNamespace(current_project=None),
     )
 
