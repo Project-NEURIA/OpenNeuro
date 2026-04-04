@@ -39,7 +39,7 @@ describe("useUIChannelManager", () => {
     const { result, unmount } = renderHook(() => useUIChannelManager());
     const socket = MockWebSocket.instances[0]!;
 
-    expect(socket.url).toBe("ws://localhost:3000/ui/ws");
+    expect(socket.url).toBe("ws://localhost:8000/ui/ws");
     expect(socket.binaryType).toBe("arraybuffer");
 
     socket.readyState = MockWebSocket.OPEN;
