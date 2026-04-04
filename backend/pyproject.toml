@@ -52,7 +52,7 @@ dependencies = [
 ]
 
 [tool.mypy]
-exclude = '(^tests/)|(^tests_runtime/)|(^cache/)|(^pytest[^/\\]*(?:$|[\\/]))|(^\.venv(?:$|[\\/]))'
+exclude = '(^tests/)|(^\.output/)|(^pytest[^/\\]*(?:$|[\\/]))|(^\.venv(?:$|[\\/]))'
 
 [[tool.mypy.overrides]]
 module = [
@@ -93,7 +93,6 @@ explicit = true
 [tool.uv]
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
 override-dependencies = ["open3d ; python_version < '0'"]
-cache-dir = "cache/uv"
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
@@ -146,13 +145,11 @@ rocm = [
 addopts = [
     "--cov=src",
     "--cov-report=term-missing",
-    "--cov-report=xml:tests_runtime/coverage/coverage.xml",
-    "--basetemp=cache/pytest-temp",
+    "--cov-report=xml:.output/coverage.xml",
     "-p",
     "no:cacheprovider",
 ]
-cache_dir = "cache/pytest-cache"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-data_file = "tests_runtime/coverage/.coverage"
+data_file = ".output/.coverage"

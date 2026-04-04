@@ -78,7 +78,7 @@ def test_agent_state_run_builds_messages_and_dumps_json(monkeypatch) -> None:
         "src.lib.llm.agent_state.drain",
         lambda *args: [(speech, feedback, memory, tool_call)],
     )
-    projects_dir = Path("tests_runtime") / "agent_state"
+    projects_dir = Path(".output") / "agent_state"
     project_dir = projects_dir / "demo-project"
     project_dir.mkdir(parents=True, exist_ok=True)
 
