@@ -524,7 +524,8 @@ class CompositeComponent(Component[tuple[Receiver[Any] | None, ...], tuple[Sende
             return
         self._status = Status.SETUP
 
-        from src.core.graph import GraphManager, ReceiverKey, SenderKey
+        from src.core.graph import GraphManager
+        from src.core.utils import ReceiverKey, SenderKey
 
         self._inner_manager = GraphManager(self._sub_graph)
 

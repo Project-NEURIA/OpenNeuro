@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from src.api.graph.node.dto import NodeUpdateRequest
+from src.api.ui.bridge import UIChannelBridge
 from src.core.config import PROJECTS_DIR
 from src.core.graph import Edge, Graph, GraphManager, Node
 
@@ -39,10 +40,15 @@ def delete_node(manager: GraphManager, node_id: str) -> None:
 
 def update_primitive_node_init_args(
     manager: GraphManager,
+    ui_bridge: UIChannelBridge,
     node_id: str,
     init_args: dict[str, Any],
 ) -> Node | None:
-    return manager.update_primitive_node_init_args(node_id, init_args)
+    node, was_running = manager.update_primitive_node_init_args(node_id, init_args)
+    if was_running and node is not None:
+        recv_overrides, send_overrides = ui_bridge.wire(manager)
+        manager.run(recv_overrides, send_overrides)
+    return node
 
 
 def create_subgraph(

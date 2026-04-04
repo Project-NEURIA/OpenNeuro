@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import threading
 import time
 import uuid
 from collections import defaultdict
-from typing import Any, get_origin
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -18,8 +17,7 @@ from src.core.component import (
 from src.core.log_capture import get_log_store
 
 
-SenderKey = tuple[str, str]  # (node_id, slot_name)
-ReceiverKey = tuple[str, str]  # (node_id, slot_name)
+from src.core.utils import SenderKey, ReceiverKey
 
 
 class Node(BaseModel):
@@ -56,11 +54,6 @@ class GraphManager:
         self._graph = Graph(edges=[], nodes={})
         self._components: dict[str, Component[Any, Any]] = {}
         self._channel_map: dict[frozenset[SenderKey], Channel[Any]] = {}
-        # UI channels: keyed by (node_id, slot_name)
-        self._ui_senders: dict[tuple[str, str], Sender[Any]] = {}
-        self._ui_receivers: dict[tuple[str, str], Receiver[Any]] = {}
-        self._ui_version = 0
-        self._ui_changed = asyncio.Event()
         self.reset(graph)
 
     # --- node CRUD ---
@@ -111,15 +104,20 @@ class GraphManager:
 
     def update_primitive_node_init_args(
         self, node_id: str, init_args: dict[str, Any]
-    ) -> Node | None:
+    ) -> tuple[Node | None, bool]:
+        """Replace a node's init_args and recreate its component.
+
+        Returns (node, was_running). The caller is responsible for
+        calling run() with UI channel overrides if was_running is True.
+        """
         node = self._graph.nodes.get(node_id)
         if node is None:
-            return None
+            return None, False
 
         classes = PrimitiveComponent.registered_subclasses()
         cls = classes.get(node.type)
         if cls is None:
-            return None
+            return None, False
 
         was_running = any(
             c.status.value == "running" for c in self._components.values()
@@ -130,10 +128,7 @@ class GraphManager:
         node.init_args = init_args
         self._components[node_id] = cls.from_args(init_args)
         self._reconcile()
-
-        if was_running:
-            self.run()
-        return node
+        return node, was_running
 
     def delete_node(self, node_id: str) -> None:
         node = self._graph.nodes.get(node_id)
@@ -202,13 +197,21 @@ class GraphManager:
             if receiver is not None
         }
 
-    def ui_senders(self) -> dict[tuple[str, str], Sender[Any]]:
-        """Server-side senders that push data into component UIReceiver slots."""
-        return self._ui_senders
+    def ui_input_slots(self) -> list[ReceiverKey]:
+        """All (node_id, slot) pairs for UI input slots across the graph."""
+        return [
+            (node_id, slot)
+            for node_id, comp in self._components.items()
+            for slot in comp.get_ui_input_types()
+        ]
 
-    def ui_receivers(self) -> dict[tuple[str, str], Receiver[Any]]:
-        """Server-side receivers that read from component UISender slots."""
-        return self._ui_receivers
+    def ui_output_slots(self) -> list[SenderKey]:
+        """All (node_id, slot) pairs for UI output slots across the graph."""
+        return [
+            (node_id, slot)
+            for node_id, comp in self._components.items()
+            for slot in comp.get_ui_output_types()
+        ]
 
     def get_node_output(self, node_id: str) -> dict[str, type]:
         return self._components[node_id].get_output_types()
@@ -222,8 +225,6 @@ class GraphManager:
         self._graph = graph
         self._components.clear()
         self._channel_map.clear()
-        self._ui_senders.clear()
-        self._ui_receivers.clear()
 
         classes = PrimitiveComponent.registered_subclasses()
         for node_id, node in self._graph.nodes.items():
@@ -305,8 +306,6 @@ class GraphManager:
         pre-built handles for specific slots.
         """
         self.stop()
-        self._ui_senders.clear()
-        self._ui_receivers.clear()
 
         sender_plan, receiver_plan = self._reconcile()
         _recv_over = receiver_overrides or {}
@@ -322,8 +321,6 @@ class GraphManager:
 
             input_slots = comp.get_input_types()
             output_slots = comp.get_output_types()
-            ui_input_slots = comp.get_ui_input_types()
-            ui_output_slots = comp.get_ui_output_types()
 
             stop_event = comp.stop_event if isinstance(comp, ThreadedComponent) else threading.Event()
 
@@ -346,20 +343,6 @@ class GraphManager:
                     # Unconnected output: no-op sender (sends are discarded)
                     node.senders[slot] = Sender()
 
-            # Wire UI input channels (frontend -> component)
-            for slot, slot_type in ui_input_slots.items():
-                ch: Channel[Any] = Channel()
-                origin = get_origin(slot_type) or slot_type
-                node.receivers[slot] = origin(ch, stop_event)
-                self._ui_senders[(node_id, slot)] = Sender(ch)
-
-            # Wire UI output channels (component -> frontend)
-            for slot, slot_type in ui_output_slots.items():
-                ch = Channel()
-                origin = get_origin(slot_type) or slot_type
-                node.senders[slot] = origin(ch)
-                self._ui_receivers[(node_id, slot)] = Receiver(ch, threading.Event())
-
             built_inputs = self._build_tuple(input_type, dict(node.receivers))
             built_outputs = self._build_tuple(output_type, dict(node.senders))
 
@@ -376,7 +359,6 @@ class GraphManager:
             if isinstance(comp, ThreadedComponent):
                 ident = comp.get_ident()
                 if ident is None:
-                    # Thread ident may lag briefly after start().
                     for _ in range(10):
                         time.sleep(0.005)
                         ident = comp.get_ident()
@@ -384,15 +366,6 @@ class GraphManager:
                             break
                 if ident is not None:
                     get_log_store().register_thread(node_id=node_id, ident=ident)
-
-        # Notify WS listeners that UI channels are ready.
-        # Save old event, replace with fresh one, *then* wake waiters.
-        # This avoids a race where a coroutine calling wait() between
-        # set() and reassignment would block on the now-orphaned event.
-        self._ui_version += 1
-        old_event = self._ui_changed
-        self._ui_changed = asyncio.Event()
-        old_event.set()
 
     @staticmethod
     def _build_tuple(tp: type | None, handles: dict[str, Any]) -> tuple[Any, ...]:
@@ -410,8 +383,6 @@ class GraphManager:
             for sender in node.senders.values():
                 if sender is not None:
                     sender._stopped = True
-        for sender in self._ui_senders.values():
-            sender._stopped = True
         for comp in self._components.values():
             comp.stop()
         for comp in self._components.values():

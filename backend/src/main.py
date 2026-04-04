@@ -16,6 +16,7 @@ from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
 from src.api.env.controller import router as env_router
+from src.api.ui.bridge import UIChannelBridge
 from src.core.graph import Graph
 from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
     app.state.current_project = config.current_project
 
     app.state.manager = GraphManager(Graph(edges=[], nodes={}))
+    app.state.ui_bridge = UIChannelBridge()
 
     yield
 

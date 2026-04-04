@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.dep import get_manager
+from src.api.dep import get_manager, get_ui_bridge
+from src.api.ui.bridge import UIChannelBridge
 from src.api.graph.node.dto import (
     NodeInitArgsUpdateRequest,
     NodeCreateRequest,
@@ -83,8 +84,9 @@ def update_primitive_node_init_args(
     node_id: str,
     req: NodeInitArgsUpdateRequest,
     manager: GraphManager = Depends(get_manager),
+    ui_bridge: UIChannelBridge = Depends(get_ui_bridge),
 ) -> NodeResponse:
-    node = service.update_primitive_node_init_args(manager, node_id, req.init_args)
+    node = service.update_primitive_node_init_args(manager, ui_bridge, node_id, req.init_args)
     if node is None:
         raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
     return _node_response(node_id, node, manager)
