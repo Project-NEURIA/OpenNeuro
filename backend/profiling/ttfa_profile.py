@@ -585,7 +585,7 @@ def run_pipeline(wav_path: str):
     def adapter3():
         comp = _Stub()
         comp._stop_event = threading.Event()
-        for tf in Receiver(ch3)(comp):
+        for tf in Receiver(ch3, threading.Event()):
             if tf is None:
                 break
             msgs = [
@@ -607,19 +607,19 @@ def run_pipeline(wav_path: str):
     vad_2 = VAD(config=VADConfig())
     file_source_2 = FileSource(wav_path=wav_path)
 
-    null_sink_2.start(NullSinkInputs(audio=Receiver(ch6)), ())
+    null_sink_2.start(NullSinkInputs(audio=Receiver(ch6, threading.Event())), ())
     tts_2.start(
-        tts_mod.TTSInputs(text=Receiver(ch5)),
+        tts_mod.TTSInputs(text=Receiver(ch5, threading.Event())),
         tts_mod.TTSOutputs(audio=Sender(ch6), text=Sender()),
     )
     llm_2.start(
-        llm_mod.LLMInputs(messages=Receiver(ch4)), llm_mod.LLMOutputs(token=Sender(ch5))
+        llm_mod.LLMInputs(messages=Receiver(ch4, threading.Event())), llm_mod.LLMOutputs(token=Sender(ch5))
     )
     asr_2.start(
-        asr_mod.ASRInputs(audio=Receiver(ch2)), asr_mod.ASROutputs(text=Sender(ch3))
+        asr_mod.ASRInputs(audio=Receiver(ch2, threading.Event())), asr_mod.ASROutputs(text=Sender(ch3))
     )
     vad_2.start(
-        vad_mod.VADInputs(audio=Receiver(ch1)), vad_mod.VADOutputs(audio=Sender(ch2))
+        vad_mod.VADInputs(audio=Receiver(ch1, threading.Event())), vad_mod.VADOutputs(audio=Sender(ch2))
     )
     file_source_2.start((), FileSourceOutputs(audio=Sender(ch1)))
 

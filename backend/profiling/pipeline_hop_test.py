@@ -208,20 +208,20 @@ def run_test(model: str):
     # Wire: FileSource -> VAD -> ASR -> Adapter -> LLM -> NullSink
     ch1: Channel[AudioFrame] = Channel()
     s1 = Sender(ch1)
-    r1 = Receiver(ch1)
+    r1 = Receiver(ch1, threading.Event())
     ch2: Channel[AudioFrame] = Channel()
     s2 = Sender(ch2)
-    r2 = Receiver(ch2)
+    r2 = Receiver(ch2, threading.Event())
     ch3: Channel[TextFrame] = Channel()
     ch4: Channel[list[MessageFrame]] = Channel()
     s4 = Sender(ch4)
-    r4 = Receiver(ch4)
+    r4 = Receiver(ch4, threading.Event())
 
     # Adapter thread
     def adapter():
         comp = _Adapter()
         comp._stop_event = threading.Event()
-        for text_frame in Receiver(ch3)(comp):
+        for text_frame in Receiver(ch3, threading.Event()):
             if text_frame is None:
                 break
             if comp.stop_event.is_set():
