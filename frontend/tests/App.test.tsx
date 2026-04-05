@@ -159,7 +159,7 @@ vi.mock("@/components/graph/GraphCanvas", () => ({
         <button onClick={() => firstGraphNode && (props.onNodesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstGraphNode.id }])}>
           remove-node
         </button>
-        <button onClick={() => firstEdge && (props.onEdgesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstEdge.id }])}>
+        <button onClick={() => firstEdge && (props.onEdgesDelete as ((edges: unknown[]) => void) | undefined)?.([firstEdge])}>
           remove-edge
         </button>
         <button
