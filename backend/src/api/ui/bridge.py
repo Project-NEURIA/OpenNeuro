@@ -200,6 +200,8 @@ class UIChannelBridge:
     async def _recv_msgs(self, ws: WebSocket) -> None:
         while True:
             ws_msg = await ws.receive()
+            if ws_msg.get("type") == "websocket.disconnect":
+                break
             if "bytes" in ws_msg:
                 key, payload = decode_binary(ws_msg["bytes"])
                 if key is not None:
