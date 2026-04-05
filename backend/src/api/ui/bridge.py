@@ -97,7 +97,7 @@ class UIChannelBridge:
         self._ui_receivers: dict[ReceiverKey, Receiver[Any]] = {}
         self._manager: GraphManager | None = None
         self._ws: WebSocket | None = None
-        self._stop_event: asyncio.Event = asyncio.Event()
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._send_tasks: dict[SenderKey, asyncio.Task[None]] = {}
 
     def wire(
@@ -106,7 +106,11 @@ class UIChannelBridge:
         dict[ReceiverKey, Receiver[Any] | None],
         dict[SenderKey, Sender[Any] | None],
     ]:
-        """Create UI channels for all components and return overrides for run()."""
+        """Create UI channels for all components and return overrides for run().
+
+        Called from a sync thread (start endpoint). If a WebSocket is
+        connected, schedules task (re)spawning on the event loop.
+        """
         self._manager = manager
         self._ui_senders.clear()
         self._ui_receivers.clear()
@@ -131,22 +135,25 @@ class UIChannelBridge:
                 send_overrides[(node_id, slot)] = origin(ch)
                 self._ui_receivers[(node_id, slot)] = Receiver(ch, threading.Event())
 
-        # Restart outbound tasks if WS is connected
-        if self._ws is not None:
-            self._send_msgs(self._ws)
+        if self._ws is not None and self._loop is not None:
+            self._loop.call_soon_threadsafe(self._start_send_tasks)
 
         return recv_overrides, send_overrides
 
     async def run(self, ws: WebSocket) -> None:
-        """Own the WebSocket: read inbound, send outbound via tasks."""
+        """Own the WebSocket lifecycle. Blocks until disconnect."""
         self._ws = ws
-        self._stop_event.clear()
-        self._send_msgs(ws)
+        self._loop = asyncio.get_running_loop()
+
+        # If pipeline already started (receivers exist), start tasks now
+        if self._ui_receivers:
+            self._start_send_tasks()
+
         try:
             await self._recv_msgs(ws)
         finally:
             self._ws = None
-            self._stop_event.set()
+            self._loop = None
             for t in self._send_tasks.values():
                 t.cancel()
             await asyncio.gather(*self._send_tasks.values(), return_exceptions=True)
@@ -154,9 +161,13 @@ class UIChannelBridge:
 
     # -- Outbound: component → frontend --
 
-    def _send_msgs(self, ws: WebSocket) -> None:
+    def _start_send_tasks(self) -> None:
+        """Spawn one task per UI output receiver. Must run in the event loop."""
         for key in list(self._send_tasks):
             self._send_tasks.pop(key).cancel()
+        ws = self._ws
+        if ws is None:
+            return
         for key, receiver in self._ui_receivers.items():
             node_id, slot = key
             inner_type = self._resolve_ui_output_type(node_id, slot)
@@ -173,7 +184,7 @@ class UIChannelBridge:
         inner_type: type | None,
     ) -> None:
         try:
-            while not self._stop_event.is_set():
+            while True:
                 item = await asyncio.to_thread(next, receiver)
                 if item is None:
                     break
