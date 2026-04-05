@@ -65,14 +65,12 @@ def test_think_tool_setup_and_run_paths(capsys) -> None:
     assert all(result.content == "" for result in tool_results)
 
 
-def test_throttle_forwards_newest_items(monkeypatch) -> None:
-    sleeps = []
+def test_throttle_forwards_newest_items() -> None:
     sent = []
+    waits = []
     throttle = Throttle[int](ThrottleConfig(interval=0.25))
-
-    monkeypatch.setattr(
-        "src.lib.misc.throttle.time.sleep", lambda value: sleeps.append(value)
-    )
+    # Mock stop_event.wait to record calls and return False (not stopped)
+    throttle._stop_event.wait = lambda timeout: (waits.append(timeout), False)[1]  # type: ignore[assignment]
 
     recv = _FakeRecv([1, 2, None])
     throttle.run(
@@ -84,4 +82,4 @@ def test_throttle_forwards_newest_items(monkeypatch) -> None:
 
     assert recv.newest is True
     assert sent == [1, 2]
-    assert sleeps == [0.25, 0.25]
+    assert waits == [0.25, 0.25]
