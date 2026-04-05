@@ -1,5 +1,9 @@
+from src.lib.audio.audio_in import AudioIn as AudioIn
+from src.lib.audio.audio_out import AudioOut as AudioOut
 from src.lib.audio.mic import Mic as Mic
 from src.lib.audio.mic_browser import MicBrowser as MicBrowser
+from src.lib.audio.remote_audio_in import RemoteAudioIn as RemoteAudioIn
+from src.lib.audio.remote_audio_out import RemoteAudioOut as RemoteAudioOut
 from src.lib.audio.speaker import Speaker as Speaker
 from src.lib.audio.speaker_browser import SpeakerBrowser as SpeakerBrowser
 from src.lib.audio.vad import VAD as VAD

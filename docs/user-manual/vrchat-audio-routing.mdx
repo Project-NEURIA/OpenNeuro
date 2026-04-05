@@ -1,0 +1,121 @@
+# VRChat Audio Routing
+
+This guide explains how to use `AudioIn`, `AudioOut`, `RemoteAudioIn`, and
+`RemoteAudioOut` with VB-Cable A+B so OpenNeuro can hear VRChat voice chat and
+talk back to other players.
+
+## Cable Mapping
+
+Use the two virtual cables like this:
+
+- `CABLE-A` carries **AI speech into VRChat's microphone**
+- `CABLE-B` carries **VRChat's game audio into OpenNeuro**
+
+The recommended signal flow is:
+
+```text
+OpenNeuro AudioOut -> CABLE-A Input -> CABLE-A Output -> VRChat microphone
+Windows default output / VRChat output -> CABLE-B Input -> CABLE-B Output -> OpenNeuro AudioIn
+```
+
+## Important VRChat Note
+
+VRChat lets you change the **microphone** device, but its **output** follows
+the Windows system playback device. That means:
+
+- Set the VRChat microphone to `CABLE-A Output`
+- Set the Windows default playback device to `CABLE-B Input`
+
+If you still want to hear the game locally, enable **Listen to this device** on
+`CABLE-B Output` and route it to your real headphones or speakers.
+
+## Local Setup
+
+Use this when OpenNeuro and VRChat are running on the **same machine**.
+
+### OpenNeuro Components
+
+Configure the graph like this:
+
+- `AudioIn`
+  - `device`: `CABLE-B Output`
+  - `sample_rate`: `48000`
+  - `channels`: `2`
+  - `frame_ms`: `20`
+- `AudioOut`
+  - `device`: `CABLE-A Input`
+  - `sample_rate`: `48000`
+  - `channels`: `1`
+
+### VRChat / Windows
+
+- In VRChat, set **Microphone** to `CABLE-A Output`
+- In Windows, set the **default playback device** to `CABLE-B Input`
+- Optional: enable **Listen to this device** on `CABLE-B Output` so you can
+  monitor game audio through your real headset
+
+## Remote Setup
+
+Use this when OpenNeuro and VRChat are running on **different machines**.
+
+### On the Game Machine
+
+Install VB-Cable A+B and start the bridge server:
+
+```bash
+cd backend
+uv run python -m src.lib.audio.remote_audio_server
+```
+
+By default the bridge assumes:
+
+- `--input-device "CABLE-B Output"`
+- `--output-device "CABLE-A Input"`
+
+If your device names differ, list them first:
+
+```bash
+cd backend
+uv run python -m src.lib.audio.remote_audio_server --list-devices
+```
+
+Then launch the server with explicit device names if needed:
+
+```bash
+cd backend
+uv run python -m src.lib.audio.remote_audio_server --input-device "CABLE-B Output (VB-Audio Virtual Cable B)" --output-device "CABLE-A Input (VB-Audio Virtual Cable A)"
+```
+
+Also configure the game machine the same way as the local setup:
+
+- In VRChat, set **Microphone** to `CABLE-A Output`
+- In Windows, set the **default playback device** to `CABLE-B Input`
+
+### On the OpenNeuro Machine
+
+Point both remote components at the game machine's bridge:
+
+- `RemoteAudioIn`
+  - `server_url`: `ws://<game-machine-ip>:8765/ws/audio`
+  - `sample_rate`: `48000`
+  - `channels`: `2`
+  - `frame_ms`: `20`
+- `RemoteAudioOut`
+  - `server_url`: `ws://<game-machine-ip>:8765/ws/audio`
+  - `sample_rate`: `48000`
+  - `channels`: `1`
+  - `frame_ms`: `20`
+
+## Recommended Graphs
+
+For voice-to-voice VRChat flows:
+
+- `AudioIn` or `RemoteAudioIn`
+- `VAD`
+- `ASR`
+- `LLM`
+- `TTS`
+- `AudioOut` or `RemoteAudioOut`
+
+If your downstream audio stack expects mono, that's okay: `AudioFrame`
+conversion inside the pipeline will down-mix and resample automatically.
