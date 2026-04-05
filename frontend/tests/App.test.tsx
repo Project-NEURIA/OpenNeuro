@@ -1077,20 +1077,30 @@ describe("App", () => {
   });
 
   it("removes only edges touching a deleted node and accepts anyOf ref-backed config drops", async () => {
-    vi.spyOn(api, "fetchEdges").mockResolvedValueOnce([
-      {
-        source_node: "n1",
-        source_slot: "output",
-        target_node: "n2",
-        target_slot: "input",
-      },
-      {
-        source_node: "n2",
-        source_slot: "output",
-        target_node: "n3",
-        target_slot: "input",
-      },
-    ]);
+    vi.spyOn(api, "fetchEdges")
+      .mockResolvedValueOnce([
+        {
+          source_node: "n1",
+          source_slot: "output",
+          target_node: "n2",
+          target_slot: "input",
+        },
+        {
+          source_node: "n2",
+          source_slot: "output",
+          target_node: "n3",
+          target_slot: "input",
+        },
+      ])
+      // After node deletion, backend returns only the surviving edge
+      .mockResolvedValueOnce([
+        {
+          source_node: "n2",
+          source_slot: "output",
+          target_node: "n3",
+          target_slot: "input",
+        },
+      ]);
 
     render(<App />);
     await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());
