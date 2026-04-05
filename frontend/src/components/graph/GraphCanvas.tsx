@@ -38,6 +38,7 @@ interface GraphCanvasProps {
   onDragOver?: (event: React.DragEvent) => void;
   onNodeDragStop?: OnNodeDrag;
   onSelectionChange?: OnSelectionChangeFunc;
+  onEdgesDelete?: (edges: Edge[]) => void;
   onNodeContextMenu?: (event: React.MouseEvent, node: Node) => void;
   onPaneClick?: () => void;
 }
@@ -51,6 +52,7 @@ export function GraphCanvas({
   onDrop,
   onDragOver,
   onNodeDragStop,
+  onEdgesDelete,
   onSelectionChange,
   onNodeContextMenu,
   onPaneClick,
@@ -100,6 +102,7 @@ export function GraphCanvas({
         onDrop={onDrop}
         onDragOver={onDragOver}
         onNodeDragStop={onNodeDragStop}
+        onEdgesDelete={onEdgesDelete}
         onSelectionChange={onSelectionChange}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
