@@ -93,6 +93,9 @@ cd frontend && bun install && cd ..
 
 # Start both backend + frontend
 bun run dev
+
+# For AMD GPUs (ROCm):
+bun run dev -- --amd
 ```
 
 This runs the backend (FastAPI on `:8000`) and frontend (Vite on `:5173`) concurrently.
@@ -139,7 +142,18 @@ cd backend
 uv sync --group cuda12
 ```
 
-For **AMD GPUs** (ROCm), PyTorch's ROCm builds are mapped to `cuda` internally — install the appropriate ROCm wheels for your platform.
+For **AMD GPUs** (ROCm):
+
+```bash
+cd backend
+uv sync --group rocm --no-default-groups
+```
+
+Or use the dev script flag:
+
+```bash
+bun run dev -- --amd
+```
 
 ### Environment Variables
 

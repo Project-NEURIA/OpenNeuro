@@ -1,6 +1,6 @@
-const rocm = process.argv.includes("--rocm");
+const rocm = process.argv.includes("--rocm") || process.argv.includes("--amd");
 const uvArgs = rocm
-  ? ["run", "--no-group", "cuda12", "--group", "rocm", "python", "-m", "src.main"]
+  ? ["run", "--group", "rocm", "--no-default-groups", "python", "-m", "src.main"]
   : ["run", "python", "-m", "src.main"];
 
 const backend = Bun.spawn(["uv", ...uvArgs], {
