@@ -343,8 +343,6 @@ class ThreadedComponent[
         except Exception:
             traceback.print_exc()
         finally:
-            # Registration happens in GraphManager when start() is called.
-            # Unregister here to ensure buffered partial lines are flushed.
             get_log_store().unregister_thread()
             self._status = Status.STOPPED
 
@@ -550,4 +548,11 @@ class CompositeComponent(
     def stop(self) -> None:
         super().stop()
         if self._inner_manager is not None:
-            self._inner_manager.stop()
+            # Only signal inner components to stop, don't join —
+            # the outer GraphManager handles joining.
+            for node in self._inner_manager._graph.nodes.values():
+                for sender in node.senders.values():
+                    if sender is not None:
+                        sender._stopped = True
+            for comp in self._inner_manager._components.values():
+                comp.stop()

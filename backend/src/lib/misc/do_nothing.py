@@ -15,5 +15,6 @@ class DoNothing[T](ThreadedComponent[DoNothingInputs[T], tuple[()]]):
     description = "Consumes input and discards it"
 
     def run(self, inputs: DoNothingInputs[T], outputs: tuple[()]) -> None:
-        for _ in inputs.input:
-            pass
+        for item in inputs.input:
+            if item is None:
+                break

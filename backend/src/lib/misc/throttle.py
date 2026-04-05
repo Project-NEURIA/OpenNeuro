@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import NamedTuple
 
 from pydantic import BaseModel
@@ -40,4 +39,5 @@ class Throttle[T](ThreadedComponent[ThrottleInputs[T], ThrottleOutputs[T]]):
             if item is None:
                 break
             outputs.data.send(item)
-            time.sleep(self.config.interval)
+            if self.stop_event.wait(self.config.interval):
+                break
