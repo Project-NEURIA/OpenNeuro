@@ -613,13 +613,16 @@ def run_pipeline(wav_path: str):
         tts_mod.TTSOutputs(audio=Sender(ch6), text=Sender()),
     )
     llm_2.start(
-        llm_mod.LLMInputs(messages=Receiver(ch4, threading.Event())), llm_mod.LLMOutputs(token=Sender(ch5))
+        llm_mod.LLMInputs(messages=Receiver(ch4, threading.Event())),
+        llm_mod.LLMOutputs(token=Sender(ch5)),
     )
     asr_2.start(
-        asr_mod.ASRInputs(audio=Receiver(ch2, threading.Event())), asr_mod.ASROutputs(text=Sender(ch3))
+        asr_mod.ASRInputs(audio=Receiver(ch2, threading.Event())),
+        asr_mod.ASROutputs(text=Sender(ch3)),
     )
     vad_2.start(
-        vad_mod.VADInputs(audio=Receiver(ch1, threading.Event())), vad_mod.VADOutputs(audio=Sender(ch2))
+        vad_mod.VADInputs(audio=Receiver(ch1, threading.Event())),
+        vad_mod.VADOutputs(audio=Sender(ch2)),
     )
     file_source_2.start((), FileSourceOutputs(audio=Sender(ch1)))
 
