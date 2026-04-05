@@ -18,6 +18,7 @@ class TalkToolConfig(BaseModel):
 
 class TalkToolInputs(NamedTuple):
     tool_call: Receiver[ToolCall]
+    done_speaking: Receiver[TextFrame] | None = None
 
 
 class TalkToolOutputs(NamedTuple):
@@ -55,11 +56,32 @@ class TalkTool(
         )
 
     def run(self, inputs: TalkToolInputs, outputs: TalkToolOutputs) -> None:
+        speaking = False
+
+        if inputs.done_speaking is not None:
+            inputs.done_speaking.blocking = False
+
         for call in inputs.tool_call:
             if call is None:
                 break
             if call.name != "talk":
                 continue
+
+            # Drain done_speaking signal
+            if inputs.done_speaking is not None:
+                done = next(inputs.done_speaking, None)
+                if done is not None:
+                    speaking = False
+
+            if speaking:
+                outputs.tool_result.send(
+                    ToolResult.new(
+                        call_id=call.call_id,
+                        content="Error: still speaking. Wait until done.",
+                    )
+                )
+                continue
+
             try:
                 text = json.loads(call.arguments).get("text", "")
             except (json.JSONDecodeError, AttributeError):
@@ -67,4 +89,5 @@ class TalkTool(
             if text:
                 print(f"[Talk] {text}")
                 outputs.text.send(TextFrame.new(text=text))
+                speaking = True
             outputs.tool_result.send(ToolResult.new(call_id=call.call_id, content=""))
