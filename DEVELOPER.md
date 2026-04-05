@@ -168,14 +168,20 @@ graph LR
 - `_stopped` flag makes `send()` a no-op after pipeline stop
 
 **`Receiver[T]`** — reads from one channel as an iterator:
+- Registers with the channel on construction (`__init__` takes `channel` and `stop_event`)
 - **Blocking mode** (default): blocks on `__next__()` until data arrives or `stop_event` fires
 - **Non-blocking mode**: returns `None` immediately if no data
 - **Newest mode**: fast-forwards cursor to latest item (essential for video to prevent lag)
 - Tracks `_msg_count`, `_byte_count`, `lag` for metrics
+- Handles are **ephemeral** — created fresh on each `run()`, stored on `Node.senders`/`Node.receivers`, discarded on `stop()`
 
-#### Channel Reconciliation
+#### Channel Topology
 
-When edges are added/removed, `GraphManager._reconcile()` recomputes the optimal channel layout:
+The system separates **graph topology** (nodes + edges), **channel topology** (the wiring plan), and **wiring** (live handle creation) into three layers:
+
+1. **Graph topology** — trivial CRUD on nodes and edges
+2. **Channel topology** — `_reconcile()` computes a `(sender_plan, receiver_plan)` from the current edges. It only produces a plan, never creates Sender/Receiver handles.
+3. **Wiring** — `run()` reads the plan and creates fresh handles, storing them on `Node.senders` and `Node.receivers`. `stop()` discards them.
 
 ```mermaid
 graph TD
@@ -183,15 +189,15 @@ graph TD
     B --> C[Diff against existing channels]
     C --> D[Reuse unchanged channels]
     C --> E[Create new channels for new groups]
-    D & E --> F[Rebuild Sender/Receiver handles]
-    F --> G[Ensure every output slot has a Sender]
+    D & E --> F["Return (sender_plan, receiver_plan)"]
+    F --> G["run() creates fresh handles from plan"]
 ```
 
 Receivers sharing the same set of upstream senders share a single `Channel` instance, minimizing memory and synchronization overhead.
 
 #### UI Channels
 
-UI channels are type-system markers that route data to/from the WebSocket instead of inter-component edges:
+UI channels are type-system markers that route data to/from the WebSocket instead of inter-component edges. They are managed by `UIChannelBridge` (in `src/api/ui/bridge.py`), **not** by GraphManager:
 
 | Marker Class | Direction | Use Case |
 |---|---|---|
@@ -199,6 +205,8 @@ UI channels are type-system markers that route data to/from the WebSocket instea
 | `UIVideoSender` | component → frontend | Display JPEG video in node UI |
 | `UITextReceiver` | frontend → component | Text input from node UI |
 | `UIKeystrokeReceiver` | frontend → component | Individual keystrokes from node UI |
+
+The bridge creates UI channels via `wire(manager)`, which returns overrides passed to `GraphManager.run()`. It owns the WebSocket lifecycle via `run(ws)` — spawning outbound tasks per UI output receiver and handling inbound messages in a receive loop.
 
 ---
 
@@ -273,7 +281,7 @@ Key design decisions:
 
 ### GraphManager
 
-The `GraphManager` is the runtime orchestrator. It owns the graph definition, component instances, and all channel/handle state.
+The `GraphManager` is the runtime orchestrator. It owns the graph definition, component instances, and channel topology. Sender/Receiver handles are stored on `Node` objects, not on the manager.
 
 ```mermaid
 graph TD
@@ -281,14 +289,21 @@ graph TD
         Graph["Graph (nodes + edges)"]
         CompMap["Component instances"]
         ChanMap["Channel map"]
-        Senders["Sender handles"]
-        Receivers["Receiver handles"]
-        UIChan["UI channels"]
+    end
+
+    subgraph Node
+        Senders["senders: dict"]
+        Receivers["receivers: dict"]
+    end
+
+    subgraph UIChannelBridge
+        UISend["UI senders (server-side)"]
+        UIRecv["UI receivers (server-side)"]
     end
 
     Graph -->|"_reconcile()"| ChanMap
-    ChanMap --> Senders
-    ChanMap --> Receivers
+    ChanMap -->|"run(overrides)"| Node
+    UIChannelBridge -->|"wire() → overrides"| ChanMap
     CompMap -->|"run()"| Threads["Daemon threads"]
 ```
 
@@ -297,24 +312,24 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant Client
+    participant Bridge as UIChannelBridge
     participant GM as GraphManager
     participant Comp as Components
 
-    Client->>GM: run()
+    Client->>Bridge: wire(manager)
+    Bridge-->>Client: (recv_overrides, send_overrides)
+    Client->>GM: run(recv_overrides, send_overrides)
     GM->>Comp: stop() all (if running)
-    GM->>GM: Clear UI channels
+    GM->>GM: _reconcile() → (sender_plan, receiver_plan)
     loop For each node
-        GM->>GM: Build input/output handles
-        GM->>GM: Create UI channels
-        GM->>GM: Wire receivers (register cursors)
+        GM->>GM: Create fresh Sender/Receiver from plan + overrides
+        GM->>GM: Store on node.senders / node.receivers
     end
     GM->>Comp: setup(outputs) — all components, sequential
     GM->>Comp: start(inputs, outputs) — spawns daemon threads
-    GM->>GM: Register threads with log store
-    GM->>GM: Notify WebSocket watchers
 
     Client->>GM: stop()
-    GM->>GM: Set _stopped on all senders
+    GM->>GM: Set _stopped on all node senders
     GM->>Comp: stop() — sets stop_event on each thread
 ```
 
@@ -322,9 +337,9 @@ sequenceDiagram
 
 | Method | Effect |
 |---|---|
-| `add_node(type, init_args)` | Instantiate component, add to graph, reconcile channels |
-| `delete_node(id)` | Stop component + connected neighbors, remove edges, reconcile |
-| `update_node_init_args(id, args)` | Recreate component; if graph was running, auto-restart (hot-reload) |
+| `add_primitive_node(type_, init_args)` | Instantiate component, add to graph, reconcile channels |
+| `delete_node(id)` | Stop component + downstream nodes, remove edges, reconcile |
+| `update_primitive_node_init_args(id, args)` | Recreate component; returns `(node, was_running)` — caller handles restart |
 | `add_edge(edge)` / `delete_edge(edge)` | Modify graph topology, reconcile channels |
 | `reset(graph)` | Replace entire graph — stop everything, re-instantiate all components |
 
@@ -415,6 +430,8 @@ graph TD
 ```
 
 **State management** is local React hooks — no Redux or Zustand. ReactFlow manages node/edge state via `useNodesState` / `useEdgesState`. A single `UIChannelContext` provides the WebSocket manager.
+
+The frontend calls the backend directly at `http://localhost:8000` via `API_BASE` / `WS_BASE` constants in `src/lib/api.ts` — no Vite proxy.
 
 **Key hooks:**
 
