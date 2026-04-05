@@ -114,6 +114,22 @@ def is_subtype(sub: str = Query(), sup: str = Query()) -> bool:
         return False
 
 
+@router.post("/subtype-pairs")
+def subtype_pairs(names: list[str]) -> list[list[str]]:
+    """Return all [sub, sup] pairs where sub is a subtype of sup."""
+    result: list[list[str]] = []
+    for a in names:
+        for b in names:
+            if a == b:
+                continue
+            try:
+                if issubclass(_resolve_type(a), _resolve_type(b)):
+                    result.append([a, b])
+            except ValueError:
+                pass
+    return result
+
+
 @router.post("/{component_name}/options")
 def get_options(
     component_name: str,

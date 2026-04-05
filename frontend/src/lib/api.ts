@@ -40,6 +40,16 @@ export async function fetchIsSubtype(sub: string, sup: string): Promise<boolean>
   return res.json();
 }
 
+export async function fetchSubtypePairs(names: string[]): Promise<[string, string][]> {
+  const res = await fetch(`${API_BASE}/component/subtype-pairs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(names),
+  });
+  if (!res.ok) throw new Error(`subtype-pairs failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchNodes(): Promise<NodeResponse[]> {
   const res = await fetch(`${API_BASE}/graph/nodes`);
   if (!res.ok) throw new Error(`Fetch nodes failed: ${res.status}`);
