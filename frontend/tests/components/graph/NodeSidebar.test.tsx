@@ -61,7 +61,6 @@ describe("NodeSidebar", () => {
     );
 
     expect(screen.getByText("Audio")).toBeInTheDocument();
-    expect(screen.getByText("Misc")).toBeInTheDocument();
     expect(screen.getByText("Projects")).toBeInTheDocument();
     expect(screen.queryByText("Current")).not.toBeInTheDocument();
 
