@@ -116,17 +116,20 @@ class Sender[T]:
 
 
 class Receiver[T]:
-    """Handle for receiving from a channel. Is itself the iterator."""
+    """Handle for receiving from a channel. Is itself the iterator.
 
-    def __init__(self, channel: Channel[T]) -> None:
+    Registers with the channel on construction, unregisters on GC.
+    """
+
+    def __init__(self, channel: Channel[T], stop_event: threading.Event) -> None:
         self._channel = channel
+        self._stop_event = stop_event
+        self._sub_id: int = id(self)
         self._msg_count: int = 0
         self._byte_count: int = 0
-        self._sub_id: int | None = None
-        self._stop_event: threading.Event | None = None
-        self._wired: bool = False
         self._newest: bool = False
         self.blocking: bool = True
+        self._channel._register(self._sub_id)
 
     @property
     def newest(self) -> bool:
@@ -137,32 +140,15 @@ class Receiver[T]:
         if self._newest == value:
             return
         self._newest = value
-        if self._wired:
-            self._channel._reregister(self._sub_id, newest=value)  # type: ignore[arg-type]
-
-    def _wire(self, stop_event: threading.Event) -> None:
-        """Register with the channel. Called by GraphManager.run()."""
-        if self._wired:
-            return
-        self._sub_id = id(self)
-        self._stop_event = stop_event
-        self._channel._register(self._sub_id, newest=self._newest)
-        self._wired = True
-
-    def _unwire(self) -> None:
-        """Unregister from the channel. Idempotent."""
-        if not self._wired:
-            return
-        self._channel._unregister(self._sub_id)  # type: ignore[arg-type]
-        self._wired = False
+        self._channel._reregister(self._sub_id, newest=value)
 
     def __iter__(self) -> Iterator[T | None]:
         return self
 
     def __next__(self) -> T | None:
         item = self._channel._get(
-            self._sub_id,  # type: ignore[arg-type]
-            self._stop_event,  # type: ignore[arg-type]
+            self._sub_id,
+            self._stop_event,
             blocking=self.blocking,
         )
         if item is not None:
@@ -172,18 +158,17 @@ class Receiver[T]:
 
     def __del__(self) -> None:
         try:
-            self._unwire()
+            self._channel._unregister(self._sub_id)
         except Exception:
             pass
 
     @property
     def lag(self) -> int:
-        sub_id = self._sub_id
-        if sub_id is None or self._newest:
+        if self._newest:
             return 0
         ch = self._channel
         with ch._condition:
-            cursor = ch._cursors.get(sub_id)
+            cursor = ch._cursors.get(self._sub_id)
             if cursor is None:
                 return 0
             head = ch._offset + len(ch._items)

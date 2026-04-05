@@ -159,7 +159,7 @@ vi.mock("@/components/graph/GraphCanvas", () => ({
         <button onClick={() => firstGraphNode && (props.onNodesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstGraphNode.id }])}>
           remove-node
         </button>
-        <button onClick={() => firstEdge && (props.onEdgesChange as ((changes: unknown[]) => void) | undefined)?.([{ type: "remove", id: firstEdge.id }])}>
+        <button onClick={() => firstEdge && (props.onEdgesDelete as ((edges: unknown[]) => void) | undefined)?.([firstEdge])}>
           remove-edge
         </button>
         <button
@@ -1077,20 +1077,30 @@ describe("App", () => {
   });
 
   it("removes only edges touching a deleted node and accepts anyOf ref-backed config drops", async () => {
-    vi.spyOn(api, "fetchEdges").mockResolvedValueOnce([
-      {
-        source_node: "n1",
-        source_slot: "output",
-        target_node: "n2",
-        target_slot: "input",
-      },
-      {
-        source_node: "n2",
-        source_slot: "output",
-        target_node: "n3",
-        target_slot: "input",
-      },
-    ]);
+    vi.spyOn(api, "fetchEdges")
+      .mockResolvedValueOnce([
+        {
+          source_node: "n1",
+          source_slot: "output",
+          target_node: "n2",
+          target_slot: "input",
+        },
+        {
+          source_node: "n2",
+          source_slot: "output",
+          target_node: "n3",
+          target_slot: "input",
+        },
+      ])
+      // After node deletion, backend returns only the surviving edge
+      .mockResolvedValueOnce([
+        {
+          source_node: "n2",
+          source_slot: "output",
+          target_node: "n3",
+          target_slot: "input",
+        },
+      ]);
 
     render(<App />);
     await waitFor(() => expect(screen.getByText("chooser:false")).toBeInTheDocument());

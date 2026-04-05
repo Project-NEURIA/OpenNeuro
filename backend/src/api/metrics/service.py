@@ -9,7 +9,8 @@ from src.api.metrics.dto import (
     ReceiverSnapshot,
     SenderSnapshot,
 )
-from src.core.graph import GraphManager, ReceiverKey, SenderKey
+from src.core.graph import GraphManager
+from src.core.utils import ReceiverKey, SenderKey
 
 
 class MetricsCollector:

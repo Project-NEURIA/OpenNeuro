@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import types
 
 import pytest
@@ -33,7 +34,7 @@ class FakeManager:
         self._reset_called = False
         channel = Channel()
         self._sender = Sender(channel)
-        self._receiver = Receiver(channel)
+        self._receiver = Receiver(channel, threading.Event())
 
     def get_node(self, node_id: str):
         return self.graph.nodes.get(node_id)
@@ -50,7 +51,7 @@ class FakeManager:
     def delete_edge(self, edge: Edge) -> None:
         self.graph.edges.remove(edge)
 
-    def run(self) -> None:
+    def run(self, receiver_overrides=None, sender_overrides=None) -> None:
         self._run_called = True
 
     def stop(self) -> None:
@@ -60,9 +61,13 @@ class FakeManager:
         self._reset_called = True
 
     def components(self):
+        _no_ui = lambda: {}  # noqa: E731
         return {
             "a": types.SimpleNamespace(
-                type_="A", status=types.SimpleNamespace(value="running")
+                type_="A",
+                status=types.SimpleNamespace(value="running"),
+                get_ui_input_types=_no_ui,
+                get_ui_output_types=_no_ui,
             )
         }
 
@@ -198,7 +203,10 @@ def test_edge_run_save_services(tmp_path, monkeypatch) -> None:
     with pytest.raises(KeyError):
         edge_service.delete_edge(manager, "a", "out", "b", "in")
 
-    run_service.start_all(manager)
+    from src.api.ui.bridge import UIChannelBridge
+
+    bridge = UIChannelBridge()
+    run_service.start_all(manager, bridge)
     run_service.stop_all(manager)
     assert manager._run_called is True
     assert manager._stop_called is True
@@ -224,9 +232,7 @@ def test_logs_controller(monkeypatch) -> None:
 def test_metrics_collector_collect() -> None:
     manager = FakeManager()
     frame = TextFrame.new(text="hello")
-    stop_event = types.SimpleNamespace(is_set=lambda: False)
     manager._receiver.blocking = False
-    manager._receiver._wire(stop_event)
     manager._sender.send(frame)
     next(manager._receiver)
 
@@ -235,7 +241,6 @@ def test_metrics_collector_collect() -> None:
     second = collector.collect(manager)
     assert "a" in first.nodes
     assert second.nodes["a"].senders["out"].msg_count_delta == 0
-    manager._receiver._unwire()
 
 
 def test_project_service(monkeypatch, tmp_path) -> None:

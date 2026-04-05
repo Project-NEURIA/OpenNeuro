@@ -1,7 +1,30 @@
 import { useState, useRef } from "react";
-import { Mic, AudioLines, MessageSquareText, Brain, Volume2, Radio, Speaker, Video, Monitor, Play, Camera, Puzzle, FolderOpen, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import {
+  Mic,
+  AudioLines,
+  MessageSquareText,
+  Brain,
+  Volume2,
+  Radio,
+  Speaker,
+  Video,
+  Monitor,
+  Play,
+  Camera,
+  Puzzle,
+  FolderOpen,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ComponentInfo, IOTag, FunctionalityTag, GPUTag } from "@/lib/types";
+import type {
+  ComponentInfo,
+  IOTag,
+  FunctionalityTag,
+  GPUTag,
+} from "@/lib/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Mic,
@@ -17,6 +40,24 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   VideoStream: Monitor,
 };
 
+const funcLabels: Record<FunctionalityTag, string> = {
+  audio: "Audio",
+  vision: "Vision",
+  llm: "LLM",
+  motion: "Motion",
+  misc: "Misc",
+  other: "Other",
+};
+
+const funcOrder: FunctionalityTag[] = [
+  "audio",
+  "vision",
+  "llm",
+  "motion",
+  "misc",
+  "other",
+];
+
 const ioLabels: Record<IOTag, string> = {
   source: "Sources",
   conduit: "Conduits",
@@ -25,49 +66,94 @@ const ioLabels: Record<IOTag, string> = {
 
 const ioOrder: IOTag[] = ["source", "conduit", "sink"];
 
-const funcLabels: Record<FunctionalityTag, string> = {
-  audio: "Audio",
-  video: "Video",
-  llm: "LLM",
-  image: "Image",
-  movement: "Movement",
-  misc: "Misc",
-  other: "Other",
-};
-
 const ioAccent: Record<IOTag, string> = {
   source: "text-source",
   conduit: "text-conduit",
   sink: "text-sink",
 };
 
-const ioTagColors: Record<IOTag, { bg: string; text: string; border: string }> = {
-  source: { bg: "bg-source/15", text: "text-source", border: "border-source/30" },
-  conduit: { bg: "bg-conduit/15", text: "text-conduit", border: "border-conduit/30" },
+const ioTagColors: Record<
+  IOTag,
+  { bg: string; text: string; border: string }
+> = {
+  source: {
+    bg: "bg-source/15",
+    text: "text-source",
+    border: "border-source/30",
+  },
+  conduit: {
+    bg: "bg-conduit/15",
+    text: "text-conduit",
+    border: "border-conduit/30",
+  },
   sink: { bg: "bg-sink/15", text: "text-sink", border: "border-sink/30" },
 };
 
-const funcTagColors: Record<FunctionalityTag, { bg: string; text: string; border: string }> = {
-  audio: { bg: "bg-tag-audio/15", text: "text-tag-audio", border: "border-tag-audio/30" },
-  video: { bg: "bg-tag-video/15", text: "text-tag-video", border: "border-tag-video/30" },
-  llm: { bg: "bg-tag-llm/15", text: "text-tag-llm", border: "border-tag-llm/30" },
-  image: { bg: "bg-tag-image/15", text: "text-tag-image", border: "border-tag-image/30" },
-  movement: { bg: "bg-tag-movement/15", text: "text-tag-movement", border: "border-tag-movement/30" },
-  misc: { bg: "bg-tag-misc/15", text: "text-tag-misc", border: "border-tag-misc/30" },
-  other: { bg: "bg-tag-other/15", text: "text-tag-other", border: "border-tag-other/30" },
+const funcTagColors: Record<
+  FunctionalityTag,
+  { bg: string; text: string; border: string }
+> = {
+  audio: {
+    bg: "bg-tag-audio/15",
+    text: "text-tag-audio",
+    border: "border-tag-audio/30",
+  },
+  vision: {
+    bg: "bg-tag-vision/15",
+    text: "text-tag-vision",
+    border: "border-tag-vision/30",
+  },
+  llm: {
+    bg: "bg-tag-llm/15",
+    text: "text-tag-llm",
+    border: "border-tag-llm/30",
+  },
+  motion: {
+    bg: "bg-tag-motion/15",
+    text: "text-tag-motion",
+    border: "border-tag-motion/30",
+  },
+  misc: {
+    bg: "bg-tag-misc/15",
+    text: "text-tag-misc",
+    border: "border-tag-misc/30",
+  },
+  other: {
+    bg: "bg-tag-other/15",
+    text: "text-tag-other",
+    border: "border-tag-other/30",
+  },
 };
 
-const gpuTagColors: Record<string, { bg: string; text: string; border: string }> = {
-  nvidia: { bg: "bg-tag-nvidia/15", text: "text-tag-nvidia", border: "border-tag-nvidia/30" },
-  apple: { bg: "bg-tag-apple/15", text: "text-tag-apple", border: "border-tag-apple/30" },
-  intel: { bg: "bg-tag-intel/15", text: "text-tag-intel", border: "border-tag-intel/30" },
-  amd: { bg: "bg-tag-amd/15", text: "text-tag-amd", border: "border-tag-amd/30" },
+const gpuTagColors: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  nvidia: {
+    bg: "bg-tag-nvidia/15",
+    text: "text-tag-nvidia",
+    border: "border-tag-nvidia/30",
+  },
+  apple: {
+    bg: "bg-tag-apple/15",
+    text: "text-tag-apple",
+    border: "border-tag-apple/30",
+  },
+  intel: {
+    bg: "bg-tag-intel/15",
+    text: "text-tag-intel",
+    border: "border-tag-intel/30",
+  },
+  amd: {
+    bg: "bg-tag-amd/15",
+    text: "text-tag-amd",
+    border: "border-tag-amd/30",
+  },
 };
 
 /** Render simple inline markdown: **bold**, *italic*, `code` */
 function InlineMarkdown({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
-  // Match **bold**, *italic*, `code`
   const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -78,11 +164,26 @@ function InlineMarkdown({ text }: { text: string }) {
       parts.push(text.slice(lastIndex, match.index));
     }
     if (match[2]) {
-      parts.push(<strong key={key++} className="font-bold text-white/90">{match[2]}</strong>);
+      parts.push(
+        <strong key={key++} className="font-bold text-white/90">
+          {match[2]}
+        </strong>,
+      );
     } else if (match[3]) {
-      parts.push(<em key={key++} className="italic text-white/70">{match[3]}</em>);
+      parts.push(
+        <em key={key++} className="italic text-white/70">
+          {match[3]}
+        </em>,
+      );
     } else if (match[4]) {
-      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80">{match[4]}</code>);
+      parts.push(
+        <code
+          key={key++}
+          className="px-1 py-0.5 rounded bg-white/[0.08] text-[10px] font-mono text-white/80"
+        >
+          {match[4]}
+        </code>,
+      );
     }
     lastIndex = match.index + match[0].length;
   }
@@ -97,12 +198,15 @@ interface NodeSidebarProps {
   currentProject: string;
 }
 
-/** Group components by IO → Functionality. Components with no tags go into `untagged`. */
+/** Group components by Functionality → IO. */
 function groupComponents(components: ComponentInfo[]) {
-  const groups: Record<IOTag, Record<FunctionalityTag, ComponentInfo[]>> = {
-    source: {} as Record<FunctionalityTag, ComponentInfo[]>,
-    conduit: {} as Record<FunctionalityTag, ComponentInfo[]>,
-    sink: {} as Record<FunctionalityTag, ComponentInfo[]>,
+  const groups: Record<FunctionalityTag, Record<IOTag, ComponentInfo[]>> = {
+    audio: {} as Record<IOTag, ComponentInfo[]>,
+    vision: {} as Record<IOTag, ComponentInfo[]>,
+    llm: {} as Record<IOTag, ComponentInfo[]>,
+    motion: {} as Record<IOTag, ComponentInfo[]>,
+    misc: {} as Record<IOTag, ComponentInfo[]>,
+    other: {} as Record<IOTag, ComponentInfo[]>,
   };
   const untagged: ComponentInfo[] = [];
 
@@ -115,10 +219,10 @@ function groupComponents(components: ComponentInfo[]) {
       continue;
     }
 
-    for (const io of ioTags) {
-      for (const func of funcTags) {
-        if (!groups[io][func]) groups[io][func] = [];
-        groups[io][func].push(comp);
+    for (const func of funcTags) {
+      for (const io of ioTags) {
+        if (!groups[func][io]) groups[func][io] = [];
+        groups[func][io].push(comp);
       }
     }
   }
@@ -126,7 +230,15 @@ function groupComponents(components: ComponentInfo[]) {
   return { groups, untagged };
 }
 
-function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: React.RefObject<HTMLDivElement | null>; y: number }) {
+function InfoPanel({
+  item,
+  sidebarRef,
+  y,
+}: {
+  item: ComponentInfo;
+  sidebarRef: React.RefObject<HTMLDivElement | null>;
+  y: number;
+}) {
   const inputs = Object.entries(item.inputs);
   const outputs = Object.entries(item.outputs);
   const rect = sidebarRef.current?.getBoundingClientRect();
@@ -143,42 +255,77 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
       )}
       style={{ left: rect.right + 8, top: Math.max(8, rect.top + y - 40) }}
     >
-      {/* Type */}
       <div className="font-bold text-[13px] text-white mb-1">{item.type_}</div>
 
-      {/* Description */}
       {item.description && (
         <div className="text-muted-foreground mb-2 leading-relaxed text-[11px]">
           <InlineMarkdown text={item.description} />
         </div>
       )}
 
-      {/* Tags */}
       <div className="flex flex-wrap gap-1 mb-2">
         {item.tags.io.map((t) => {
           const colors = ioTagColors[t];
           return (
-            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
+            <span
+              key={t}
+              className={cn(
+                "px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold",
+                colors.bg,
+                colors.text,
+                colors.border,
+              )}
+            >
+              {t}
+            </span>
           );
         })}
         {item.tags.functionality.map((t) => {
           const colors = funcTagColors[t];
+          if (!colors) return null;
           return (
-            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
+            <span
+              key={t}
+              className={cn(
+                "px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold",
+                colors.bg,
+                colors.text,
+                colors.border,
+              )}
+            >
+              {t}
+            </span>
           );
         })}
-        {item.tags.gpu.filter((g: GPUTag) => g !== "cpu").map((t: GPUTag) => {
-          const colors = gpuTagColors[t] ?? { bg: "bg-white/[0.06]", text: "text-white/60", border: "border-white/10" };
-          return (
-            <span key={t} className={cn("px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold", colors.bg, colors.text, colors.border)}>{t}</span>
-          );
-        })}
+        {item.tags.gpu
+          .filter((g: GPUTag) => g !== "cpu")
+          .map((t: GPUTag) => {
+            const colors = gpuTagColors[t] ?? {
+              bg: "bg-white/[0.06]",
+              text: "text-white/60",
+              border: "border-white/10",
+            };
+            return (
+              <span
+                key={t}
+                className={cn(
+                  "px-1.5 py-0.5 rounded border uppercase tracking-wider text-[9px] font-semibold",
+                  colors.bg,
+                  colors.text,
+                  colors.border,
+                )}
+              >
+                {t}
+              </span>
+            );
+          })}
       </div>
 
-      {/* IO */}
       {inputs.length > 0 && (
         <div className="mb-1.5">
-          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Inputs</div>
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">
+            Inputs
+          </div>
           {inputs.map(([k, v]) => (
             <div key={k} className="flex gap-1.5 text-white/70">
               <span className="text-muted-foreground">{k}:</span>
@@ -189,7 +336,9 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
       )}
       {outputs.length > 0 && (
         <div>
-          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Outputs</div>
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">
+            Outputs
+          </div>
           {outputs.map(([k, v]) => (
             <div key={k} className="flex gap-1.5 text-white/70">
               <span className="text-muted-foreground">{k}:</span>
@@ -199,12 +348,15 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
         </div>
       )}
 
-      {/* Init params */}
       {Object.keys(item.init).length > 0 && (
         <div className="mt-1.5">
-          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Config</div>
+          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">
+            Config
+          </div>
           {Object.keys(item.init).map((k) => (
-            <div key={k} className="text-white/70">{k}</div>
+            <div key={k} className="text-white/70">
+              {k}
+            </div>
           ))}
         </div>
       )}
@@ -212,9 +364,15 @@ function InfoPanel({ item, sidebarRef, y }: { item: ComponentInfo; sidebarRef: R
   );
 }
 
-export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
+export function NodeSidebar({
+  components,
+  currentProject,
+}: NodeSidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [hovered, setHovered] = useState<{ item: ComponentInfo; y: number } | null>(null);
+  const [hovered, setHovered] = useState<{
+    item: ComponentInfo;
+    y: number;
+  } | null>(null);
   const [search, setSearch] = useState("");
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -241,7 +399,8 @@ export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
   function onItemEnter(e: React.MouseEvent, item: ComponentInfo) {
     clearTimeout(hoverTimeout.current);
     const sidebarRect = sidebarRef.current?.getBoundingClientRect();
-    const y = e.currentTarget.getBoundingClientRect().top - (sidebarRect?.top ?? 0);
+    const y =
+      e.currentTarget.getBoundingClientRect().top - (sidebarRect?.top ?? 0);
     hoverTimeout.current = setTimeout(() => setHovered({ item, y }), 300);
   }
 
@@ -251,7 +410,9 @@ export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
   }
 
   const primitives = components.filter((c) => !c.is_composite);
-  const composites = components.filter((c) => c.is_composite && c.type_ !== currentProject);
+  const composites = components.filter(
+    (c) => c.is_composite && c.type_ !== currentProject,
+  );
   const query = search.toLowerCase();
   const filtered = query
     ? primitives.filter((c) => c.type_.toLowerCase().includes(query))
@@ -263,191 +424,215 @@ export function NodeSidebar({ components, currentProject }: NodeSidebarProps) {
 
   return (
     <>
-    <div
-      ref={sidebarRef}
-      className={cn(
-        "absolute top-4 left-4 z-10 w-52",
-        "rounded-2xl border border-glass-border",
-        "bg-glass backdrop-blur-xs backdrop-saturate-150",
-        "shadow-2xl shadow-black/40",
-        "p-3 flex flex-col gap-0.5 max-h-[70vh] overflow-hidden",
-      )}
-    >
-      <h2 className="text-sm font-semibold text-white px-1 mb-1 shrink-0">
-        Components
-      </h2>
-      <div className="relative shrink-0 mx-0.5 mb-1">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search..."
-          className={cn(
-            "w-full pl-7 pr-7 py-1.5 text-[11px] text-white/90 placeholder:text-muted-foreground",
-            "bg-white/[0.06] border border-glass-border rounded-lg",
-            "outline-none focus:border-white/20 transition-colors",
-          )}
-        />
-        {search && (
-          <button
-            onClick={() => setSearch("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+      <div
+        ref={sidebarRef}
+        className={cn(
+          "absolute top-4 left-4 z-10 w-52",
+          "rounded-2xl border border-glass-border",
+          "bg-glass backdrop-blur-xs backdrop-saturate-150",
+          "shadow-2xl shadow-black/40",
+          "p-3 flex flex-col gap-0.5 max-h-[70vh] overflow-hidden",
         )}
-      </div>
-      <div className="flex flex-col gap-0.5 overflow-y-auto overscroll-none min-h-0">
-        {ioOrder.map((io) => {
-          const funcGroups = groups[io];
-          const funcKeys = Object.keys(funcGroups) as FunctionalityTag[];
-          if (funcKeys.length === 0) return null;
+      >
+        <h2 className="text-sm font-semibold text-white px-1 mb-1 shrink-0">
+          Components
+        </h2>
+        <div className="relative shrink-0 mx-0.5 mb-1">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            className={cn(
+              "w-full pl-7 pr-7 py-1.5 text-[11px] text-white/90 placeholder:text-muted-foreground",
+              "bg-white/[0.06] border border-glass-border rounded-lg",
+              "outline-none focus:border-white/20 transition-colors",
+            )}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-0.5 overflow-y-auto overscroll-none min-h-0">
+          {funcOrder.map((func) => {
+            const ioGroups = groups[func];
+            const ioKeys = ioOrder.filter((io) => ioGroups[io]?.length > 0);
+            if (ioKeys.length === 0) return null;
 
-          const ioKey = `io:${io}`;
-          const ioCollapsed = collapsed[ioKey];
+            const funcKey = `func:${func}`;
+            const funcCollapsed = collapsed[funcKey];
 
-          return (
-            <div key={io}>
-              <button
-                onClick={() => toggle(ioKey)}
-                className={cn(
-                  "flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider",
-                  ioAccent[io],
-                )}
-              >
-                {ioCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                {ioLabels[io]}
-              </button>
+            return (
+              <div key={func}>
+                <button
+                  onClick={() => toggle(funcKey)}
+                  className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  {funcCollapsed ? (
+                    <ChevronRight size={12} />
+                  ) : (
+                    <ChevronDown size={12} />
+                  )}
+                  {funcLabels[func]}
+                </button>
 
-              {!ioCollapsed && funcKeys.map((func) => {
-                const items = funcGroups[func]!;
-                const funcKey = `${io}:${func}`;
-                const funcCollapsed = collapsed[funcKey];
+                {!funcCollapsed &&
+                  ioKeys.map((io) => {
+                    const items = ioGroups[io]!;
+                    const ioKey = `${func}:${io}`;
+                    const ioCollapsed = collapsed[ioKey];
 
-                return (
-                  <div key={func} className="ml-2">
-                    <button
-                      onClick={() => toggle(funcKey)}
-                      className="flex items-center gap-1.5 w-full px-1 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                    >
-                      {funcCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
-                      {funcLabels[func]}
-                    </button>
-
-                    {!funcCollapsed && items.map((item) => {
-                      const Icon = iconMap[item.type_] ?? Puzzle;
-                      return (
-                        <div
-                          key={item.type_}
-                          draggable
-                          onDragStart={(e) => onDragStart(e, item)}
-                          onMouseEnter={(e) => onItemEnter(e, item)}
-                          onMouseLeave={onItemLeave}
+                    return (
+                      <div key={io} className="ml-2">
+                        <button
+                          onClick={() => toggle(ioKey)}
                           className={cn(
-                            "flex items-center gap-2.5 px-3 py-2 ml-2 cursor-grab",
-                            "transition-all duration-200",
-                            "hover:bg-glass-hover",
+                            "flex items-center gap-1.5 w-full px-1 py-1 text-[10px] font-semibold uppercase tracking-wider",
+                            ioAccent[io],
                           )}
                         >
-                          <Icon className={cn("w-3.5 h-3.5 shrink-0", ioAccent[io] + "/70")} />
-                          <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
-                            {item.type_}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                          {ioCollapsed ? (
+                            <ChevronRight size={10} />
+                          ) : (
+                            <ChevronDown size={10} />
+                          )}
+                          {ioLabels[io]}
+                        </button>
 
-        {/* Untagged components */}
-        {untagged.length > 0 && (
-          <div>
-            <button
-              onClick={() => toggle("io:untagged")}
-              className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
-            >
-              {collapsed["io:untagged"] ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-              Other
-            </button>
-            {!collapsed["io:untagged"] && untagged.map((item) => {
-              const Icon = iconMap[item.type_] ?? Puzzle;
-              return (
-                <div
-                  key={item.type_}
-                  draggable
-                  onDragStart={(e) => onDragStart(e, item)}
-                  onMouseEnter={(e) => onItemEnter(e, item)}
-                  onMouseLeave={onItemLeave}
-                  className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
-                    "transition-all duration-200",
-                    "hover:bg-glass-hover",
-                  )}
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />
-                  <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
-                    {item.type_}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Projects section */}
-        {filteredComposites.length > 0 && (
-          <div>
-            <div className="border-t border-white/10 my-1.5" />
-            <button
-              onClick={() => toggle("projects")}
-              className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-purple-400"
-            >
-              {collapsed["projects"] ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-              Projects
-            </button>
-            {!collapsed["projects"] && filteredComposites.map((item) => (
-              <div
-                key={item.type_}
-                draggable
-                onDragStart={(e) => onCompositeDragStart(e, item)}
-                onMouseEnter={(e) => onItemEnter(e, item)}
-                onMouseLeave={onItemLeave}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
-                  "transition-all duration-200",
-                  "hover:bg-glass-hover",
-                )}
-              >
-                <FolderOpen className="w-3.5 h-3.5 shrink-0 text-purple-400/70" />
-                <span className="text-[12px] font-medium text-white/80 tracking-tight">
-                  {item.type_}
-                </span>
+                        {!ioCollapsed &&
+                          items.map((item) => {
+                            const Icon = iconMap[item.type_] ?? Puzzle;
+                            return (
+                              <div
+                                key={item.type_}
+                                draggable
+                                onDragStart={(e) => onDragStart(e, item)}
+                                onMouseEnter={(e) => onItemEnter(e, item)}
+                                onMouseLeave={onItemLeave}
+                                className={cn(
+                                  "flex items-center gap-2.5 px-3 py-2 ml-2 cursor-grab",
+                                  "transition-all duration-200",
+                                  "hover:bg-glass-hover",
+                                )}
+                              >
+                                <Icon
+                                  className={cn(
+                                    "w-3.5 h-3.5 shrink-0",
+                                    ioAccent[io] + "/70",
+                                  )}
+                                />
+                                <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
+                                  {item.type_}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    );
+                  })}
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+
+          {/* Untagged components */}
+          {untagged.length > 0 && (
+            <div>
+              <button
+                onClick={() => toggle("untagged")}
+                className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                {collapsed["untagged"] ? (
+                  <ChevronRight size={12} />
+                ) : (
+                  <ChevronDown size={12} />
+                )}
+                Other
+              </button>
+              {!collapsed["untagged"] &&
+                untagged.map((item) => {
+                  const Icon = iconMap[item.type_] ?? Puzzle;
+                  return (
+                    <div
+                      key={item.type_}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, item)}
+                      onMouseEnter={(e) => onItemEnter(e, item)}
+                      onMouseLeave={onItemLeave}
+                      className={cn(
+                        "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
+                        "transition-all duration-200",
+                        "hover:bg-glass-hover",
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />
+                      <span className="text-[12px] font-medium text-white/80 tracking-tight truncate">
+                        {item.type_}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Projects section */}
+          {filteredComposites.length > 0 && (
+            <div>
+              <div className="border-t border-white/10 my-1.5" />
+              <button
+                onClick={() => toggle("projects")}
+                className="flex items-center gap-1.5 w-full px-1 py-1.5 text-[11px] font-bold uppercase tracking-wider text-purple-400"
+              >
+                {collapsed["projects"] ? (
+                  <ChevronRight size={12} />
+                ) : (
+                  <ChevronDown size={12} />
+                )}
+                Projects
+              </button>
+              {!collapsed["projects"] &&
+                filteredComposites.map((item) => (
+                  <div
+                    key={item.type_}
+                    draggable
+                    onDragStart={(e) => onCompositeDragStart(e, item)}
+                    onMouseEnter={(e) => onItemEnter(e, item)}
+                    onMouseLeave={onItemLeave}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-2 ml-4 cursor-grab",
+                      "transition-all duration-200",
+                      "hover:bg-glass-hover",
+                    )}
+                  >
+                    <FolderOpen className="w-3.5 h-3.5 shrink-0 text-purple-400/70" />
+                    <span className="text-[12px] font-medium text-white/80 tracking-tight">
+                      {item.type_}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
 
-    </div>
-
-    {/* Hover info panel — rendered outside sidebar to avoid overflow clip */}
-    {hovered && (
-      <div
-        onMouseEnter={() => clearTimeout(hoverTimeout.current)}
-        onMouseLeave={onItemLeave}
-      >
-        <InfoPanel
-          item={hovered.item}
-          sidebarRef={sidebarRef}
-          y={hovered.y}
-        />
-      </div>
-    )}
-  </>
+      {/* Hover info panel — rendered outside sidebar to avoid overflow clip */}
+      {hovered && (
+        <div
+          onMouseEnter={() => clearTimeout(hoverTimeout.current)}
+          onMouseLeave={onItemLeave}
+        >
+          <InfoPanel
+            item={hovered.item}
+            sidebarRef={sidebarRef}
+            y={hovered.y}
+          />
+        </div>
+      )}
+    </>
   );
 }

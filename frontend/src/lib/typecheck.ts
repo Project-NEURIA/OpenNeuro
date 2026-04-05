@@ -4,18 +4,18 @@
 // https://doi.org/10.1145/3409006
 
 import type { Graph, SlotType } from "./types";
-import { fetchIsSubtype } from "./api";
+import { fetchSubtypePairs } from "./api";
 
 // Module-level subtype cache: "sub:sup" → true for known subtype pairs.
-// Populated by warmSubtypeCache() before solving.
+// Populated by warmSubtypeCache() with a single batch request.
 const subtypeSet = new Set<string>();
 
 export async function warmSubtypeCache(concreteNames: Iterable<string>): Promise<void> {
   const names = [...concreteNames];
-  const pairs = names.flatMap((a) => names.filter((b) => a !== b).map((b) => [a, b] as const));
-  const results = await Promise.all(pairs.map(async ([a, b]) => [a, b, await fetchIsSubtype(a, b)] as const));
-  for (const [a, b, ok] of results) {
-    if (ok) subtypeSet.add(`${a}:${b}`);
+  if (names.length === 0) return;
+  const pairs = await fetchSubtypePairs(names);
+  for (const [a, b] of pairs) {
+    subtypeSet.add(`${a}:${b}`);
   }
 }
 

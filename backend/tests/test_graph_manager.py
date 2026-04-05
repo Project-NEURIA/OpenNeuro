@@ -7,9 +7,9 @@ audio/ML pipeline components.  Its responsibilities are:
 
   Responsibility            | Interface method(s)
   ------------------------- | -------------------------------------------
-  Node lifecycle            | add_node, delete_node, get_node, update_node
+  Node lifecycle            | add_primitive_node, delete_node, get_node, update_node
   Edge lifecycle            | add_edge, delete_edge
-  Hot-reload of init args   | update_node_init_args
+  Hot-reload of init args   | update_primitive_node_init_args
   Channel reconciliation    | _reconcile (private), _group (static)
   Pipeline start / stop     | run, stop, reset
   Handle construction       | _build_tuple (static)
@@ -104,9 +104,9 @@ class TestAddNode:
     manager's internal dicts must stay in sync.
     """
 
-    def test_add_node(self):
+    def test_add_primitive_node(self):
         gm = GraphManager(_empty_graph())
-        node_id, node = gm.add_node("StubComponent", {})
+        node_id, node = gm.add_primitive_node("StubComponent", {})
 
         assert node_id in gm.graph.nodes
         assert gm.graph.nodes[node_id].type == "StubComponent"
@@ -126,8 +126,8 @@ class TestAddAndDeleteEdge:
 
     def test_add_and_delete_edge(self):
         gm = GraphManager(_empty_graph())
-        id_a, _ = gm.add_node("StubComponent", {})
-        id_b, _ = gm.add_node("StubComponent", {})
+        id_a, _ = gm.add_primitive_node("StubComponent", {})
+        id_b, _ = gm.add_primitive_node("StubComponent", {})
 
         edge = Edge(
             source_node=id_a,
@@ -136,18 +136,23 @@ class TestAddAndDeleteEdge:
             target_slot="data",
         )
         gm.add_edge(edge)
+        gm.run()
 
-        # After adding: receiver handle exists for the target slot
+        # After run: receiver handle exists for the target slot
         assert (id_b, "data") in gm.receiver_handles()
         # Sender handle for source slot should be wired to at least one channel
         sender = gm.sender_handles().get((id_a, "data"))
         assert sender is not None
         assert len(sender._channels) >= 1
 
+        gm.stop()
         gm.delete_edge(edge)
+        gm.run()
 
-        # After deleting: receiver handle should be gone
-        assert (id_b, "data") not in gm.receiver_handles()
+        # After deleting and re-running: sender has no channels (unconnected)
+        sender = gm.sender_handles().get((id_a, "data"))
+        assert sender is not None
+        assert len(sender._channels) == 0
 
 
 class TestDeleteNodeRemovesEdges:
@@ -161,9 +166,9 @@ class TestDeleteNodeRemovesEdges:
 
     def test_delete_node_removes_edges(self):
         gm = GraphManager(_empty_graph())
-        id_a, _ = gm.add_node("StubComponent", {})
-        id_b, _ = gm.add_node("StubComponent", {})
-        id_c, _ = gm.add_node("StubComponent", {})
+        id_a, _ = gm.add_primitive_node("StubComponent", {})
+        id_b, _ = gm.add_primitive_node("StubComponent", {})
+        id_c, _ = gm.add_primitive_node("StubComponent", {})
 
         gm.add_edge(
             Edge(
@@ -204,9 +209,9 @@ class TestReconcileReusesChannels:
 
     def test_reconcile_reuses_channels(self):
         gm = GraphManager(_empty_graph())
-        id_a, _ = gm.add_node("StubComponent", {})
-        id_b, _ = gm.add_node("StubComponent", {})
-        id_c, _ = gm.add_node("StubComponent", {})
+        id_a, _ = gm.add_primitive_node("StubComponent", {})
+        id_b, _ = gm.add_primitive_node("StubComponent", {})
+        id_c, _ = gm.add_primitive_node("StubComponent", {})
 
         edge_ab = Edge(
             source_node=id_a,
@@ -280,7 +285,7 @@ class TestUpdateNodePosition:
 
     def test_update_node_position(self):
         gm = GraphManager(_empty_graph())
-        node_id, _ = gm.add_node("StubComponent", {})
+        node_id, _ = gm.add_primitive_node("StubComponent", {})
 
         result = gm.update_node(node_id, x=42.0, y=99.0)
 
@@ -335,8 +340,8 @@ class TestRunAndStopLifecycle:
 
     def test_run_and_stop(self):
         gm = GraphManager(_empty_graph())
-        id_a, _ = gm.add_node("StubComponent", {})
-        id_b, _ = gm.add_node("StubComponent", {})
+        id_a, _ = gm.add_primitive_node("StubComponent", {})
+        id_b, _ = gm.add_primitive_node("StubComponent", {})
         gm.add_edge(
             Edge(
                 source_node=id_a,
@@ -374,10 +379,10 @@ class TestAddNodeUnknownType:
     partially-initialised node.
     """
 
-    def test_add_node_unknown_type(self):
+    def test_add_primitive_node_unknown_type(self):
         gm = GraphManager(_empty_graph())
         with pytest.raises(ValueError, match="Unknown node type"):
-            gm.add_node("NonExistentComponent", {})
+            gm.add_primitive_node("NonExistentComponent", {})
 
         # Graph must remain unchanged after the failed add
         assert len(gm.graph.nodes) == 0
@@ -393,7 +398,7 @@ class TestDeleteNonexistentNode:
 
     def test_delete_nonexistent_node(self):
         gm = GraphManager(_empty_graph())
-        id_a, _ = gm.add_node("StubComponent", {})
+        id_a, _ = gm.add_primitive_node("StubComponent", {})
 
         # Should not raise
         gm.delete_node("does-not-exist")
@@ -408,7 +413,7 @@ class TestUpdateNonexistentNode:
     Why: Same rationale as delete — the API must handle stale references
     gracefully.  Returning None lets callers distinguish "not found" from
     "updated".
-    Edge case: update_node and update_node_init_args both return None.
+    Edge case: update_node and update_primitive_node_init_args both return None.
     """
 
     def test_update_nonexistent_node_position(self):
@@ -418,5 +423,8 @@ class TestUpdateNonexistentNode:
 
     def test_update_nonexistent_node_init_args(self):
         gm = GraphManager(_empty_graph())
-        result = gm.update_node_init_args("ghost", {"key": "value"})
-        assert result is None
+        node, was_running = gm.update_primitive_node_init_args(
+            "ghost", {"key": "value"}
+        )
+        assert node is None
+        assert was_running is False

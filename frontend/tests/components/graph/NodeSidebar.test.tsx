@@ -60,8 +60,7 @@ describe("NodeSidebar", () => {
       />,
     );
 
-    expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getByText("Sinks")).toBeInTheDocument();
+    expect(screen.getByText("Audio")).toBeInTheDocument();
     expect(screen.getByText("Projects")).toBeInTheDocument();
     expect(screen.queryByText("Current")).not.toBeInTheDocument();
 
@@ -103,13 +102,13 @@ describe("NodeSidebar", () => {
       JSON.stringify({ kind: "project", name: "Another" }),
     );
 
-    fireEvent.click(screen.getByText("Sources"));
+    fireEvent.click(screen.getAllByText("Audio")[0]!);
     expect(screen.queryByText("Mic")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Sources"));
+    fireEvent.click(screen.getAllByText("Audio")[0]!);
 
-    fireEvent.click(screen.getAllByText("Audio")[0]!);
+    fireEvent.click(screen.getByText("Sources"));
     expect(screen.queryByText("Mic")).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByText("Audio")[0]!);
+    fireEvent.click(screen.getByText("Sources"));
 
     fireEvent.click(screen.getByText("Projects"));
     expect(screen.queryByText("Another")).not.toBeInTheDocument();
@@ -224,10 +223,10 @@ describe("NodeSidebar", () => {
       />,
     );
 
-    expect(screen.getByText("Sources")).toBeInTheDocument();
-    expect(screen.getByText("Sinks")).toBeInTheDocument();
     expect(screen.getAllByText("Audio").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Misc").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sources").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sinks").length).toBeGreaterThan(0);
 
     const item = screen.getAllByText("Hybrid")[0]!.closest("div[draggable='true']")!;
     fireEvent.mouseEnter(item);

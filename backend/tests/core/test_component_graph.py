@@ -116,8 +116,8 @@ def test_composite_component_and_graph_manager(monkeypatch) -> None:
     assert gm.get_node_output("n1")
     assert gm.get_node_input("n2")
     gm.run()
-    assert gm.ui_senders() == {}
-    assert gm.ui_receivers() == {}
+    assert gm.ui_input_slots() == []
+    assert gm.ui_output_slots() == []
     gm.stop()
 
     gm.add_edge(
@@ -144,8 +144,8 @@ def test_composite_component_start_stop(monkeypatch) -> None:
     n1 = Node(id_="a", type="DemoThread", init_args={})
     sub = Graph(nodes={"a": n1}, edges=[])
     comp = CompositeComponent("C", sub)
-    assert "a.1" in comp.get_input_types()
-    assert "a.1" in comp.get_output_types()
+    assert "1" in comp.get_input_types()
+    assert "1" in comp.get_output_types()
     comp.start((), ())
     assert comp.status == Status.RUNNING
     comp.stop()

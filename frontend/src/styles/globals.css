@@ -42,10 +42,9 @@
     --color-handle: var(--handle);
     --color-handle-border: var(--handle-border);
   --color-tag-audio: var(--tag-audio);
-  --color-tag-video: var(--tag-video);
+  --color-tag-vision: var(--tag-vision);
   --color-tag-llm: var(--tag-llm);
-  --color-tag-image: var(--tag-image);
-  --color-tag-movement: var(--tag-movement);
+  --color-tag-motion: var(--tag-motion);
   --color-tag-misc: var(--tag-misc);
   --color-tag-other: var(--tag-other);
   --color-tag-nvidia: var(--tag-nvidia);
@@ -83,10 +82,9 @@
 
     /* Functionality tag colors */
   --tag-audio: #a78bfa;
-  --tag-video: #fb923c;
+  --tag-vision: #fb923c;
   --tag-llm: #22d3ee;
-  --tag-image: #f472b6;
-  --tag-movement: #34d399;
+  --tag-motion: #34d399;
   --tag-misc: #94a3b8;
   --tag-other: #6b7280;
 

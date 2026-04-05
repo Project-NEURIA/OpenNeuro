@@ -13,6 +13,9 @@ if TYPE_CHECKING:
 
 import numpy as np
 
+SenderKey = tuple[str, str]  # (node_id, slot_name)
+ReceiverKey = tuple[str, str]  # (node_id, slot_name)
+
 _COUNTS: collections.defaultdict[str, itertools.count[int]] = collections.defaultdict(
     itertools.count
 )

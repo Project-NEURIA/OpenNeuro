@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import types
 
 import pytest
@@ -29,7 +30,7 @@ class _Manager:
         node = Node(id_="n1", type="A", init_args={}, x=1, y=2)
         self.graph = Graph(nodes={"n1": node}, edges=[])
         self._sender = Sender(Channel())
-        self._receiver = Receiver(Channel())
+        self._receiver = Receiver(Channel(), threading.Event())
 
     def component(self, _node_id: str):
         return types.SimpleNamespace(status=types.SimpleNamespace(value="running"))
@@ -126,17 +127,17 @@ def test_node_controller_paths(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(
-        node_controller.service, "update_node_init_args", lambda *a, **k: None
+        node_controller.service, "update_primitive_node_init_args", lambda *a, **k: None
     )
     with pytest.raises(HTTPException):
-        node_controller.update_node_init_args(
+        node_controller.update_primitive_node_init_args(
             "n1", NodeInitArgsUpdateRequest(init_args={}), manager
         )
     monkeypatch.setattr(
-        node_controller.service, "update_node_init_args", lambda *a, **k: node
+        node_controller.service, "update_primitive_node_init_args", lambda *a, **k: node
     )
     assert (
-        node_controller.update_node_init_args(
+        node_controller.update_primitive_node_init_args(
             "n1", NodeInitArgsUpdateRequest(init_args={}), manager
         ).id
         == "n1"
@@ -195,12 +196,17 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
 
     called = {}
     monkeypatch.setattr(
-        run_controller.service, "start_all", lambda m: called.setdefault("start", True)
+        run_controller.service,
+        "start_all",
+        lambda m, b: called.setdefault("start", True),
     )
     monkeypatch.setattr(
         run_controller.service, "stop_all", lambda m: called.setdefault("stop", True)
     )
-    run_controller.start_all(manager)
+    from src.api.ui.bridge import UIChannelBridge
+
+    bridge = UIChannelBridge()
+    run_controller.start_all(manager, bridge)
     run_controller.stop_all(manager)
     assert called == {"start": True, "stop": True}
 

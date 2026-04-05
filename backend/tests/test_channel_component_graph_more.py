@@ -53,14 +53,12 @@ def test_channel_remaining_paths(monkeypatch) -> None:
     assert channel._items == []
 
     stop_event = threading.Event()
-    cursor = Receiver(channel)
-    cursor._wire(stop_event)
+    cursor = Receiver(channel, stop_event)
     cursor.blocking = False
     assert next(cursor) is None
 
-    newest = Receiver(channel)
+    newest = Receiver(channel, stop_event)
     newest.newest = True
-    newest._wire(stop_event)
     newest.newest = False
     newest.newest = False
     assert newest._sub_id in channel._cursors
@@ -68,22 +66,20 @@ def test_channel_remaining_paths(monkeypatch) -> None:
 
     channel._items = [10]
     channel._offset = 1
-    channel._cursors[cursor._sub_id] = 0  # type: ignore[index]
-    assert channel._get(cursor._sub_id, stop_event, blocking=False) is None  # type: ignore[arg-type]
+    channel._cursors[cursor._sub_id] = 0
+    assert channel._get(cursor._sub_id, stop_event, blocking=False) is None
 
     waiting_channel = Channel[int]()
-    newest_blocking = Receiver(waiting_channel)
+    newest_blocking = Receiver(waiting_channel, stop_event)
     newest_blocking.newest = True
-    newest_blocking._wire(stop_event)
     monkeypatch.setattr(
         waiting_channel._condition, "wait", lambda timeout=None: stop_event.set()
     )
     assert next(newest_blocking) is None
 
     continue_channel = Channel[int]()
-    continue_newest = Receiver(continue_channel)
+    continue_newest = Receiver(continue_channel, threading.Event())
     continue_newest.newest = True
-    continue_newest._wire(threading.Event())
     wait_calls: list[float | None] = []
 
     def _wake_with_item(timeout: float | None = None) -> None:
@@ -98,11 +94,12 @@ def test_channel_remaining_paths(monkeypatch) -> None:
     sender.send(2)
     assert sender._msg_count == 1
 
-    bad_receiver = Receiver(channel)
-    bad_receiver._wired = True
-    bad_receiver._sub_id = 999
-    bad_receiver._unwire = lambda: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign]
+    # Test __del__ handles exceptions gracefully
+    bad_receiver = Receiver(channel, threading.Event())
+    old_unregister = channel._unregister
+    channel._unregister = lambda sub_id: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign,assignment]
     bad_receiver.__del__()
+    channel._unregister = old_unregister  # type: ignore[method-assign]
 
 
 def test_threaded_component_remaining_paths(monkeypatch) -> None:
@@ -170,5 +167,5 @@ def test_composite_component_ui_types_and_graph_run_uses_dicts() -> None:
 
         manager.run()
 
-    assert isinstance(captured["inputs"], dict)
-    assert isinstance(captured["outputs"], dict)
+    assert isinstance(captured["inputs"], tuple)
+    assert isinstance(captured["outputs"], tuple)
