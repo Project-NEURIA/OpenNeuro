@@ -27,8 +27,8 @@ describe("typecheck", () => {
   });
 
   it("warms the subtype cache and applies subtype relationships", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => {
-      return sub === "Dog" && sup === "Animal";
+    vi.spyOn(api, "fetchSubtypePairs").mockImplementation(async () => {
+      return [["Dog", "Animal"]];
     });
 
     await warmSubtypeCache(["Dog", "Animal", "Cat"]);
@@ -138,12 +138,8 @@ describe("typecheck", () => {
   });
 
   it("handles constructor and union subtype inference through the public solver", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => {
-      return (
-        (sub === "Cat" && sup === "Animal") ||
-        (sub === "Dog" && sup === "Animal") ||
-        (sub === "ImageFrame" && sup === "Frame")
-      );
+    vi.spyOn(api, "fetchSubtypePairs").mockImplementation(async () => {
+      return [["Cat", "Animal"], ["Dog", "Animal"], ["ImageFrame", "Frame"]];
     });
 
     await warmSubtypeCache(["Cat", "Dog", "Animal", "ImageFrame", "Frame"]);
@@ -246,8 +242,8 @@ describe("typecheck", () => {
   });
 
   it("propagates variable bounds in both directions and resolves upper-bound-only variables", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => {
-      return sub === "Cat" && sup === "Animal";
+    vi.spyOn(api, "fetchSubtypePairs").mockImplementation(async () => {
+      return [["Cat", "Animal"]];
     });
 
     await warmSubtypeCache(["Cat", "Animal"]);
@@ -340,8 +336,8 @@ describe("typecheck", () => {
   });
 
   it("checks constructor subtyping through unions and reports failing unions", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => {
-      return (sub === "Cat" && sup === "Animal") || (sub === "Dog" && sup === "Animal");
+    vi.spyOn(api, "fetchSubtypePairs").mockImplementation(async () => {
+      return [["Cat", "Animal"], ["Dog", "Animal"]];
     });
 
     await warmSubtypeCache(["Cat", "Dog", "Animal", "Rock"]);
@@ -508,8 +504,8 @@ describe("typecheck", () => {
   });
 
   it("propagates lower bounds before upper bounds and reports non-subtype fallthroughs", async () => {
-    vi.spyOn(api, "fetchIsSubtype").mockImplementation(async (sub, sup) => {
-      return sub === "Cat" && sup === "Animal";
+    vi.spyOn(api, "fetchSubtypePairs").mockImplementation(async () => {
+      return [["Cat", "Animal"]];
     });
 
     await warmSubtypeCache(["Cat", "Animal"]);
