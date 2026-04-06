@@ -63,9 +63,3 @@ class OpenVRPlayer(
         finally:
             client.disconnect()
             print("[OpenVRPlayer] Disconnected from driver")
-
-
-import os  # noqa: E402
-
-if os.environ.get("DEPLOY_MODE") == "remote":
-    OpenVRPlayer._registerable = False

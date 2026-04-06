@@ -96,9 +96,3 @@ class VRChatVideo(ThreadedComponent[tuple[()], VRChatVideoOutputs]):
                             height=frame.height,
                         )
                     )
-
-
-import os  # noqa: E402
-
-if os.environ.get("DEPLOY_MODE") == "remote":
-    VRChatVideo._registerable = False

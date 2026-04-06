@@ -147,9 +147,3 @@ class OpenVRMovementSink(
         finally:
             client.disconnect()
             print("[OpenVRMovement] Disconnected from driver")
-
-
-import os  # noqa: E402
-
-if os.environ.get("DEPLOY_MODE") == "remote":
-    OpenVRMovementSink._registerable = False
