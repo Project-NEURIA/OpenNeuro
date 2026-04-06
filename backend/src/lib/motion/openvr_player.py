@@ -9,10 +9,11 @@ from pydantic import BaseModel
 from ovd_client import Client, Player
 
 from src.core.component import ThreadedComponent, Tag
+from src.core.config import PCVR_IP
 
 
 class OpenVRPlayerConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = PCVR_IP
     port: int = 21213
     sensitivity: float = 0.002
     move_speed: float = 0.05
@@ -62,3 +63,9 @@ class OpenVRPlayer(
         finally:
             client.disconnect()
             print("[OpenVRPlayer] Disconnected from driver")
+
+
+import os  # noqa: E402
+
+if os.environ.get("DEPLOY_MODE") == "remote":
+    OpenVRPlayer._registerable = False

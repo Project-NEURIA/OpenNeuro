@@ -1,7 +1,10 @@
 import type { ComponentInfo } from "./types";
 
-export const API_BASE = "http://localhost:8000";
-export const WS_BASE = "ws://localhost:8000";
+const _backendUrl = (
+  window.__TAURI__ ? "http://localhost:8000" : window.location.origin
+).replace(/\/+$/, "");
+export const API_BASE = _backendUrl;
+export const WS_BASE = _backendUrl.replace(/^http/, "ws");
 
 export interface ComponentLogEntry {
   seq: number;

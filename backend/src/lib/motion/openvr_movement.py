@@ -9,6 +9,7 @@ from ovd_client import Client, Pose
 from pydantic import BaseModel
 
 from src.core.component import ThreadedComponent, Tag
+from src.core.config import PCVR_IP
 from src.core.channel import Receiver
 from src.core.frames import BodyPoseFrame, BonePose
 
@@ -58,7 +59,7 @@ _TPOSE: dict[str, Pose] = {
 
 
 class OpenVRMovementConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = PCVR_IP
     port: int = 21213
 
 
@@ -146,3 +147,9 @@ class OpenVRMovementSink(
         finally:
             client.disconnect()
             print("[OpenVRMovement] Disconnected from driver")
+
+
+import os  # noqa: E402
+
+if os.environ.get("DEPLOY_MODE") == "remote":
+    OpenVRMovementSink._registerable = False

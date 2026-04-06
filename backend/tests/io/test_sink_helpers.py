@@ -190,7 +190,7 @@ def test_osc_face_helper_functions(monkeypatch) -> None:
     client.send_message("/x", 1.0)
     client.close()
 
-    monkeypatch.setenv("VRCHAT_IP", "1.2.3.4")
+    monkeypatch.setenv("PCVR_IP", "1.2.3.4")
     monkeypatch.setenv("VRCHAT_PORT", "9001")
     monkeypatch.setenv("OSC_PREFIX", "/avatar/parameters")
     monkeypatch.setenv("VRCHAT_PARAM_PREFIX", "FT")

@@ -46,3 +46,9 @@ class Mic(ThreadedComponent[tuple[()], MicOutputs]):
                     channels=self._channels,
                 )
                 outputs.audio.send(frame)
+
+
+import os  # noqa: E402
+
+if os.environ.get("DEPLOY_MODE") == "remote":
+    Mic._registerable = False

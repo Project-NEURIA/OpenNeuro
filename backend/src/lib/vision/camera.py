@@ -41,3 +41,9 @@ class Camera(VideoSource):
                     cap.release()
 
         return {"config": {"source": results}}
+
+
+import os  # noqa: E402
+
+if os.environ.get("DEPLOY_MODE") == "remote":
+    Camera._registerable = False

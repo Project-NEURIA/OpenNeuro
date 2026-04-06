@@ -13,6 +13,7 @@ from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.channel import Receiver
 from src.core.component import ThreadedComponent, Tag
+from src.core.config import PCVR_IP
 from src.core.frames import InterruptFrame, TextFrame
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
@@ -325,7 +326,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
         super().__init__()
         self.config = config or OSCFaceConfig()
 
-        self.host = self.config.host or os.getenv("VRCHAT_IP") or "127.0.0.1"
+        self.host = self.config.host or PCVR_IP
         self.port = (
             int(self.config.port)
             if self.config.port is not None

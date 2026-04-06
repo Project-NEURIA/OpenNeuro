@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,9 +17,10 @@ from src.api.component.controller import router as component_router
 from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
 from src.api.env.controller import router as env_router
+from src.api.upload.controller import router as upload_router
 from src.api.ui.bridge import UIChannelBridge
 from src.core.graph import Graph
-from src.core.config import PROJECTS_DIR, PRESETS_DIR, AppConfig
+from src.core.config import DEPLOY_MODE, PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
 from src.core.log_capture import install_global_stream_capture
 
@@ -72,6 +74,20 @@ app.include_router(component_router)
 app.include_router(project_router)
 app.include_router(ui_router)
 app.include_router(env_router)
+app.include_router(upload_router)
+
+# Serve built frontend as static files when running remotely.
+# Must come after all include_router calls so API routes match first.
+if DEPLOY_MODE == "remote":
+    _frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    if _frontend_dist.exists():
+        from starlette.staticfiles import StaticFiles
+
+        app.mount(
+            "/",
+            StaticFiles(directory=str(_frontend_dist), html=True),
+            name="frontend",
+        )
 
 
 def _start_parent_watchdog() -> None:
@@ -94,15 +110,16 @@ def _start_parent_watchdog() -> None:
 
 
 def main() -> None:
-    from src.core.config import BASE_DIR
+    if DEPLOY_MODE != "remote":
+        _start_parent_watchdog()
 
-    load_dotenv(BASE_DIR / ".env", override=True)
-    _start_parent_watchdog()
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
 
     import uvicorn
 
-    print("[backend] API server starting on http://0.0.0.0:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
+    print(f"[backend] API server starting on http://{host}:{port} (mode={DEPLOY_MODE})")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":

@@ -49,3 +49,9 @@ class Speaker(ThreadedComponent[SpeakerInputs, tuple[()]]):
                 stream.write(
                     np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, self._channels)
                 )
+
+
+import os  # noqa: E402
+
+if os.environ.get("DEPLOY_MODE") == "remote":
+    Speaker._registerable = False

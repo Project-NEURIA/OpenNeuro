@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.component import ThreadedComponent, Tag
+from src.core.config import PCVR_IP
 from src.core.channel import Receiver
 from src.core.frames import EOS, TextFrame, InterruptFrame
 
@@ -33,7 +34,7 @@ class _OscClient:
 
 
 class OSCChatboxConfig(BaseModel):
-    host: str = "127.0.0.1"
+    host: str = PCVR_IP
     port: int = 9000
 
     # Keep the existing field name to avoid touching other code.

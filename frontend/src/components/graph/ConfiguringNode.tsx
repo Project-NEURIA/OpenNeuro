@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from "react";
 import { type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import type { ComponentInfo } from "@/lib/types";
-import { fetchOptions, type Option } from "@/lib/api";
+import { API_BASE, fetchOptions, type Option } from "@/lib/api";
 import { Dropdown } from "@/components/ui/Dropdown";
 
 interface ConfiguringNodeData {
@@ -269,7 +269,7 @@ function ConfiguringNodeComponent({ data }: NodeProps) {
                           if (!file) return;
                           const form = new FormData();
                           form.append("file", file);
-                          const res = await fetch("/upload", { method: "POST", body: form });
+                          const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
                           if (res.ok) {
                             const { path } = await res.json();
                             setValues((v) => ({ ...v, [key]: path }));
