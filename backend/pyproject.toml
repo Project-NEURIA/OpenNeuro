@@ -98,6 +98,8 @@ explicit = true
 override-dependencies = [
     "open3d ; python_version < '0'",
     "opencv-python ; python_version < '0'",
+    # pyrender pins PyOpenGL==3.1.0 which has no wheel and hangs building from source
+    "PyOpenGL>=3.1.7",
 ]
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
