@@ -1,5 +1,6 @@
 from src.lib.llm.llm import LLM as LLM
 from src.lib.llm.agent_state import AgentState as AgentState
+from src.lib.llm.agent_loop import AgentLoop as AgentLoop
 from src.lib.llm.memory import Mem0 as Mem0
 from src.lib.llm.character_card import CharacterCard as CharacterCard
 from src.lib.llm.messages_to_text import MessagesToText as MessagesToText
