@@ -4,33 +4,15 @@ import re
 import threading
 import time
 from collections import deque
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from pydantic import BaseModel
-from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.component import ThreadedComponent, Tag
 from src.core.config import PCVR_IP
 from src.core.channel import Receiver
 from src.core.frames import EOS, TextFrame, InterruptFrame
-
-
-class _OscClient:
-    """
-    Thin wrapper around python-osc with a send lock.
-    """
-
-    def __init__(self, host: str, port: int) -> None:
-        self._client = SimpleUDPClient(host, port)
-        self._lock = threading.Lock()
-
-    def send_message(self, address: str, args: list[Any]) -> None:
-        with self._lock:
-            self._client.send_message(address, args)
-
-    def close(self) -> None:
-        # SimpleUDPClient has no close() requirement; keep for interface symmetry.
-        return
+from src.core.transport import OscTransport, LocalOscTransport
 
 
 class OSCChatboxConfig(BaseModel):
@@ -65,7 +47,7 @@ class OSCChatbox(ThreadedComponent[OSCChatboxInputs, tuple[()]]):
     def __init__(self, config: OSCChatboxConfig) -> None:
         super().__init__()
         self.config = config
-        self._client = _OscClient(self.config.host, self.config.port)
+        self._client: OscTransport = LocalOscTransport(self.config.host, self.config.port)
 
         self._text_lock = threading.Lock()
         self._text_buffer = ""

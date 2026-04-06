@@ -9,12 +9,12 @@ from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import requests
 from pydantic import BaseModel
-from pythonosc.udp_client import SimpleUDPClient
 
 from src.core.channel import Receiver
 from src.core.component import ThreadedComponent, Tag
 from src.core.config import PCVR_IP
 from src.core.frames import InterruptFrame, TextFrame
+from src.core.transport import OscTransport, LocalOscTransport
 
 GENERATE_END_FLAG = "[END_OF_GENERATE]"
 
@@ -36,19 +36,6 @@ def _sanitize_env_value(value: str | None) -> str:
     while cleaned and cleaned[-1] in quote_chars:
         cleaned = cleaned[:-1].rstrip()
     return cleaned
-
-
-class _OscClient:
-    def __init__(self, host: str, port: int) -> None:
-        self._client = SimpleUDPClient(host, port)
-        self._lock = threading.Lock()
-
-    def send_message(self, address: str, value: Any) -> None:
-        with self._lock:
-            self._client.send_message(address, value)
-
-    def close(self) -> None:
-        return
 
 
 class OSCFaceConfig(BaseModel):
@@ -421,7 +408,7 @@ class OSCFace(ThreadedComponent[OSCFaceInputs, tuple[()]]):
             else _env_bool("DEBUG_PRINT_MODEL_REPR", True)
         )
 
-        self._client = _OscClient(self.host, self.port)
+        self._client: OscTransport = LocalOscTransport(self.host, self.port)
 
         self._text_lock = threading.Lock()
         self._text_buffer = ""

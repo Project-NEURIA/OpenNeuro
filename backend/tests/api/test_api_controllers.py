@@ -198,15 +198,17 @@ def test_run_save_metrics_project_controllers(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         run_controller.service,
         "start_all",
-        lambda m, b: called.setdefault("start", True),
+        lambda m, b, r=None: called.setdefault("start", True),
     )
     monkeypatch.setattr(
         run_controller.service, "stop_all", lambda m: called.setdefault("stop", True)
     )
+    from src.api.relay.bridge import RelayBridge
     from src.api.ui.bridge import UIChannelBridge
 
     bridge = UIChannelBridge()
-    run_controller.start_all(manager, bridge)
+    relay = RelayBridge()
+    run_controller.start_all(manager, bridge, relay)
     run_controller.stop_all(manager)
     assert called == {"start": True, "stop": True}
 

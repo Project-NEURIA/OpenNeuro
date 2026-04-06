@@ -34,11 +34,12 @@ def test_osc_chatbox_remaining_branches(monkeypatch: pytest.MonkeyPatch) -> None
         def send_message(self, address, args):
             sent.append((address, args))
 
-    monkeypatch.setattr("src.lib.misc.osc_chatbox.SimpleUDPClient", _UDP)
+    monkeypatch.setattr("pythonosc.udp_client.SimpleUDPClient", _UDP)
 
     import src.lib.misc.osc_chatbox as osc_chatbox
+    from src.core.transport import LocalOscTransport
 
-    client = osc_chatbox._OscClient("127.0.0.1", 9000)
+    client = LocalOscTransport("127.0.0.1", 9000)
     client.send_message("/chatbox/input", ["x", True, False])
     client.close()
     assert sent[-1] == ("/chatbox/input", ["x", True, False])
@@ -136,7 +137,7 @@ def test_osc_face_branches(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         def send_message(self, address, value):
             sent.append((address, value))
 
-    monkeypatch.setattr("src.lib.motion.osc_face.SimpleUDPClient", _UDP)
+    monkeypatch.setattr("pythonosc.udp_client.SimpleUDPClient", _UDP)
     import src.lib.motion.osc_face as osc_face
 
     cases = [

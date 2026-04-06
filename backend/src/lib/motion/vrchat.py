@@ -16,6 +16,7 @@ from src.core.frames import (
     StereoVideoFrame,
     VideoDataFormat,
 )
+from src.core.transport import VideoSourceTransport, LocalVideoSourceTransport
 
 
 class VRChatVideoConfig(BaseModel):
@@ -46,9 +47,13 @@ class VRChatVideo(ThreadedComponent[tuple[()], VRChatVideoOutputs]):
         self._frame_interval = 1.0 / config.fps
 
     def run(self, inputs: tuple[()], outputs: VRChatVideoOutputs) -> None:
-        from ovd_client import Client
+        transport: VideoSourceTransport = (
+            self._transport
+            if hasattr(self, "_transport")
+            else LocalVideoSourceTransport(self._host, self._port)
+        )
 
-        with Client(host=self._host, port=self._port) as client:
+        with transport as client:
             last_send = 0.0
 
             with client.frame_stream() as frames:

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useUIChannel } from "@/contexts/UIChannelContext";
+import { getAudioInputProcessorUrl } from "@/lib/audioInputProcessor";
 
 export function useUIAudioInput(nodeId: string | null, channel: string) {
   const { sendUIBinary } = useUIChannel();
   const [isRecording, setIsRecording] = useState(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
   const startRecording = useCallback(async () => {
     if (!nodeId) return;
@@ -28,27 +29,18 @@ export function useUIAudioInput(nodeId: string | null, channel: string) {
       });
 
       const ctx = audioContextRef.current;
-      const source = ctx.createMediaStreamSource(stream);
+      await ctx.audioWorklet.addModule(getAudioInputProcessorUrl());
 
-      // Buffer sizes must be a power of 2, like 1024 or 2048. Smaller = less latency.
-      const processor = ctx.createScriptProcessor(1024, 1, 1);
-      processorRef.current = processor;
+      const workletNode = new AudioWorkletNode(ctx, "audio-input-processor");
+      workletNodeRef.current = workletNode;
 
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        
-        // Convert Float32 to Int16
-        const int16Buffer = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          int16Buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-
-        sendUIBinary(nodeId, channel, int16Buffer.buffer);
+      workletNode.port.onmessage = (e: MessageEvent) => {
+        sendUIBinary(nodeId, channel, e.data as ArrayBuffer);
       };
 
-      source.connect(processor);
-      processor.connect(ctx.destination); // Required for processor to start in some browsers
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(workletNode);
+      // AudioWorklet does not need to connect to destination
 
       setIsRecording(true);
     } catch (err) {
@@ -57,9 +49,9 @@ export function useUIAudioInput(nodeId: string | null, channel: string) {
   }, [nodeId, channel, sendUIBinary]);
 
   const stopRecording = useCallback(() => {
-    if (processorRef.current && audioContextRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
+    if (workletNodeRef.current) {
+      workletNodeRef.current.disconnect();
+      workletNodeRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close().catch(() => {});

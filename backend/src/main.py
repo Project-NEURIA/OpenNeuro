@@ -21,7 +21,9 @@ from src.api.project.controller import router as project_router
 from src.api.ui.controller import router as ui_router
 from src.api.env.controller import router as env_router
 from src.api.upload.controller import router as upload_router
+from src.api.relay.controller import router as relay_router
 from src.api.ui.bridge import UIChannelBridge
+from src.api.relay.bridge import RelayBridge
 from src.core.graph import Graph
 from src.core.config import DEPLOY_MODE, PROJECTS_DIR, PRESETS_DIR, AppConfig
 from src.core.graph import GraphManager
@@ -55,6 +57,7 @@ async def lifespan(app: FastAPI):
     print("[backend] Registering components...")
     app.state.manager = GraphManager(Graph(edges=[], nodes={}))
     app.state.ui_bridge = UIChannelBridge()
+    app.state.relay_bridge = RelayBridge()
     print("[backend] Ready")
 
     yield
@@ -80,6 +83,7 @@ app.include_router(project_router)
 app.include_router(ui_router)
 app.include_router(env_router)
 app.include_router(upload_router)
+app.include_router(relay_router)
 
 # Serve built frontend as static files when running remotely.
 # Must come after all include_router calls so API routes match first.

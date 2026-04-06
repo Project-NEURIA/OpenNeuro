@@ -41,7 +41,7 @@ from src.lib.vision.video_player import VideoPlayer, VideoPlayerConfig
 from src.lib.vision.camera import Camera
 from src.lib.audio.mic import Mic, MicConfig, MicOutputs
 from src.lib.motion.openvr_player import OpenVRPlayer, OpenVRPlayerConfig
-from src.lib.motion.vrchat import VRChatVideo, VRChatVideoOutputs
+from src.lib.motion.vrchat import VRChatVideo, VRChatVideoConfig, VRChatVideoOutputs
 
 
 class _FakeRecv:
@@ -361,7 +361,7 @@ def test_openvr_vrchat_and_package_init(monkeypatch) -> None:
 
     out_v = []
     out_c = []
-    vc = VRChatVideo(host="h", port=1, fps=1)
+    vc = VRChatVideo(VRChatVideoConfig(host="h", port=1, fps=1))
     vc.run(
         (),
         VRChatVideoOutputs(
@@ -488,7 +488,7 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
     )
     out_v = []
     out_c = []
-    vc = VRChatVideo(host="h", port=1, fps=1)
+    vc = VRChatVideo(VRChatVideoConfig(host="h", port=1, fps=1))
     vc.run(
         (),
         VRChatVideoOutputs(
@@ -498,7 +498,7 @@ def test_camera_constructor_video_source_sleep_and_vrchat_branches(monkeypatch) 
     )
     assert len(out_v) == 1 and len(out_c) == 1
 
-    vc2 = VRChatVideo(host="h", port=1, fps=1)
+    vc2 = VRChatVideo(VRChatVideoConfig(host="h", port=1, fps=1))
     vc2.stop_event.set()
     vc2.run(
         (),

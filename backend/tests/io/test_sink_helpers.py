@@ -83,7 +83,7 @@ def test_osc_chatbox_paths(monkeypatch) -> None:
         def close(self):
             sent.append(("close", []))
 
-    monkeypatch.setattr("src.lib.misc.osc_chatbox._OscClient", _Client)
+    monkeypatch.setattr("src.lib.misc.osc_chatbox.LocalOscTransport", _Client)
     monkeypatch.setattr("src.lib.misc.osc_chatbox.time.sleep", lambda _s: None)
     monotonic = iter([0.0, 1.0, 2.0, 3.0])
     monkeypatch.setattr(
@@ -167,8 +167,9 @@ def test_osc_face_helper_functions(monkeypatch) -> None:
         def send_message(self, address, value):
             self.sent.append((address, value))
 
-    monkeypatch.setattr("src.lib.motion.osc_face.SimpleUDPClient", _UDP)
+    monkeypatch.setattr("pythonosc.udp_client.SimpleUDPClient", _UDP)
     import src.lib.motion.osc_face as osc_face
+    from src.core.transport import LocalOscTransport
 
     monkeypatch.setenv("BOOL_TRUE", " yes ")
     assert osc_face._env_bool("BOOL_TRUE", False) is True
@@ -186,10 +187,12 @@ def test_osc_face_helper_functions(monkeypatch) -> None:
     fallback = osc_face.preset_to_full("missing", base_defaults)
     assert fallback["v2/EyeLidLeft"] == osc_face.expression_neutral()["v2/EyeLidLeft"]
 
-    client = osc_face._OscClient("127.0.0.1", 9000)
+    client = LocalOscTransport("127.0.0.1", 9000)
     client.send_message("/x", 1.0)
     client.close()
 
+    monkeypatch.setattr("src.core.config.PCVR_IP", "1.2.3.4")
+    monkeypatch.setattr("src.lib.motion.osc_face.PCVR_IP", "1.2.3.4")
     monkeypatch.setenv("PCVR_IP", "1.2.3.4")
     monkeypatch.setenv("VRCHAT_PORT", "9001")
     monkeypatch.setenv("OSC_PREFIX", "/avatar/parameters")

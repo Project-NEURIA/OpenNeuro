@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-from ovd_client import Client, Pose
+from ovd_client import Pose
 from pydantic import BaseModel
 
 from src.core.component import ThreadedComponent, Tag
 from src.core.config import PCVR_IP
 from src.core.channel import Receiver
 from src.core.frames import BodyPoseFrame, BonePose
+from src.core.transport import PoseTransport, LocalPoseTransport
 
 
 # Default T-pose body positions (heights in meters, identity rotation)
@@ -86,7 +87,7 @@ def _to_ovd_pose(bone: BonePose | None) -> Pose | None:
     )
 
 
-def _send_poses(client: Client, poses: Mapping[str, Pose | None]) -> None:
+def _send_poses(client: PoseTransport, poses: Mapping[str, Any]) -> None:
     """Send a dict of body part poses to the driver."""
     client.update_pose(
         head=poses.get("head"),
@@ -122,8 +123,10 @@ class OpenVRMovementSink(
         self.config = config
 
     def run(self, inputs: OpenVRMovementInputs, outputs: OpenVRMovementOutputs) -> None:
-        client = Client(host=self.config.host, port=self.config.port)
-        client.connect()
+        transport = self._transport if hasattr(self, "_transport") else LocalPoseTransport(
+            self.config.host, self.config.port
+        )
+        transport.connect()
         print(
             f"[OpenVRMovement] Connected to driver at {self.config.host}:{self.config.port}"
         )
@@ -132,7 +135,7 @@ class OpenVRMovementSink(
             poses = inputs.poses
             if poses is None:
                 print("[OpenVRMovement] No input channel, sending T-pose")
-                _send_poses(client, _TPOSE)
+                _send_poses(transport, _TPOSE)
                 self.stop_event.wait()
             else:
                 for frame in poses:
@@ -141,9 +144,9 @@ class OpenVRMovementSink(
 
                     p = frame.get()
                     _send_poses(
-                        client,
+                        transport,
                         {k: _to_ovd_pose(v) for k, v in p.items()},
                     )
         finally:
-            client.disconnect()
+            transport.disconnect()
             print("[OpenVRMovement] Disconnected from driver")

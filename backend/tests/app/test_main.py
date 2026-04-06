@@ -42,9 +42,6 @@ def test_main_invokes_uvicorn_and_env(monkeypatch) -> None:
     called = {}
 
     monkeypatch.setattr(
-        main_module, "load_dotenv", lambda *a, **k: called.setdefault("dotenv", True)
-    )
-    monkeypatch.setattr(
         main_module,
         "_start_parent_watchdog",
         lambda: called.setdefault("watchdog", True),
@@ -57,7 +54,6 @@ def test_main_invokes_uvicorn_and_env(monkeypatch) -> None:
     )
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
     main_module.main()
-    assert called["dotenv"] is True
     assert called["watchdog"] is True
     assert called["uvicorn"] == ("0.0.0.0", 8000, "warning")
 
@@ -96,7 +92,5 @@ def test_lifespan_sets_state(monkeypatch, tmp_path) -> None:
 def test_main_module_dunder_main(monkeypatch) -> None:
     fake_uvicorn = types.SimpleNamespace(run=lambda *a, **k: None)
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
-    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
-    monkeypatch.setattr("src.main.load_dotenv", lambda *a, **k: None)
     monkeypatch.setattr("src.main._start_parent_watchdog", lambda: None)
     runpy.run_module("src.main", run_name="__main__")
