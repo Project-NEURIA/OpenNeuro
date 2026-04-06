@@ -78,6 +78,32 @@ class StereoDepthEstimator(
         self._model.to(self._device).eval()
         torch._dynamo.config.disable = True  # Triton codegen incompatible with ROCm
         torch.set_grad_enabled(False)
+
+        # The FFS library hardcodes torch.amp.autocast('cuda', ...) which
+        # silently disables on non-CUDA devices. Patch it to use the actual
+        # device so MPS/other backends get proper float16 autocast.
+        if self._device.type != "cuda":
+            _real_autocast = torch.amp.autocast
+
+            def _patched_autocast(device_type, *args, **kwargs):
+                if device_type == "cuda":
+                    device_type = self._device.type
+                return _real_autocast(device_type, *args, **kwargs)
+
+            torch.amp.autocast = _patched_autocast  # type: ignore[assignment]
+
+            # Also patch the old-style torch.cuda.amp.autocast used in geometry.py
+            _real_cuda_autocast = torch.cuda.amp.autocast
+
+            def _patched_cuda_autocast(*args, **kwargs):
+                return _real_autocast(self._device.type, enabled=kwargs.get("enabled", True))
+
+            torch.cuda.amp.autocast = _patched_cuda_autocast  # type: ignore[assignment]
+
+            print(
+                f"[StereoDepthEstimator] Patched autocast: cuda → {self._device.type}"
+            )
+
         print("[StereoDepthEstimator] Model loaded")
 
     def _ensure_buffers(self, H: int, W: int) -> None:
@@ -109,6 +135,7 @@ class StereoDepthEstimator(
 
     def _infer(self, left: np.ndarray, right: np.ndarray) -> np.ndarray:
         """Run FFS inference on resize_width x resize_height images and return disparity."""
+        import time
         import torch
 
         rw, rh = self.config.resize_width, self.config.resize_height
@@ -132,6 +159,7 @@ class StereoDepthEstimator(
         )
         t0_pad, t1_pad = self._padder.pad(self._t0_buf, self._t1_buf)
 
+        t_start = time.perf_counter()
         with (
             torch.no_grad(),
             torch.amp.autocast(
@@ -149,6 +177,8 @@ class StereoDepthEstimator(
             )
 
         disp = self._padder.unpad(disp.float())
+        dt = time.perf_counter() - t_start
+        print(f"[StereoDepthEstimator] infer {dt*1000:.0f}ms  device={self._device}")
         return disp.data.cpu().numpy().reshape(H, W).clip(0, None)
 
     def _resize_outputs(

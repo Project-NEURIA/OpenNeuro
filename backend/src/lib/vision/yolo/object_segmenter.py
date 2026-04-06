@@ -235,7 +235,12 @@ class ObjectSegmenter(ThreadedComponent[ObjectSegmenterInputs, ObjectSegmenterOu
             if not self._prompts:
                 continue
 
+            import time
+
+            t_start = time.perf_counter()
             result = self._infer(rgb)
+            dt = time.perf_counter() - t_start
+            print(f"[ObjectSegmenter] infer {dt*1000:.0f}ms  device={self._device}")
 
             if result is not None:
                 masks, boxes, scores, object_ids, labels = result
