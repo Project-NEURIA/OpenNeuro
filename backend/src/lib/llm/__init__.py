@@ -9,3 +9,4 @@ from src.lib.llm.stop_tool import StopTool as StopTool
 from src.lib.llm.talk_tool import TalkTool as TalkTool
 from src.lib.llm.think_tool import ThinkTool as ThinkTool
 from src.lib.llm.movement_tool import MovementTool as MovementTool
+from src.lib.llm.scratchpad_tool import ScratchpadTool as ScratchpadTool

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import base64
+import io
 import json
 import math
-import os
-import time
 from datetime import datetime
 from typing import Any, NamedTuple
+
+from PIL import Image
 
 from openai import OpenAI
 from pydantic import BaseModel
@@ -20,29 +22,53 @@ from src.core.frames import (
     TextFrame,
     ToolCall,
     ToolDef,
+    VideoFrame,
+    VideoDataFormat,
 )
-from src.core.config import PROJECTS_DIR, AppConfig
 from src.core.utils import drain
+
+
+_DEFAULT_SYSTEM_PROMPT = """\
+You are an embodied AI agent operating inside a real-time multimodal pipeline.
+
+You exist in a physical or virtual environment. You can see through a camera, \
+hear through a microphone, and act through tools (speaking, moving, etc.).
+
+# Vision
+Each turn, you may receive an image — this is your current view of the world. \
+Use it to ground your responses in what you actually see. \
+Do not hallucinate objects or spatial relationships that are not visible.
+
+# Speech
+User speech arrives as transcribed text with timestamps and speaker diarization. There could be more than one speaker.\
+You should use your vision to help you ground who actually said the latest message from the user. \
+Respond naturally and conversationally. Keep responses brief unless asked to elaborate.
+
+# Tools
+You have access to tools for interacting with the environment. \
+Use them when the user asks you to act, not just describe. \
+When you call a tool, wait for the result before continuing.
+
+# Guidelines
+- Be proactive. Do things when you are along. Think constantly but only talk when the latest user message hasn't been responded to.\
+- If you see something relevant to the conversation, mention it naturally.
+- Do not repeat yourself or narrate your own actions unless asked.
+"""
+
+_DEFAULT_POST_PROMPT = "Do nothing unless the user has talked and you haven't replied, "
 
 
 class AgentLoopConfig(BaseModel):
     model: str = "gpt-4.1"
-    system_prompt: str = "You are a helpful assistant."
-    post_prompt: str = (
-        "Do nothing unless the user has talked and you haven't replied, "
-        "or if you are executing a task."
-    )
-    temperature: float | None = None
-    top_p: float | None = None
-    max_tokens: int | None = None
+    system_prompt: str = _DEFAULT_SYSTEM_PROMPT
+    post_prompt: str = _DEFAULT_POST_PROMPT
 
 
 class AgentLoopInputs(NamedTuple):
     initial_msgs: Receiver[list[MessageFrame]] | None = None
     speech: Receiver[TextFrame] | None = None
-    feedback: Receiver[TextFrame] | None = None
     tool_result: Receiver[TextFrame] | None = None
-    vision: Receiver[TextFrame] | None = None
+    video: Receiver[VideoFrame] | None = None
     pose: Receiver[BodyPoseFrame] | None = None
     objects: Receiver[ObjectLocationFrame] | None = None
     memory: Receiver[TextFrame] | None = None
@@ -59,9 +85,9 @@ class AgentLoopOutputs(NamedTuple):
 class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
     """Agentic loop: manages conversation state and calls the LLM directly.
 
-    Uses the OpenAI Responses API with streaming. Drains speech, feedback,
-    vision, and other inputs each iteration, builds the message context,
-    calls the model, and streams tokens + tool calls to outputs.
+    Uses the OpenAI Responses API with streaming. Drains speech and other
+    inputs each iteration, builds the message context, calls the model,
+    and streams tokens + tool calls to outputs.
     """
 
     description = (
@@ -70,6 +96,29 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
         "and streams tokens and tool calls using the OpenAI Responses API."
     )
     tags = Tag(io={"conduit"}, functionality={"llm"})
+
+    _DIARY_TOOL: dict[str, Any] = {
+        "type": "function",
+        "name": "diary",
+        "description": (
+            "Write a diary entry to track your mental state. "
+            "Record what you see, where you are, what you're doing, "
+            "how you feel, your current goal, and any observations. "
+            "Call this every few turns to maintain self-awareness. "
+            "Your diary entries stay in your history so you can always "
+            "look back at what you were thinking."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entry": {
+                    "type": "string",
+                    "description": "A natural language snapshot of your current mental state.",
+                },
+            },
+            "required": ["entry"],
+        },
+    }
 
     def __init__(self, config: AgentLoopConfig) -> None:
         super().__init__()
@@ -91,20 +140,28 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
         preview = content[:120]
         print(f"  [{role}] {preview}")
 
+    @staticmethod
+    def _encode_frame(frame: VideoFrame) -> str:
+        """Encode a VideoFrame as a base64 JPEG data URL."""
+        img = Image.fromarray(frame.get(VideoDataFormat.RGB))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=80)
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{b64}"
+
     # -- Main loop --
 
     def run(self, inputs: AgentLoopInputs, outputs: AgentLoopOutputs) -> None:
         print("[AgentLoop] Starting")
 
-        # System prompt
-        self._input = [{"role": "system", "content": self.config.system_prompt}]
+        self._input = []
 
         # Read initial prompts once (e.g. CharacterCard)
         if inputs.initial_msgs is not None:
             frame = next(inputs.initial_msgs)
             if frame is not None:
                 for m in frame:
-                    self._append_msg(m.role, m.content)
+                    self._append_msg(m.role, m.content or "")
 
         # Collect tool definitions once
         if inputs.tools is not None:
@@ -121,21 +178,18 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
                         **({"strict": td.strict} if td.strict is not None else {}),
                     }
                 )
-        if self._tool_defs:
-            print(f"[AgentLoop] Tools: {[t['name'] for t in self._tool_defs]}")
+        # Always include the built-in diary tool
+        self._tool_defs.append(self._DIARY_TOOL)
+        print(f"[AgentLoop] Tools: {[t['name'] for t in self._tool_defs]}")
 
         # Configure receiver modes
         if inputs.speech:
             inputs.speech.blocking = False
-        if inputs.feedback:
-            inputs.feedback.blocking = False
-        if inputs.vision:
-            inputs.vision.newest = True
-            inputs.vision.blocking = False
         if inputs.memory:
             inputs.memory.blocking = False
-        if inputs.tool_result:
-            inputs.tool_result.blocking = False
+        if inputs.video is not None:
+            inputs.video.newest = True
+            inputs.video.blocking = False
         if inputs.objects is not None:
             inputs.objects.newest = True
             inputs.objects.blocking = False
@@ -144,39 +198,33 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
             inputs.pose.blocking = False
 
         while not self.stop_event.is_set():
-            # Drain inputs into history
-            has_new_input = False
-
-            for speech, feedback, memory in drain(
-                inputs.speech,
-                inputs.feedback,
-                inputs.memory,
-            ):
+            # Drain any new speech into history
+            for (speech,) in drain(inputs.speech):
                 if speech is not None:
                     ts = datetime.fromtimestamp(speech.pts / 1e9).strftime("%H:%M:%S")
                     self._append_msg("user", f"[{ts}] {speech.text}")
-                    has_new_input = True
-                if feedback is not None:
-                    ts = datetime.fromtimestamp(feedback.pts / 1e9).strftime("%H:%M:%S")
-                    self._append_msg("assistant", f"[{ts}] {feedback.text}")
-                if memory is not None:
-                    ts = datetime.fromtimestamp(memory.pts / 1e9).strftime("%H:%M:%S")
-                    self._append_msg("system", f"[{ts}] {memory.text}")
-
-            # Nothing new — sleep briefly to avoid busy loop
-            if not has_new_input:
-                self.stop_event.wait(0.1)
-                continue
 
             # Build transient context (not persisted in history)
             transient: list[dict[str, Any]] = []
 
-            if inputs.vision is not None:
-                v = next(inputs.vision, None)
-                if v is not None:
-                    ts = datetime.fromtimestamp(v.pts / 1e9).strftime("%H:%M:%S")
+            # Latest video frame — what the agent currently sees
+            if inputs.video is not None:
+                vf = next(inputs.video, None)
+                if vf is not None:
                     transient.append(
-                        {"role": "system", "content": f"[{ts}] {v.text}"}
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_image",
+                                    "image_url": self._encode_frame(vf),
+                                },
+                                {
+                                    "type": "input_text",
+                                    "text": "[This is what you currently see]",
+                                },
+                            ],
+                        }
                     )
 
             if inputs.objects is not None:
@@ -212,9 +260,7 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
                         )
 
             if self.config.post_prompt:
-                transient.append(
-                    {"role": "system", "content": self.config.post_prompt}
-                )
+                transient.append({"role": "system", "content": self.config.post_prompt})
 
             # Call LLM
             api_input = self._input + transient
@@ -231,15 +277,11 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
         """Stream a single LLM response, emit tokens/tool calls, handle tool loop."""
         kwargs: dict[str, Any] = {
             "model": self.config.model,
+            "instructions": self.config.system_prompt,
             "input": api_input,
             "stream": True,
+            "reasoning": {"effort": "low"},
         }
-        if self.config.temperature is not None:
-            kwargs["temperature"] = self.config.temperature
-        if self.config.top_p is not None:
-            kwargs["top_p"] = self.config.top_p
-        if self.config.max_tokens is not None:
-            kwargs["max_output_tokens"] = self.config.max_tokens
         if self._tool_defs:
             kwargs["tools"] = self._tool_defs
             kwargs["tool_choice"] = "auto"
@@ -260,9 +302,7 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
             elif event.type == "response.function_call_arguments.delta":
                 # Accumulate function call arguments
                 if not tool_calls or tool_calls[-1].get("_done"):
-                    tool_calls.append(
-                        {"call_id": "", "name": "", "arguments": ""}
-                    )
+                    tool_calls.append({"call_id": "", "name": "", "arguments": ""})
                 tool_calls[-1]["arguments"] += event.delta
 
             elif event.type == "response.output_item.added":
@@ -292,46 +332,51 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
             if outputs.text is not None:
                 outputs.text.send(TextFrame.new(text=full_text))
 
-        # Emit tool calls
-        if tool_calls and outputs.tool_calls is not None:
-            for tc in tool_calls:
-                outputs.tool_calls.send(
-                    ToolCall.new(
-                        call_id=tc["call_id"],
-                        name=tc["name"],
-                        arguments=tc["arguments"],
-                    )
-                )
-                # Add function_call to input for next turn
+        # Process tool calls
+        for tc in tool_calls:
+            self._input.append(
+                {
+                    "type": "function_call",
+                    "call_id": tc["call_id"],
+                    "name": tc["name"],
+                    "arguments": tc["arguments"],
+                }
+            )
+
+            if tc["name"] == "diary":
+                # Built-in: handle internally
+                try:
+                    entry = json.loads(tc["arguments"]).get("entry", "")
+                except (json.JSONDecodeError, KeyError):
+                    entry = tc["arguments"]
+                print(f"[AgentLoop] Diary: {entry[:120]}")
                 self._input.append(
                     {
-                        "type": "function_call",
+                        "type": "function_call_output",
                         "call_id": tc["call_id"],
-                        "name": tc["name"],
-                        "arguments": tc["arguments"],
+                        "output": "ok",
                     }
                 )
-
-            # Wait for tool results and add them
-            if inputs.tool_result is not None:
-                inputs.tool_result.blocking = True
-                for tc in tool_calls:
-                    result = next(inputs.tool_result, None)
-                    if result is None:
-                        break
-                    self._input.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": tc["call_id"],
-                            "output": result.text,
-                        }
+            else:
+                # External tool: emit and wait for result
+                if outputs.tool_calls is not None:
+                    outputs.tool_calls.send(
+                        ToolCall.new(
+                            call_id=tc["call_id"],
+                            name=tc["name"],
+                            arguments=tc["arguments"],
+                        )
                     )
-                inputs.tool_result.blocking = False
-
-                # Loop back — call LLM again with tool results
-                if not self.stop_event.is_set():
-                    self._call_llm(self._input, inputs, outputs)
-                    return
+                if inputs.tool_result is not None:
+                    result = next(inputs.tool_result, None)
+                    if result is not None:
+                        self._input.append(
+                            {
+                                "type": "function_call_output",
+                                "call_id": tc["call_id"],
+                                "output": result.text,
+                            }
+                        )
 
         # EOS
         outputs.token.send(EOS.END)
