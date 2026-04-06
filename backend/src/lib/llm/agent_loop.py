@@ -22,6 +22,7 @@ from src.core.frames import (
     TextFrame,
     ToolCall,
     ToolDef,
+    ToolResult,
     VideoFrame,
     VideoDataFormat,
 )
@@ -67,7 +68,7 @@ class AgentLoopConfig(BaseModel):
 class AgentLoopInputs(NamedTuple):
     initial_msgs: Receiver[list[MessageFrame]] | None = None
     speech: Receiver[TextFrame] | None = None
-    tool_result: Receiver[TextFrame] | None = None
+    tool_result: Receiver[ToolResult] | None = None
     video: Receiver[VideoFrame] | None = None
     pose: Receiver[BodyPoseFrame] | None = None
     objects: Receiver[ObjectLocationFrame] | None = None
@@ -247,15 +248,27 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
                 if pose is not None:
                     poses = pose.get()
                     waist = poses.get("waist")
+                    head = poses.get("head")
+                    print(f"[AgentLoop] waist={waist} head={head}")
                     if waist is not None:
-                        heading = self._heading_from_quat(
+                        body_heading = self._heading_from_quat(
                             waist.rot_w, waist.rot_x, waist.rot_y, waist.rot_z
                         )
+                        lines = [
+                            f"[Position (y-up): x={waist.pos_x:.2f}, y={waist.pos_y:.2f}, z={waist.pos_z:.2f}]",
+                            f"[Body heading (from +Z clockwise): {body_heading:.0f}°]",
+                        ]
+                        if head is not None:
+                            look_heading = self._heading_from_quat(
+                                head.rot_w, head.rot_x, head.rot_y, head.rot_z
+                            )
+                            lines.append(f"[Look heading (from +Z clockwise): {look_heading:.0f}°]")
+                        pose_content = "\n".join(lines)
+                        print(f"[AgentLoop] Pose context: {pose_content}")
                         transient.append(
                             {
                                 "role": "system",
-                                "content": f"[Position (y-up): x={waist.pos_x:.2f}, y={waist.pos_y:.2f}, z={waist.pos_z:.2f}]\n"
-                                f"[Heading (from +Z clockwise): {heading:.0f}°]",
+                                "content": pose_content,
                             }
                         )
 
@@ -373,8 +386,8 @@ class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
                         self._input.append(
                             {
                                 "type": "function_call_output",
-                                "call_id": tc["call_id"],
-                                "output": result.text,
+                                "call_id": result.call_id,
+                                "output": result.content,
                             }
                         )
 
