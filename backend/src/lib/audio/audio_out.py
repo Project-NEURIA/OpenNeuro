@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from typing import Any
 
 import numpy as np
@@ -13,6 +15,8 @@ from src.lib.audio.devices import (
 from src.lib.audio.speaker import SpeakerInputs
 from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioDataFormat
+
+_USE_PAPLAY = sys.platform == "linux"
 
 
 class AudioOutConfig(BaseModel):
@@ -36,9 +40,45 @@ class AudioOut(ThreadedComponent[SpeakerInputs, tuple[()]]):
 
     @classmethod
     def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if _USE_PAPLAY:
+            from src.lib.audio.devices import list_pulse_sinks
+
+            return {"config": {"device": list_pulse_sinks()}}
         return {"config": {"device": list_audio_output_devices()}}
 
-    def run(self, inputs: SpeakerInputs, outputs: tuple[()]) -> None:
+    def _run_paplay(self, inputs: SpeakerInputs) -> None:
+        device = self.config.device or None
+        cmd = [
+            "paplay",
+            "--raw",
+            "--format=s16le",
+            f"--rate={self._sample_rate}",
+            f"--channels={self._channels}",
+        ]
+        if device:
+            cmd.append(f"--device={device}")
+
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        try:
+            for frame in inputs.audio:
+                if frame is None:
+                    break
+                pcm_bytes = frame.get(
+                    sample_rate=self._sample_rate,
+                    num_channels=self._channels,
+                    data_format=AudioDataFormat.PCM16,
+                )
+                try:
+                    proc.stdin.write(pcm_bytes)  # type: ignore[union-attr]
+                except BrokenPipeError:
+                    break
+        finally:
+            if proc.stdin:
+                proc.stdin.close()
+            proc.terminate()
+            proc.wait()
+
+    def _run_sounddevice(self, inputs: SpeakerInputs) -> None:
         with sd.OutputStream(
             samplerate=self._sample_rate,
             channels=self._channels,
@@ -59,3 +99,9 @@ class AudioOut(ThreadedComponent[SpeakerInputs, tuple[()]]):
                 stream.write(
                     np.frombuffer(pcm_bytes, dtype=np.int16).reshape(-1, self._channels)
                 )
+
+    def run(self, inputs: SpeakerInputs, outputs: tuple[()]) -> None:
+        if _USE_PAPLAY:
+            self._run_paplay(inputs)
+        else:
+            self._run_sounddevice(inputs)

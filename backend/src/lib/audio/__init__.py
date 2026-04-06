@@ -8,6 +8,7 @@ from src.lib.audio.speaker import Speaker as Speaker
 from src.lib.audio.speaker_browser import SpeakerBrowser as SpeakerBrowser
 from src.lib.audio.vad import VAD as VAD
 from src.lib.audio.asr import ASR as ASR
+from src.lib.audio.deepgram_asr import DeepgramASR as DeepgramASR
 from src.lib.audio.tts import TTS as TTS
 from src.lib.audio.tts_fish import FishTTS as FishTTS
 from src.lib.audio.sts import STS as STS

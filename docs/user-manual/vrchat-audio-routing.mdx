@@ -106,6 +106,59 @@ Point both remote components at the game machine's bridge:
   - `channels`: `1`
   - `frame_ms`: `20`
 
+## Linux Local Setup
+
+On Linux (e.g. Linux Mint, Ubuntu), use PulseAudio/PipeWire virtual sinks
+instead of VB-Cable. AudioIn and AudioOut automatically use `parec`/`paplay`
+on Linux, which can see PulseAudio virtual devices that sounddevice cannot.
+
+### Create Virtual Cables
+
+```bash
+pactl load-module module-null-sink sink_name=cable_a sink_properties=device.description="Cable-A"
+pactl load-module module-null-sink sink_name=cable_b sink_properties=device.description="Cable-B"
+```
+
+These are temporary (lost on reboot). To make them persistent, add the commands
+to `~/.config/pulse/default.pa`.
+
+### Signal Flow
+
+```text
+AudioOut -> cable_a (sink) -> cable_a.monitor (source) -> VRChat microphone
+VRChat audio output -> cable_b (sink) -> cable_b.monitor (source) -> AudioIn
+```
+
+### Setup
+
+1. Route VRChat's output to `cable_b`: open `pavucontrol`, go to the
+   **Playback** tab, and change VRChat's output to **Cable-B**. Alternatively,
+   set `cable_b` as the system default sink before launching VRChat:
+   ```bash
+   pactl set-default-sink cable_b
+   ```
+
+2. Route VRChat's mic input to `cable_a.monitor`: open `pavucontrol`, go to
+   the **Recording** tab, and change VRChat's input source to
+   **Monitor of Cable-A**.
+
+3. In OpenNeuro, configure the components:
+   - `AudioIn`
+     - `device`: `cable_b.monitor`
+     - `sample_rate`: `48000`
+     - `channels`: `2`
+   - `AudioOut`
+     - `device`: `cable_a`
+     - `sample_rate`: `48000`
+     - `channels`: `1`
+
+### Optional: Hear Game Audio Locally
+
+If you still want to hear VRChat through your headset while routing to
+OpenNeuro, enable monitoring on `cable_b` in `pavucontrol`: go to the
+**Output Devices** tab, find **Cable-B**, click the lock icon, and enable
+**Monitor of Cable-B** routed to your real audio device.
+
 ## Recommended Graphs
 
 For voice-to-voice VRChat flows:

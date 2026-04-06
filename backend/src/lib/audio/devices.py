@@ -106,6 +106,42 @@ def list_audio_output_devices(
     return list_audio_devices("output", include_default=include_default)
 
 
+def _list_pulse_devices(kind: str) -> list[AudioDeviceOption]:
+    """List PulseAudio sources or sinks via pactl.
+
+    Args:
+        kind: 'sources' for input devices, 'sinks' for output devices.
+    """
+    import subprocess
+
+    options: list[AudioDeviceOption] = [{"value": "", "label": "System Default"}]
+    try:
+        result = subprocess.run(
+            ["pactl", "list", "short", kind],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for line in result.stdout.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                name = parts[1]
+                options.append({"value": name, "label": name})
+    except Exception:
+        pass
+    return options
+
+
+def list_pulse_sources() -> list[AudioDeviceOption]:
+    """List PulseAudio/PipeWire input sources (including virtual monitors)."""
+    return _list_pulse_devices("sources")
+
+
+def list_pulse_sinks() -> list[AudioDeviceOption]:
+    """List PulseAudio/PipeWire output sinks (including virtual sinks)."""
+    return _list_pulse_devices("sinks")
+
+
 def coerce_sounddevice_device(value: str | None) -> int | str | None:
     if value is None:
         return None
