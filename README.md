@@ -208,7 +208,9 @@ For full architectural details, see [project/docs/system_design.md](project/docs
 
 | Component | Description |
 |-----------|-------------|
+| **AudioIn** | Audio capture from a selectable input device (including virtual cables) |
 | **Mic** | Microphone audio capture via sounddevice |
+| **RemoteAudioIn** | Audio capture from a remote bridge server over WebSocket |
 | **Camera** | Webcam video capture with device enumeration |
 | **VideoPlayer** | Video file playback (looping) |
 | **TextInput** | Text input from the node UI |
@@ -295,7 +297,9 @@ For full architectural details, see [project/docs/system_design.md](project/docs
 
 | Component | Description |
 |-----------|-------------|
+| **AudioOut** | Audio playback to a selectable output device (including virtual cables) |
 | **Speaker** | Audio playback via sounddevice |
+| **RemoteAudioOut** | Audio playback to a remote bridge server over WebSocket |
 | **VideoStream** | JPEG video stream to node UI |
 | **TextDisplay** | Text display in node UI |
 | **OSCFace** | VRChat facial animation via OSC (with emotion detection) |
