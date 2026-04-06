@@ -52,6 +52,8 @@ class RelayBridge:
             await self._recv_loop(ws)
         except WebSocketDisconnect:
             pass
+        except Exception as exc:
+            print(f"[relay] Error in recv loop: {exc!r}")
         finally:
             self._connected.clear()
             self._ws = None
