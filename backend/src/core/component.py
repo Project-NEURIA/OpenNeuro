@@ -287,10 +287,39 @@ class PrimitiveComponent[
     def get_ui_output_types(self) -> dict[str, type]:
         return type(self)._class_ui_output_types()
 
+    _libraries_loaded = False
+
     @classmethod
     def registered_subclasses(cls) -> dict[str, type[PrimitiveComponent[Any, Any]]]:
         """Returns all concrete subclasses as {name: class}, walking from PrimitiveComponent."""
-        from src.lib import audio, vision, llm, motion, misc  # noqa: F401
+        if not cls._libraries_loaded:
+            import time
+
+            t0 = time.time()
+            print("[backend] Loading component libraries (may take a while)...")
+            from src.lib import audio  # noqa: F401
+
+            print(f"[backend]   audio loaded ({time.time() - t0:.1f}s)")
+            t1 = time.time()
+            from src.lib import vision  # noqa: F401
+
+            print(f"[backend]   vision loaded ({time.time() - t1:.1f}s)")
+            t1 = time.time()
+            from src.lib import llm  # noqa: F401
+
+            print(f"[backend]   llm loaded ({time.time() - t1:.1f}s)")
+            t1 = time.time()
+            from src.lib import motion  # noqa: F401
+
+            print(f"[backend]   motion loaded ({time.time() - t1:.1f}s)")
+            t1 = time.time()
+            from src.lib import misc  # noqa: F401
+
+            print(f"[backend]   misc loaded ({time.time() - t1:.1f}s)")
+            print(f"[backend] All component libraries loaded ({time.time() - t0:.1f}s)")
+            cls._libraries_loaded = True
+        else:
+            from src.lib import audio, vision, llm, motion, misc  # noqa: F401
 
         result: dict[str, type[PrimitiveComponent[Any, Any]]] = {}
 

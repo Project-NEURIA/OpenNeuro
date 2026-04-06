@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -49,8 +52,10 @@ async def lifespan(app: FastAPI):
     config = AppConfig.load_config()
     app.state.current_project = config.current_project
 
+    print("[backend] Registering components...")
     app.state.manager = GraphManager(Graph(edges=[], nodes={}))
     app.state.ui_bridge = UIChannelBridge()
+    print("[backend] Ready")
 
     yield
 

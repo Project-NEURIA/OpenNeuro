@@ -93,7 +93,12 @@ explicit = true
 
 [tool.uv]
 # DA3 lists open3d but never imports it; open3d lacks 3.13+ wheels
-override-dependencies = ["open3d ; python_version < '0'"]
+# Force headless opencv: depth-anything-3 and ultralytics pull in opencv-python
+# which conflicts with pygame-ce's bundled SDL on macOS
+override-dependencies = [
+    "open3d ; python_version < '0'",
+    "opencv-python ; python_version < '0'",
+]
 conflicts = [
     [{ group = "cuda12" }, { group = "cuda13" }, { group = "rocm" }],
 ]
