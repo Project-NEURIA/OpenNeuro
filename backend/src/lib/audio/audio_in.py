@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from typing import Any
 
 import sounddevice as sd
@@ -12,6 +14,8 @@ from src.lib.audio.devices import (
 from src.lib.audio.mic import MicOutputs
 from src.core.component import ThreadedComponent, Tag
 from src.core.frames import AudioFrame
+
+_USE_PAREC = sys.platform == "linux"
 
 
 class AudioInConfig(BaseModel):
@@ -37,9 +41,42 @@ class AudioIn(ThreadedComponent[tuple[()], MicOutputs]):
 
     @classmethod
     def get_options(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if _USE_PAREC:
+            from src.lib.audio.devices import list_pulse_sources
+
+            return {"config": {"device": list_pulse_sources()}}
         return {"config": {"device": list_audio_input_devices()}}
 
-    def run(self, inputs: tuple[()], outputs: MicOutputs) -> None:
+    def _run_parec(self, outputs: MicOutputs) -> None:
+        device = self.config.device or None
+        cmd = [
+            "parec",
+            "--format=s16le",
+            f"--rate={self._sample_rate}",
+            f"--channels={self._channels}",
+        ]
+        if device:
+            cmd.append(f"--device={device}")
+
+        frame_bytes = self._frame_samples * self._channels * 2
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        try:
+            while not self.stop_event.is_set():
+                data = proc.stdout.read(frame_bytes)  # type: ignore[union-attr]
+                if not data:
+                    break
+                outputs.audio.send(
+                    AudioFrame.new(
+                        data=data,
+                        sample_rate=self._sample_rate,
+                        channels=self._channels,
+                    )
+                )
+        finally:
+            proc.terminate()
+            proc.wait()
+
+    def _run_sounddevice(self, outputs: MicOutputs) -> None:
         with sd.InputStream(
             samplerate=self._sample_rate,
             channels=self._channels,
@@ -57,3 +94,9 @@ class AudioIn(ThreadedComponent[tuple[()], MicOutputs]):
                         channels=self._channels,
                     )
                 )
+
+    def run(self, inputs: tuple[()], outputs: MicOutputs) -> None:
+        if _USE_PAREC:
+            self._run_parec(outputs)
+        else:
+            self._run_sounddevice(outputs)
