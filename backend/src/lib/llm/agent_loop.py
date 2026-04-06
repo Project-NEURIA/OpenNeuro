@@ -28,8 +28,7 @@ class AgentLoopConfig(BaseModel):
     )
 
 
-class AgentLoopInputs[T](NamedTuple):
-    request: Receiver[T]
+class AgentLoopInputs(NamedTuple):
     initial_msgs: Receiver[list[MessageFrame]] | None = None
     speech: Receiver[TextFrame] | None = None
     feedback: Receiver[TextFrame] | None = None
@@ -46,7 +45,7 @@ class AgentLoopOutputs(NamedTuple):
     messages: Sender[list[MessageFrame]]
 
 
-class AgentLoop[T](ThreadedComponent[AgentLoopInputs[T], AgentLoopOutputs]):
+class AgentLoop(ThreadedComponent[AgentLoopInputs, AgentLoopOutputs]):
     """Manages conversation history, optionally enriched by memory and character card."""
 
     description = "Tracks and manages **agent conversation state**. Maintains message history enriched by optional *memory* and *character card* inputs, and outputs assembled `MessageFrame` lists for the LLM."
@@ -115,12 +114,8 @@ class AgentLoop[T](ThreadedComponent[AgentLoopInputs[T], AgentLoopOutputs]):
         # Buffer tool_calls until their matching tool_result arrives
         pending_tool_calls: dict[str, ToolCall] = {}
 
-        # Block on request, drain others on each trigger
-        for req in inputs.request:
-            if req is None:
-                break
-
-            # Check for pause signal — drain all queued requests and wait for next
+        while not self.stop_event.is_set():
+            # Check for pause signal
             if inputs.pause is not None:
                 p = next(inputs.pause, None)
                 if p is not None:
