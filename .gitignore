@@ -32,6 +32,7 @@ backend/pytest_temp_workspace/
 backend/pytest-cache-files-*/
 backend/.output/
 backend/cache/
+backend/uv.lock
 frontend/coverage/
 frontend/node_modules/.vite-temp/
 

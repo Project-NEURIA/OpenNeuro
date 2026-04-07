@@ -86,8 +86,10 @@ class LocalRelay:
                 )
             try:
                 await asyncio.gather(*tasks)
-            except websockets.exceptions.ConnectionClosed:
-                print("[relay] Connection closed")
+            except websockets.exceptions.ConnectionClosed as exc:
+                print(f"[relay] Connection closed: code={exc.code} reason={exc.reason}")
+            except Exception as exc:
+                print(f"[relay] Error: {exc!r}")
 
     # -- Receive from backend, forward to local apps --
 
